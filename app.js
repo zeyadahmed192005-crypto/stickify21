@@ -1,12 +1,28 @@
 /**
- * STICKIFY21 - Minimalist Sticker & Bookmark Studio
+ * STICKIFY 21 - Storefront Controller
+ * Minimalist Sticker & Bookmark Studio
  * WhatsApp: 01043546503 (201043546503)
- * Dynamic Sync with Admin Portal (admin.html)
  */
 
-const WHATSAPP_NUMBER = '201043546503';
+import { CONFIG } from './src/config/config.js';
+import { escapeHtml, sanitizeUrl, sanitizeSvg } from './src/utils/escape.js';
+import { getProductPriceForSize, calculatePackSummary, calculateCart, generateCartLineKey } from './src/domain/pricing.js';
 
-// Default Categories (Synchronized with admin.html)
+// Safe JSON parser with fallback and corrupted snapshot
+function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString);
+  } catch (err) {
+    console.error(`[STICKIFY 21] Error parsing JSON for key "${storageKey}":`, err);
+    try {
+      localStorage.setItem(`${storageKey}_corrupt_${Date.now()}`, jsonString);
+    } catch (saveErr) {}
+    return fallback;
+  }
+}
+
+// Default Categories
 const defaultCategories = [
   { id: 'bookmarks', nameAr: 'فواصل كتب', nameEn: 'Bookmarks', icon: '🔖', badge: 'جديد' },
   { id: 'tech', nameAr: 'برمجة وتِك', nameEn: 'Coding', icon: '💻' },
@@ -18,13 +34,7 @@ const defaultCategories = [
   { id: 'brand', nameAr: 'شعار البراند', nameEn: 'Brand', icon: '🍊', image: 'logo.jpg' }
 ];
 
-// Default Coupons
-const defaultCoupons = [
-  { code: 'STICKIFY10', discountPercent: 10 },
-  { code: 'STICKIFY21', discountPercent: 21 }
-];
-
-// Fallback initial products
+// Fallback initial products (clean, no unauthorized IP)
 const initialProducts = [
   {
     id: 'stk-logo',
@@ -59,8 +69,8 @@ const initialProducts = [
   {
     id: 'bm-2',
     sku: 'BM-02',
-    name: 'Om Kalthoum Vintage Bookmark',
-    nameAr: 'فاصل كتب: لسّة فاكر - أم كلثوم 🎙️',
+    name: 'Vintage Melodies Bookmark',
+    nameAr: 'فاصل كتب: نغم وروايات زمان 🎙️',
     category: 'bookmarks',
     subCategory: 'bookmarks-vintage',
     type: 'bookmark',
@@ -68,7 +78,7 @@ const initialProducts = [
     finish: 'matte',
     badge: 'طرب وروايات 🔖',
     desc: 'تصميم فينتدج راقي لكوكب الشرق، رفيق مثالي لجلسات القراءة مع فنجان الشاي.',
-    svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#FDFBF7" stroke="#0E0E10" stroke-width="3"/><circle cx="50" cy="24" r="4" fill="#0E0E10"/><ellipse cx="40" cy="65" rx="12" ry="8" fill="#0E0E10"/><ellipse cx="60" cy="65" rx="12" ry="8" fill="#0E0E10"/><line x1="48" y1="65" x2="52" y2="65" stroke="#0E0E10" stroke-width="2"/><line x1="20" y1="90" x2="80" y2="90" stroke="#FF5000" stroke-width="2"/><text x="50" y="115" font-family="'Readex Pro'" font-weight="700" font-size="11" fill="#0E0E10" text-anchor="middle">لسّة فاكر</text><text x="50" y="132" font-family="'Readex Pro'" font-weight="600" font-size="10" fill="#71717A" text-anchor="middle">كان زمان</text><text x="50" y="170" font-family="'Space Grotesk'" font-weight="800" font-size="10" fill="#FF5000" text-anchor="middle">S21 BOOKS</text></svg>`,
+    svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#FDFBF7" stroke="#0E0E10" stroke-width="3"/><circle cx="50" cy="24" r="4" fill="#0E0E10"/><ellipse cx="40" cy="65" rx="12" ry="8" fill="#0E0E10"/><ellipse cx="60" cy="65" rx="12" ry="8" fill="#0E0E10"/><line x1="48" y1="65" x2="52" y2="65" stroke="#0E0E10" stroke-width="2"/><line x1="20" y1="90" x2="80" y2="90" stroke="#FF5000" stroke-width="2"/><text x="50" y="115" font-family="'Readex Pro'" font-weight="700" font-size="11" fill="#0E0E10" text-anchor="middle">نغم أصيل</text><text x="50" y="132" font-family="'Readex Pro'" font-weight="600" font-size="10" fill="#71717A" text-anchor="middle">روقان زمان</text><text x="50" y="170" font-family="'Space Grotesk'" font-weight="800" font-size="10" fill="#FF5000" text-anchor="middle">S21 BOOKS</text></svg>`,
     dateAdded: 13
   },
   {
@@ -85,21 +95,6 @@ const initialProducts = [
     desc: 'ألوان ترابية هادئة وطباعة عالية الوضوح تدوم لسنوات بين صفحات كتبك المفضلة.',
     svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#0E0E10" stroke="#E4E4E7" stroke-width="2"/><circle cx="50" cy="25" r="4" fill="#FF5000"/><text x="50" y="65" font-size="24" text-anchor="middle">☕</text><text x="50" y="95" font-family="'Readex Pro'" font-weight="700" font-size="11" fill="#FFFFFF" text-anchor="middle">صفحة كمان</text><text x="50" y="112" font-family="'Readex Pro'" font-weight="600" font-size="10" fill="#FF5000" text-anchor="middle">وهنام خلاص!</text><rect x="25" y="130" width="50" height="4" rx="2" fill="#27272A"/><rect x="35" y="140" width="30" height="4" rx="2" fill="#27272A"/><text x="50" y="172" font-family="'Space Grotesk'" font-weight="700" font-size="9" fill="#71717A" text-anchor="middle">CHAPTER NEXT</text></svg>`,
     dateAdded: 12
-  },
-  {
-    id: 'bm-4',
-    sku: 'BM-04',
-    name: 'One Piece Luffy Strawhat Bookmark',
-    nameAr: 'فاصل كتب: ون بيس - قبعة القش 🍖',
-    category: 'bookmarks',
-    subCategory: 'bookmarks-anime',
-    type: 'bookmark',
-    price: 25,
-    finish: 'glossy',
-    badge: 'أنمي 🔖',
-    desc: 'فاصل كتب كارتون مقوى لشعار طاقم قبعة القش مع طبقة حماية ضد الخدش.',
-    svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#18181B" stroke="#FF5000" stroke-width="3"/><ellipse cx="50" cy="55" rx="30" ry="8" fill="#FFC107"/><circle cx="50" cy="80" r="16" fill="#FFFFFF"/><circle cx="45" cy="78" r="3" fill="#000000"/><circle cx="55" cy="78" r="3" fill="#000000"/><text x="50" y="125" font-family="'Space Grotesk'" font-weight="900" font-size="12" fill="#FF5000" text-anchor="middle">STRAW HAT</text><text x="50" y="145" font-family="'Readex Pro'" font-weight="700" font-size="10" fill="#FFFFFF" text-anchor="middle">ملك القراصنة</text><text x="50" y="175" font-family="'Space Grotesk'" font-weight="700" font-size="9" fill="#71717A" text-anchor="middle">ONE PIECE</text></svg>`,
-    dateAdded: 11
   },
   {
     id: 'stk-1',
@@ -192,21 +187,6 @@ const initialProducts = [
     dateAdded: 4
   },
   {
-    id: 'stk-6',
-    sku: 'ANM-01',
-    name: 'Luffy Strawhat Minimal',
-    nameAr: 'طاقم ون بيس - لوفي 🍖',
-    category: 'anime',
-    subCategory: 'one-piece',
-    type: 'sticker',
-    price: 35,
-    finish: 'glossy',
-    badge: 'أنمي',
-    desc: 'شعار طاقم قبعة القش بتصميم مينيمال عالي التباين.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><ellipse cx="80" cy="50" rx="52" ry="14" fill="#FFC107" stroke="#0E0E10" stroke-width="3"/><path d="M 54 50 Q 80 24 106 50 Z" fill="#FFC107" stroke="#0E0E10" stroke-width="3"/><path d="M 54 48 Q 80 38 106 48" stroke="#FF5000" stroke-width="6"/><circle cx="80" cy="88" r="28" fill="#FFFFFF" stroke="#0E0E10" stroke-width="4"/><circle cx="71" cy="86" r="6" fill="#0E0E10"/><circle cx="89" cy="86" r="6" fill="#0E0E10"/><path d="M 70 102 Q 80 110 90 102" stroke="#0E0E10" stroke-width="3" fill="none"/></svg>`,
-    dateAdded: 3
-  },
-  {
     id: 'stk-8',
     sku: 'GAM-01',
     name: 'Retro Game Controller',
@@ -238,30 +218,15 @@ const initialProducts = [
   }
 ];
 
-// Sticker Sizes System (6cm Small, 8cm Medium, 10cm Large)
-const STICKER_SIZES = [
-  { key: 'small', labelAr: '6 سم (Small)', cm: '6cm', badge: 'Small', scale: 0.75, offset: -10 },
-  { key: 'medium', labelAr: '8 سم (Medium)', cm: '8cm', badge: 'Medium', scale: 1.0, offset: 0 },
-  { key: 'large', labelAr: '10 سم (Large)', cm: '10cm', badge: 'Large', scale: 1.35, offset: 15 }
-];
-
-function getProductPriceForSize(product, sizeKey = 'medium') {
-  if (product.category === 'bookmarks' || product.type === 'bookmark') {
-    return product.price || 25;
-  }
-  const base = product.price || 35;
-  if (sizeKey === 'small') return Math.max(20, base - 10);
-  if (sizeKey === 'large') return base + 15;
-  return base;
-}
-
+// App State
 const state = {
   categories: [],
   products: [],
-  cart: JSON.parse(localStorage.getItem('stickify21_cart') || '[]'),
+  cart: safeJsonParse(localStorage.getItem('stickify21_cart'), [], 'stickify21_cart'),
   selectedSizes: {}, // { [productId]: 'small' | 'medium' | 'large' }
   selectedCategory: 'all',
   selectedSubCategory: 'all',
+  selectedGovernorate: 'القاهرة',
   sortBy: 'featured',
   searchQuery: '',
   activeFinish: 'all',
@@ -278,33 +243,32 @@ const state = {
   }
 };
 
+// Device definitions for Mockup Studio (Neutral shapes, NO trademark logos)
 const devices = {
   laptop: {
     id: 'laptop',
-    name: 'لابتوب (MacBook)',
-    aspectRatio: '16/10',
+    name: 'لابتوب (15" Laptop)',
     frameClass: 'mockup-laptop-realistic relative flex items-center justify-center p-6 min-h-[380px] w-full max-w-xl mx-auto overflow-hidden select-none',
     decorationsHtml: `
-      <!-- MacBook Display Notch & Hinge Lines -->
+      <!-- Display Notch & Hinge Lines -->
       <div class="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-2 bg-[#121315] rounded-b-lg pointer-events-none opacity-80"></div>
       <div class="absolute bottom-0 left-10 right-10 h-1.5 bg-[#121315] rounded-t-sm pointer-events-none opacity-80"></div>
-      <!-- Polished Chrome Apple Logo -->
-      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-25">
-        <svg class="w-16 h-16 drop-shadow-[0_1px_2px_rgba(255,255,255,0.2)]" viewBox="0 0 170 170" fill="#CBD5E1">
-          <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.04-7.6-7.77-11.7-14.19-5.76-8.91-10.37-18.81-13.84-29.7-3.48-10.89-5.21-21.36-5.21-31.41 0-14.35 3.69-26.24 11.07-35.68 7.38-9.44 16.58-14.28 27.6-14.53 4.58 0 9.87 1.25 15.87 3.75 6 2.5 10.15 3.81 12.44 3.93 2.18-.12 6.44-1.46 12.79-4.04 6.35-2.58 11.75-3.75 16.2-3.53 12.28.62 22.37 5.37 30.26 14.25-10.76 6.53-16.03 15.54-15.82 27.05.22 9.02 3.69 16.64 10.42 22.86 6.73 6.22 14.53 9.77 23.4 10.66-2.5 7.64-5.59 15.22-9.28 22.75zM119.22 33.04c0-7.19 2.61-13.92 7.83-20.19 5.22-6.27 11.59-10.39 19.11-12.35.76 7.4-1.74 14.33-7.5 20.79-5.76 6.46-12.24 10.59-19.44 11.75z"/>
-        </svg>
+      <!-- Neutral Brand Medallion -->
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-15">
+        <div class="w-16 h-16 rounded-full border-2 border-slate-300 flex items-center justify-center">
+          <span class="font-mono text-xs font-black text-slate-300">S21</span>
+        </div>
       </div>
-      <!-- Subtle Space Gray Metal Specular Sheen -->
+      <!-- Space Gray Specular Sheen -->
       <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none"></div>
     `
   },
   phone: {
     id: 'phone',
-    name: 'موبايل (iPhone)',
-    aspectRatio: '9/19',
+    name: 'موبايل (Smart Phone)',
     frameClass: 'mockup-phone-realistic relative flex items-center justify-center p-6 min-h-[420px] max-w-[240px] mx-auto overflow-hidden select-none',
     decorationsHtml: `
-      <!-- iPhone 15/16 Pro Triple Camera Island Plateau -->
+      <!-- Camera Island Plateau -->
       <div class="absolute top-4 left-4 w-24 h-24 rounded-3xl bg-[#202226] border border-[#3A3D44] shadow-lg p-2.5 pointer-events-none flex flex-col justify-between">
         <div class="flex justify-between items-center">
           <div class="w-8 h-8 rounded-full bg-[#08080A] border-2 border-[#525661] flex items-center justify-center shadow-inner">
@@ -324,55 +288,44 @@ const devices = {
           </div>
         </div>
       </div>
-      <!-- Apple Logo -->
+      <!-- Neutral Phone Center Dot -->
       <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none opacity-20">
-        <svg class="w-12 h-12" viewBox="0 0 170 170" fill="#E2E8F0">
-          <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.04-7.6-7.77-11.7-14.19-5.76-8.91-10.37-18.81-13.84-29.7-3.48-10.89-5.21-21.36-5.21-31.41 0-14.35 3.69-26.24 11.07-35.68 7.38-9.44 16.58-14.28 27.6-14.53 4.58 0 9.87 1.25 15.87 3.75 6 2.5 10.15 3.81 12.44 3.93 2.18-.12 6.44-1.46 12.79-4.04 6.35-2.58 11.75-3.75 16.2-3.53 12.28.62 22.37 5.37 30.26 14.25-10.76 6.53-16.03 15.54-15.82 27.05.22 9.02 3.69 16.64 10.42 22.86 6.73 6.22 14.53 9.77 23.4 10.66-2.5 7.64-5.59 15.22-9.28 22.75zM119.22 33.04c0-7.19 2.61-13.92 7.83-20.19 5.22-6.27 11.59-10.39 19.11-12.35.76 7.4-1.74 14.33-7.5 20.79-5.76 6.46-12.24 10.59-19.44 11.75z"/>
-        </svg>
+        <div class="w-8 h-8 rounded-full border border-slate-400"></div>
       </div>
     `
   },
   bottle: {
     id: 'bottle',
     name: 'زجاجة ماء (Tumbler)',
-    aspectRatio: '1/2.5',
     frameClass: 'mockup-bottle-realistic relative flex items-center justify-center p-6 min-h-[420px] max-w-[210px] mx-auto overflow-hidden select-none',
     decorationsHtml: `
-      <!-- Tumbler Stainless Cap & Loop Handle -->
+      <!-- Tumbler Cap & Loop Handle -->
       <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-28 h-9 rounded-t-2xl bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-700 border-t-2 border-zinc-200 shadow-md pointer-events-none flex items-center justify-center">
         <div class="w-14 h-3 rounded-full border-2 border-zinc-800 bg-zinc-900 shadow-inner"></div>
       </div>
       <div class="absolute top-3 left-0 right-0 h-1 bg-zinc-600/50 pointer-events-none"></div>
-      <!-- Cylindrical Center Reflection Highlight -->
       <div class="absolute inset-y-0 left-1/2 -translate-x-1/2 w-12 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none"></div>
-      <!-- Bottom Boot Rim -->
       <div class="absolute bottom-0 left-0 right-0 h-6 bg-zinc-950/70 border-t border-zinc-700/50 pointer-events-none"></div>
     `
   },
   book: {
     id: 'book',
     name: 'كتاب / رواية (Book)',
-    aspectRatio: '4/5',
     frameClass: 'mockup-book-realistic relative flex items-center justify-center p-6 min-h-[400px] max-w-[290px] mx-auto select-none',
     decorationsHtml: `
-      <!-- Hardcover Gilded Borders & Silk Ribbon -->
       <div class="absolute inset-4 rounded-lg border border-[#D4AF37]/35 pointer-events-none flex flex-col justify-between p-4">
         <div class="text-center font-mono text-[9px] tracking-widest text-[#D4AF37]/60">STICKIFY 21 LIMITED EDITION</div>
-        <div class="text-center font-mono text-[9px] text-[#D4AF37]/40 tracking-wider">★ NOVEL & LITERATURE ★</div>
+        <div class="text-center font-mono text-[9px] text-[#D4AF37]/40 tracking-wider">★ NOVEL &amp; LITERATURE ★</div>
       </div>
-      <!-- Silk Ribbon Bookmark hanging from top -->
       <div class="absolute -top-3 right-10 w-3.5 h-14 bg-[#FF5000] rounded-b-md shadow-md pointer-events-none transform -rotate-2"></div>
-      <!-- Stacked Pages Edge Texture on Right -->
       <div class="absolute top-2 bottom-2 -right-2.5 w-2.5 bg-gradient-to-b from-[#F3EEEA] via-[#E8E2DC] to-[#DDD6CE] rounded-r-sm shadow-md border-r border-[#C9C0B7] pointer-events-none"></div>
     `
   },
   notebook: {
     id: 'notebook',
     name: 'كشكول ملاحظات',
-    aspectRatio: '3/4',
     frameClass: 'mockup-notebook-realistic relative flex items-center justify-center p-6 min-h-[380px] max-w-[280px] mx-auto select-none',
     decorationsHtml: `
-      <!-- Metallic Twin Wire Spiral Binding on Spine -->
       <div class="absolute -left-3 top-4 bottom-4 w-4 flex flex-col justify-between pointer-events-none z-20">
         <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
         <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
@@ -380,40 +333,36 @@ const devices = {
         <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
         <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
         <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
       </div>
-      <!-- Elastic Closure Strap on Right -->
       <div class="absolute top-0 bottom-0 right-6 w-3 bg-[#18181B] rounded shadow pointer-events-none opacity-80"></div>
     `
   }
 };
 
-function initApp() {
-  // Sync categories with Admin localStorage
-  const storedCats = localStorage.getItem('stickify21_categories');
-  if (storedCats) {
-    try {
-      state.categories = JSON.parse(storedCats);
-    } catch(e) {
-      state.categories = [...defaultCategories];
-    }
+// ==========================================
+// INITIALIZATION
+// ==========================================
+export function initApp() {
+  // Sync categories
+  const storedCats = safeJsonParse(localStorage.getItem('stickify21_categories'), null, 'stickify21_categories');
+  if (storedCats && Array.isArray(storedCats) && storedCats.length > 0) {
+    state.categories = storedCats;
   } else {
     state.categories = [...defaultCategories];
-    localStorage.setItem('stickify21_categories', JSON.stringify(state.categories));
+    try {
+      localStorage.setItem('stickify21_categories', JSON.stringify(state.categories));
+    } catch(e) {}
   }
 
-  // Sync products with Admin localStorage
-  const storedProds = localStorage.getItem('stickify21_products');
-  if (storedProds) {
-    try {
-      state.products = JSON.parse(storedProds);
-    } catch(e) {
-      state.products = [...initialProducts];
-    }
+  // Sync products
+  const storedProds = safeJsonParse(localStorage.getItem('stickify21_products'), null, 'stickify21_products');
+  if (storedProds && Array.isArray(storedProds) && storedProds.length > 0) {
+    state.products = storedProds;
   } else {
     state.products = [...initialProducts];
-    localStorage.setItem('stickify21_products', JSON.stringify(state.products));
+    try {
+      localStorage.setItem('stickify21_products', JSON.stringify(state.products));
+    } catch(e) {}
   }
 
   renderCategories();
@@ -424,80 +373,102 @@ function initApp() {
   setupEventListeners();
   updateCartBadge();
 
-  // Instant sync with admin actions from other tabs or windows
+  // Cross-tab sync
   window.addEventListener('storage', (e) => {
     if (e.key === 'stickify21_categories') {
-      try {
-        state.categories = JSON.parse(e.newValue || '[]');
-        renderCategories();
-        renderProducts();
-      } catch(err) {}
+      state.categories = safeJsonParse(e.newValue, defaultCategories, 'stickify21_categories');
+      renderCategories();
+      renderProducts();
     } else if (e.key === 'stickify21_products') {
-      try {
-        state.products = JSON.parse(e.newValue || '[]');
-        renderProducts();
-      } catch(err) {}
+      state.products = safeJsonParse(e.newValue, initialProducts, 'stickify21_products');
+      renderProducts();
+    } else if (e.key === 'stickify21_cart') {
+      state.cart = safeJsonParse(e.newValue, [], 'stickify21_cart');
+      renderCart();
+      updateCartBadge();
     }
   });
 }
 
+// ==========================================
+// CATALOG & PRODUCTS
+// ==========================================
 function getFilteredAndSortedProducts() {
+  const q = state.searchQuery.toLowerCase();
   let list = state.products.filter(p => {
     const matchCat = state.selectedCategory === 'all' || p.category === state.selectedCategory;
     const matchSubCat = state.selectedSubCategory === 'all' || p.subCategory === state.selectedSubCategory;
     const matchFinish = state.activeFinish === 'all' || p.finish === state.activeFinish;
-    const matchSearch = p.name.toLowerCase().includes(state.searchQuery.toLowerCase()) || 
-                        p.nameAr.includes(state.searchQuery) ||
-                        p.desc.includes(state.searchQuery) ||
-                        (p.sku && p.sku.toLowerCase().includes(state.searchQuery.toLowerCase()));
+    const matchSearch = !q ||
+      (p.name && p.name.toLowerCase().includes(q)) || 
+      (p.nameAr && p.nameAr.includes(q)) ||
+      (p.sku && p.sku.toLowerCase().includes(q)) ||
+      (p.desc && p.desc.includes(q));
+
     return matchCat && matchSubCat && matchFinish && matchSearch;
   });
 
   if (state.sortBy === 'price-low') {
-    list.sort((a, b) => a.price - b.price);
+    list.sort((a, b) => (a.price || 0) - (b.price || 0));
   } else if (state.sortBy === 'price-high') {
-    list.sort((a, b) => b.price - a.price);
+    list.sort((a, b) => (b.price || 0) - (a.price || 0));
   } else if (state.sortBy === 'newest') {
-    list.sort((a, b) => b.dateAdded - a.dateAdded);
+    list.sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
   }
 
   return list;
 }
 
-function renderProducts() {
+export function renderProducts() {
   const container = document.getElementById('products-grid');
-  const countLabel = document.getElementById('products-count');
+  const countBadge = document.getElementById('products-count');
   if (!container) return;
 
-  const filtered = getFilteredAndSortedProducts();
-  if (countLabel) {
-    countLabel.innerText = `${filtered.length} منتج`;
+  const products = getFilteredAndSortedProducts();
+  if (countBadge) {
+    countBadge.innerText = `${products.length} منتج`;
   }
 
-  if (filtered.length === 0) {
+  if (products.length === 0) {
     container.innerHTML = `
-      <div class="col-span-full py-16 text-center">
-        <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-zinc-100 flex items-center justify-center text-2xl text-zinc-400">🔍</div>
-        <h3 class="text-base font-bold text-zinc-900">مفيش عناصر مطابقة للقسم المحدد</h3>
-        <p class="text-zinc-500 text-xs mt-1">جرب اختيار قسم آخر أو مسح الفلاتر</p>
-        <button onclick="resetFilters()" class="mt-4 px-4 py-2 rounded-full bg-zinc-900 text-white font-medium text-xs hover:bg-black transition">
-          عرض كل المنتجات
+      <div class="col-span-full py-16 text-center text-zinc-400 bg-white rounded-3xl border border-zinc-200">
+        <div class="text-3xl mb-2">🔍</div>
+        <h3 class="text-sm font-bold text-zinc-700">لا توجد منتجات مطابقة للبحث أو الفلتر</h3>
+        <p class="text-xs text-zinc-400 mt-1">جرب تغيير القسم أو مسح كلمة البحث</p>
+        <button onclick="resetFilters()" class="mt-4 px-4 py-2 rounded-full bg-zinc-900 text-white font-bold text-xs hover:bg-[#FF5000] transition">
+          عرض جميع المنتجات
         </button>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = filtered.map(product => {
-    const isHolo = product.finish === 'holographic';
+  container.innerHTML = products.map(product => {
     const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
-    const hasImage = !!product.image;
-    const currentSizeKey = state.selectedSizes[product.id] || 'medium';
+    const isHolo = product.finish === 'holographic';
+    const hasImage = Boolean(product.image);
+    const safeImage = sanitizeUrl(product.image);
+    const safeSvg = sanitizeSvg(product.svg);
+
+    const currentSizeKey = state.selectedSizes[product.id] || (isBookmark ? 'standard' : 'medium');
     const currentPrice = getProductPriceForSize(product, currentSizeKey);
     const smallPrice = getProductPriceForSize(product, 'small');
     const medPrice = getProductPriceForSize(product, 'medium');
     const largePrice = getProductPriceForSize(product, 'large');
-    const currentSizeLabel = isBookmark ? 'فاصل كتب 15 × 5 سم' : (currentSizeKey === 'small' ? '6 سم (Small)' : (currentSizeKey === 'large' ? '10 سم (Large)' : '8 سم (Medium)'));
+
+    // Valid standard Tailwind size stage classes (fixes Bug 01: w-34 h-34 replaced with w-36 h-36)
+    let stageClass = 'w-28 h-28';
+    if (isBookmark) {
+      stageClass = 'w-24 h-36';
+    } else if (currentSizeKey === 'small') {
+      stageClass = 'w-24 h-24';
+    } else if (currentSizeKey === 'large') {
+      stageClass = 'w-36 h-36';
+    }
+
+    const currentSizeLabel = isBookmark 
+      ? 'فاصل كتب 15 × 5 سم' 
+      : (currentSizeKey === 'small' ? '6 سم (Small)' : (currentSizeKey === 'large' ? '10 سم (Large)' : '8 سم (Medium)'));
 
     return `
       <div class="sticker-card group relative rounded-2xl bg-white border border-zinc-200/90 hover:border-zinc-900 p-5 transition-all duration-200 flex flex-col justify-between hover:shadow-sm">
@@ -505,72 +476,75 @@ function renderProducts() {
         <!-- Header Tags: Badge + SKU -->
         <div class="flex items-center justify-between mb-4">
           <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isBookmark ? 'bg-amber-50 text-amber-800 border border-amber-200' : (isHolo ? 'bg-[#FF5000]/10 text-[#FF5000] border border-[#FF5000]/30' : 'bg-zinc-100 text-zinc-700')}">
-            ${product.badge}
+            ${escapeHtml(product.badge)}
           </span>
           <div class="flex items-center gap-1.5 font-mono">
-            <span class="text-[10px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-bold border border-zinc-200">#${product.sku}</span>
+            <span class="text-[10px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-bold border border-zinc-200">#${escapeHtml(product.sku)}</span>
           </div>
         </div>
 
         <!-- Graphic Stage -->
         <div class="relative w-full aspect-square p-6 flex items-center justify-center rounded-xl bg-zinc-50 border border-zinc-100 mb-4 overflow-hidden ${isHolo ? 'hologram-effect' : ''}">
-          <div id="graphic-wrapper-${product.id}" class="${isBookmark ? 'w-24 h-36' : (currentSizeKey === 'small' ? 'w-24 h-24' : (currentSizeKey === 'large' ? 'w-34 h-34' : 'w-28 h-28'))} sticker-diecut-minimal flex items-center justify-center transition-all duration-200">
-            ${hasImage ? `<img src="${product.image}" alt="${product.name}" class="w-full h-full object-contain">` : product.svg}
+          <div id="graphic-wrapper-${escapeHtml(product.id)}" class="${stageClass} sticker-diecut-minimal flex items-center justify-center transition-all duration-200">
+            ${hasImage && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(product.nameAr)}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
           </div>
 
-          <button onclick="addStickerToMockup('${product.id}')" title="جرب على جهازك" class="absolute bottom-2.5 left-2.5 px-3 py-1.5 rounded-lg bg-white/95 text-zinc-900 border border-zinc-200 hover:border-black hover:bg-black hover:text-white transition shadow-sm opacity-0 group-hover:opacity-100 flex items-center gap-1.5 text-xs font-semibold">
+          <!-- Preview Button: touch-preview-visible fixes Bug 05 (visible on touch devices) -->
+          <button onclick="addStickerToMockup('${escapeHtml(product.id)}')" title="جرب على جهازك" class="touch-preview-visible absolute bottom-2.5 left-2.5 px-3 py-1.5 rounded-lg bg-white/95 text-zinc-900 border border-zinc-200 hover:border-black hover:bg-black hover:text-white transition shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1.5 text-xs font-semibold">
             <span>معاينة</span>
             <span>↗</span>
           </button>
         </div>
 
-        <!-- Info & Dynamic Price Display -->
+        <!-- Info & Price -->
         <div class="mb-3">
           <div class="flex items-baseline justify-between gap-2 mb-1.5">
-            <h3 class="font-bold text-sm text-zinc-900 group-hover:text-[#FF5000] transition">${product.nameAr}</h3>
+            <h3 class="font-bold text-sm text-zinc-900 group-hover:text-[#FF5000] transition">${escapeHtml(product.nameAr)}</h3>
             <div class="text-left font-mono">
-              <span id="card-price-${product.id}" class="font-extrabold text-zinc-900 text-base whitespace-nowrap">${currentPrice}</span>
-              <span class="text-[10px] font-medium text-zinc-500">ج.م</span>
+              <span id="card-price-${escapeHtml(product.id)}" class="font-extrabold text-zinc-900 text-base whitespace-nowrap">${currentPrice}</span>
+              <span class="text-[10px] font-medium text-zinc-500">${CONFIG.CURRENCY}</span>
             </div>
           </div>
-          <p class="text-xs text-zinc-500 leading-relaxed line-clamp-2">${product.desc}</p>
+          <p class="text-xs text-zinc-500 leading-relaxed line-clamp-2">${escapeHtml(product.desc)}</p>
         </div>
 
-        <!-- Size Selector Pill (Interactive 6cm, 8cm, 10cm) -->
+        <!-- Size Selector Pill (Stickers only) -->
         ${!isBookmark ? `
           <div class="mb-4 bg-zinc-50 border border-zinc-200/80 p-2 rounded-xl">
             <div class="flex items-center justify-between text-[11px] mb-1.5 font-semibold text-zinc-600">
               <span>اختر المقاس:</span>
-              <span id="selected-size-label-${product.id}" class="text-zinc-900 font-bold">${currentSizeLabel}</span>
+              <span id="selected-size-label-${escapeHtml(product.id)}" class="text-zinc-900 font-bold">${escapeHtml(currentSizeLabel)}</span>
             </div>
             <div class="grid grid-cols-3 gap-1 bg-zinc-200/60 p-1 rounded-lg text-xs font-bold text-center">
-              <button type="button" onclick="selectCardSize('${product.id}', 'small', event)" id="size-btn-${product.id}-small" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'small' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
-                6 سم <span class="text-[9px] block font-mono font-normal">(${smallPrice} ج.م)</span>
+              <button type="button" onclick="selectCardSize('${escapeHtml(product.id)}', 'small', event)" id="size-btn-${escapeHtml(product.id)}-small" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'small' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
+                6 سم <span class="text-[9px] block font-mono font-normal">(${smallPrice} ${CONFIG.CURRENCY})</span>
               </button>
-              <button type="button" onclick="selectCardSize('${product.id}', 'medium', event)" id="size-btn-${product.id}-medium" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'medium' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
-                8 سم <span class="text-[9px] block font-mono font-normal">(${medPrice} ج.م)</span>
+              <button type="button" onclick="selectCardSize('${escapeHtml(product.id)}', 'medium', event)" id="size-btn-${escapeHtml(product.id)}-medium" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'medium' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
+                8 سم <span class="text-[9px] block font-mono font-normal">(${medPrice} ${CONFIG.CURRENCY})</span>
               </button>
-              <button type="button" onclick="selectCardSize('${product.id}', 'large', event)" id="size-btn-${product.id}-large" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'large' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
-                10 سم <span class="text-[9px] block font-mono font-normal">(${largePrice} ج.م)</span>
+              <button type="button" onclick="selectCardSize('${escapeHtml(product.id)}', 'large', event)" id="size-btn-${escapeHtml(product.id)}-large" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'large' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
+                10 سم <span class="text-[9px] block font-mono font-normal">(${largePrice} ${CONFIG.CURRENCY})</span>
               </button>
             </div>
           </div>
         ` : `
           <div class="mb-4 bg-amber-50/70 border border-amber-200/60 p-2 rounded-xl text-center">
-            <span class="text-[11px] font-bold text-amber-900">🔖 مقاس قياسي فاخر: 15 × 5 سم (كرتون 350gsm)</span>
+            <span class="text-[11px] font-bold text-amber-900">🔖 مقاس قياسي فاخر: ${CONFIG.BOOKMARK_SPECS.dimensions} (${CONFIG.BOOKMARK_SPECS.material})</span>
           </div>
         `}
 
-        <!-- Action Buttons -->
-        <div class="grid grid-cols-2 gap-2 mt-auto pt-2 border-t border-zinc-100">
-          <button onclick="addToCart('${product.id}')" class="w-full py-2.5 px-3 rounded-xl bg-zinc-900 hover:bg-[#FF5000] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm">
+        <!-- Actions: Fixes Bug 04 (hide "للباقة" for bookmarks) -->
+        <div class="grid ${!isBookmark ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-auto pt-2 border-t border-zinc-100">
+          <button onclick="addToCart('${escapeHtml(product.id)}')" class="w-full py-2.5 px-3 rounded-xl bg-zinc-900 hover:bg-[#FF5000] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm">
             <span>أضف للسلة</span>
             <span>+</span>
           </button>
-          <button onclick="addToPack('${product.id}')" class="w-full py-2.5 px-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs flex items-center justify-center gap-1 transition">
-            <span>للباقة</span>
-            <span>📦</span>
-          </button>
+          ${!isBookmark ? `
+            <button onclick="addToPack('${escapeHtml(product.id)}')" class="w-full py-2.5 px-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs flex items-center justify-center gap-1 transition">
+              <span>للباقة</span>
+              <span>📦</span>
+            </button>
+          ` : ''}
         </div>
 
       </div>
@@ -578,7 +552,7 @@ function renderProducts() {
   }).join('');
 }
 
-function selectCardSize(productId, sizeKey, e) {
+export function selectCardSize(productId, sizeKey, e) {
   if (e) e.stopPropagation();
   state.selectedSizes[productId] = sizeKey;
 
@@ -586,7 +560,7 @@ function selectCardSize(productId, sizeKey, e) {
   if (!product) return;
 
   const price = getProductPriceForSize(product, sizeKey);
-  const sizeObj = STICKER_SIZES.find(s => s.key === sizeKey) || STICKER_SIZES[1];
+  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey) || CONFIG.STICKER_SIZES[1];
 
   const priceElem = document.getElementById(`card-price-${productId}`);
   if (priceElem) priceElem.innerText = price;
@@ -604,41 +578,46 @@ function selectCardSize(productId, sizeKey, e) {
 
   const graphicElem = document.getElementById(`graphic-wrapper-${productId}`);
   if (graphicElem) {
-    if (sizeKey === 'small') graphicElem.className = 'w-24 h-24 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
-    else if (sizeKey === 'large') graphicElem.className = 'w-34 h-34 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
-    else graphicElem.className = 'w-28 h-28 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
+    // Valid standard Tailwind classes (fixes Bug 01)
+    if (sizeKey === 'small') {
+      graphicElem.className = 'w-24 h-24 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
+    } else if (sizeKey === 'large') {
+      graphicElem.className = 'w-36 h-36 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
+    } else {
+      graphicElem.className = 'w-28 h-28 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
+    }
   }
 }
 
-function renderCategories() {
+export function renderCategories() {
   const gridContainer = document.getElementById('categories-cards-grid');
   const pillsContainer = document.getElementById('category-pills-container');
 
-  // 1. Render Visual Category Cards (Sticka Egypt style with image/emoji support)
   if (gridContainer) {
     gridContainer.innerHTML = state.categories.map(cat => {
       const isActive = state.selectedCategory === cat.id;
+      const safeImage = sanitizeUrl(cat.image);
+
       return `
-        <div onclick="selectCategoryByCard('${cat.id}')" class="category-card p-4 flex flex-col items-center justify-between text-center group border transition-all duration-200 cursor-pointer ${isActive ? 'border-zinc-900 ring-2 ring-[#FF5000] bg-orange-50/40 shadow-sm' : 'border-zinc-200 bg-white hover:border-zinc-900'}">
+        <div onclick="selectCategoryByCard('${escapeHtml(cat.id)}')" class="category-card p-4 flex flex-col items-center justify-between text-center group border transition-all duration-200 cursor-pointer ${isActive ? 'border-zinc-900 ring-2 ring-[#FF5000] bg-orange-50/40 shadow-sm' : 'border-zinc-200 bg-white hover:border-zinc-900'}">
           <div class="w-full flex justify-between items-start mb-2 min-h-[18px]">
-            ${cat.badge ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FF5000]/10 text-[#FF5000]">${cat.badge}</span>` : '<span></span>'}
-            <span class="text-[9px] text-zinc-300 font-mono">#${cat.id}</span>
+            ${cat.badge ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FF5000]/10 text-[#FF5000]">${escapeHtml(cat.badge)}</span>` : '<span></span>'}
+            <span class="text-[9px] text-zinc-300 font-mono">#${escapeHtml(cat.id)}</span>
           </div>
 
           <div class="w-16 h-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center overflow-hidden cat-thumb-img mb-3 p-1.5 shadow-inner">
-            ${cat.image ? `<img src="${cat.image}" alt="${cat.nameAr}" class="w-full h-full object-contain">` : `<span class="text-3xl">${cat.icon || '🏷️'}</span>`}
+            ${safeImage ? `<img src="${safeImage}" alt="${escapeHtml(cat.nameAr)}" class="w-full h-full object-contain">` : `<span class="text-3xl">${escapeHtml(cat.icon || '🏷️')}</span>`}
           </div>
 
           <div>
-            <h3 class="text-xs sm:text-sm font-bold text-zinc-900 group-hover:text-[#FF5000] transition">${cat.nameAr}</h3>
-            <span class="text-[10px] text-zinc-400 font-mono block mt-0.5">${cat.nameEn || ''}</span>
+            <h3 class="text-xs sm:text-sm font-bold text-zinc-900 group-hover:text-[#FF5000] transition">${escapeHtml(cat.nameAr)}</h3>
+            <span class="text-[10px] text-zinc-400 font-mono block mt-0.5">${escapeHtml(cat.nameEn || '')}</span>
           </div>
         </div>
       `;
     }).join('');
   }
 
-  // 2. Render Category Filter Pills above catalog
   if (pillsContainer) {
     const isAll = state.selectedCategory === 'all';
     let pillsHtml = `
@@ -649,10 +628,11 @@ function renderCategories() {
 
     pillsHtml += state.categories.map(cat => {
       const isActive = state.selectedCategory === cat.id;
+      const safeImage = sanitizeUrl(cat.image);
       return `
-        <button onclick="selectCategoryByCard('${cat.id}')" data-category="${cat.id}" class="cat-filter-btn px-4 py-2 rounded-full whitespace-nowrap transition text-xs font-semibold flex items-center gap-1.5 ${isActive ? 'bg-zinc-900 text-white shadow-sm' : 'bg-zinc-100 text-zinc-600 hover:text-black hover:bg-zinc-200'}">
-          ${cat.image ? `<img src="${cat.image}" class="w-4 h-4 object-contain rounded" alt="">` : `<span>${cat.icon || '🏷️'}</span>`}
-          <span>${cat.nameAr}</span>
+        <button onclick="selectCategoryByCard('${escapeHtml(cat.id)}')" data-category="${escapeHtml(cat.id)}" class="cat-filter-btn px-4 py-2 rounded-full whitespace-nowrap transition text-xs font-semibold flex items-center gap-1.5 ${isActive ? 'bg-zinc-900 text-white shadow-sm' : 'bg-zinc-100 text-zinc-600 hover:text-black hover:bg-zinc-200'}">
+          ${safeImage ? `<img src="${safeImage}" class="w-4 h-4 object-contain rounded" alt="">` : `<span>${escapeHtml(cat.icon || '🏷️')}</span>`}
+          <span>${escapeHtml(cat.nameAr)}</span>
         </button>
       `;
     }).join('');
@@ -661,7 +641,7 @@ function renderCategories() {
   }
 }
 
-function selectCategoryByCard(catId) {
+export function selectCategoryByCard(catId) {
   state.selectedCategory = catId;
   state.selectedSubCategory = 'all';
   renderCategories();
@@ -673,12 +653,13 @@ function selectCategoryByCard(catId) {
   }
 }
 
-function resetFilters() {
+export function resetFilters() {
   state.selectedCategory = 'all';
   state.selectedSubCategory = 'all';
   state.activeFinish = 'all';
   state.searchQuery = '';
   state.sortBy = 'featured';
+
   const searchInput = document.getElementById('search-input');
   if (searchInput) searchInput.value = '';
   const sortSelect = document.getElementById('sort-select');
@@ -694,33 +675,36 @@ function resetFilters() {
   renderProducts();
 }
 
-function addToCart(productId, customSizeKey = null) {
+// ==========================================
+// CART SYSTEM
+// ==========================================
+export function addToCart(productId, customSizeKey = null) {
   const product = state.products.find(p => p.id === productId);
   if (!product) return;
 
   const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
   const selectedKey = customSizeKey || (isBookmark ? 'standard' : (state.selectedSizes[productId] || 'medium'));
-  const sizeObj = STICKER_SIZES.find(s => s.key === selectedKey);
-  const sizeLabel = isBookmark ? 'فاصل كتب (15 × 5 سم)' : (sizeObj ? sizeObj.labelAr : '8 سم (Medium)');
+  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === selectedKey);
+  const sizeLabel = isBookmark ? CONFIG.BOOKMARK_SPECS.dimensions : (sizeObj ? sizeObj.labelAr : '8 سم (Medium)');
   const itemPrice = getProductPriceForSize(product, selectedKey);
 
-  const cartItemId = `${product.id}-${selectedKey}`;
-  const existingIndex = state.cart.findIndex(item => item.id === cartItemId || (item.productId === product.id && item.size === sizeLabel));
-  
+  const cartItemId = generateCartLineKey({ productId: product.id, sizeKey: selectedKey });
+  const existingIndex = state.cart.findIndex(item => item.id === cartItemId);
+
   if (existingIndex > -1) {
     state.cart[existingIndex].quantity += 1;
   } else {
     state.cart.push({
       id: cartItemId,
+      type: isBookmark ? 'bookmark' : 'sticker',
       productId: product.id,
-      sku: product.sku || 'S21-XX',
+      sku: product.sku || 'S21',
       nameAr: product.nameAr,
       name: product.name,
       price: itemPrice,
       size: sizeLabel,
       sizeKey: selectedKey,
       finish: product.finish,
-      type: isBookmark ? 'bookmark' : 'sticker',
       image: product.image,
       svg: product.svg,
       quantity: 1
@@ -730,10 +714,11 @@ function addToCart(productId, customSizeKey = null) {
   saveCart();
   renderCart();
   updateCartBadge();
-  showToast(`تمت إضافة [${product.sku}] مقاس ${sizeLabel} بسعر ${itemPrice} ج.م للسلة 🛍️`);
+  showToast(`تمت إضافة [${escapeHtml(product.sku)}] مقاس ${escapeHtml(sizeLabel)} بسعر ${itemPrice} ${CONFIG.CURRENCY} للسلة 🛍️`);
 }
 
-function updateCartQuantity(index, delta) {
+export function updateCartQuantity(index, delta) {
+  if (!state.cart[index]) return;
   state.cart[index].quantity += delta;
   if (state.cart[index].quantity <= 0) {
     state.cart.splice(index, 1);
@@ -743,22 +728,26 @@ function updateCartQuantity(index, delta) {
   updateCartBadge();
 }
 
-function removeCartItem(index) {
+export function removeCartItem(index) {
   const removed = state.cart.splice(index, 1);
   saveCart();
   renderCart();
   updateCartBadge();
   if (removed[0]) {
-    showToast(`تم حذف "${removed[0].nameAr}" من السلة`, 'info');
+    showToast(`تم حذف "${escapeHtml(removed[0].nameAr)}" من السلة`, 'info');
   }
 }
 
 function saveCart() {
-  localStorage.setItem('stickify21_cart', JSON.stringify(state.cart));
+  try {
+    localStorage.setItem('stickify21_cart', JSON.stringify(state.cart));
+  } catch (err) {
+    console.error('[STICKIFY 21] Failed to save cart:', err);
+  }
 }
 
 function updateCartBadge() {
-  const totalCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalCount = state.cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
   const badge = document.getElementById('cart-badge');
   if (badge) {
     badge.innerText = totalCount;
@@ -766,16 +755,7 @@ function updateCartBadge() {
   }
 }
 
-function getCartCalculations() {
-  const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const discount = Math.round(subtotal * (state.coupon.discountPercent / 100));
-  const shipping = subtotal >= 200 ? 0 : (subtotal > 0 ? 35 : 0);
-  const total = subtotal - discount + shipping;
-
-  return { subtotal, discount, shipping, total };
-}
-
-function renderCart() {
+export function renderCart() {
   const itemsContainer = document.getElementById('cart-items-container');
   const summaryContainer = document.getElementById('cart-summary-container');
   if (!itemsContainer || !summaryContainer) return;
@@ -795,52 +775,107 @@ function renderCart() {
     return;
   }
 
-  itemsContainer.innerHTML = state.cart.map((item, index) => `
-    <div class="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50 border border-zinc-200/80 gap-3">
-      <div class="w-14 h-14 p-1 rounded-lg bg-white border border-zinc-200 flex-shrink-0 flex items-center justify-center">
-        ${item.image ? `<img src="${item.image}" alt="" class="w-11 h-11 object-contain">` : item.svg}
-      </div>
-      <div class="flex-grow">
-        <div class="flex items-center gap-1.5">
-          <span class="bg-zinc-200 text-zinc-800 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold">#${item.sku || 'SKU'}</span>
-          <h4 class="font-bold text-zinc-900 text-xs">${item.nameAr}</h4>
-        </div>
-        <div class="text-[11px] text-zinc-500 flex items-center gap-2 mt-1 font-mono">
-          <span>${item.type === 'bookmark' ? 'بوك مارك' : item.size}</span>
-          <span>•</span>
-          <span class="text-zinc-900 font-bold">${item.price} ج.م</span>
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="flex items-center border border-zinc-300 rounded-lg overflow-hidden bg-white">
-          <button onclick="updateCartQuantity(${index}, -1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">-</button>
-          <span class="px-2 py-1 text-xs font-bold text-zinc-900 font-mono">${item.quantity}</span>
-          <button onclick="updateCartQuantity(${index}, 1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">+</button>
-        </div>
-        <button onclick="removeCartItem(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition">✕</button>
-      </div>
-    </div>
-  `).join('');
+  // Render items (Supports both loose items and custom packs as a single unit)
+  itemsContainer.innerHTML = state.cart.map((item, index) => {
+    const isPack = item.type === 'pack';
+    const safeImage = sanitizeUrl(item.image);
+    const safeSvg = sanitizeSvg(item.svg);
 
-  const { subtotal, discount, shipping, total } = getCartCalculations();
+    if (isPack) {
+      // Fixes Bug 03: Render pack bundle as a single cohesive unit
+      return `
+        <div class="p-3.5 rounded-xl bg-orange-50/50 border border-[#FF5000]/30 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <span class="bg-[#FF5000] text-white px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">باقة توفير</span>
+              <h4 class="font-bold text-zinc-900 text-xs">${escapeHtml(item.nameAr)}</h4>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="flex items-center border border-zinc-300 rounded-lg overflow-hidden bg-white">
+                <button onclick="updateCartQuantity(${index}, -1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">-</button>
+                <span class="px-2 py-1 text-xs font-bold text-zinc-900 font-mono">${item.quantity}</span>
+                <button onclick="updateCartQuantity(${index}, 1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">+</button>
+              </div>
+              <button onclick="removeCartItem(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition" title="حذف الباقة بالكامل">✕</button>
+            </div>
+          </div>
+
+          <!-- Included items mini gallery -->
+          <div class="flex items-center gap-1.5 overflow-x-auto py-1">
+            ${(item.items || []).map(sub => {
+              const subImg = sanitizeUrl(sub.image);
+              const subSvg = sanitizeSvg(sub.svg);
+              return `
+                <div class="w-8 h-8 rounded-lg bg-white border border-zinc-200 p-0.5 flex-shrink-0 flex items-center justify-center overflow-hidden" title="${escapeHtml(sub.nameAr)}">
+                  ${subImg ? `<img src="${subImg}" class="w-full h-full object-contain">` : subSvg}
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono border-t border-orange-100 pt-1.5">
+            <span>المقاس: ${escapeHtml(item.size)}</span>
+            <div>
+              ${item.savings ? `<span class="line-through text-zinc-400 ml-1.5">${item.rawTotal} ${CONFIG.CURRENCY}</span>` : ''}
+              <span class="text-[#FF5000] font-black text-xs">${item.price * item.quantity} ${CONFIG.CURRENCY}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50 border border-zinc-200/80 gap-3">
+        <div class="w-14 h-14 p-1 rounded-lg bg-white border border-zinc-200 flex-shrink-0 flex items-center justify-center">
+          ${safeImage ? `<img src="${safeImage}" alt="" class="w-11 h-11 object-contain">` : safeSvg}
+        </div>
+        <div class="flex-grow min-w-0">
+          <div class="flex items-center gap-1.5 truncate">
+            <span class="bg-zinc-200 text-zinc-800 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold">#${escapeHtml(item.sku || 'SKU')}</span>
+            <h4 class="font-bold text-zinc-900 text-xs truncate">${escapeHtml(item.nameAr)}</h4>
+          </div>
+          <div class="text-[11px] text-zinc-500 flex items-center gap-2 mt-1 font-mono">
+            <span>${escapeHtml(item.type === 'bookmark' ? 'بوك مارك' : item.size)}</span>
+            <span>•</span>
+            <span class="text-zinc-900 font-bold">${item.price * item.quantity} ${CONFIG.CURRENCY}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center border border-zinc-300 rounded-lg overflow-hidden bg-white">
+            <button onclick="updateCartQuantity(${index}, -1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">-</button>
+            <span class="px-2 py-1 text-xs font-bold text-zinc-900 font-mono">${item.quantity}</span>
+            <button onclick="updateCartQuantity(${index}, 1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">+</button>
+          </div>
+          <button onclick="removeCartItem(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Calculations via single source of truth (pricing.js)
+  const calc = calculateCart({
+    items: state.cart,
+    coupon: state.coupon,
+    governorate: state.selectedGovernorate
+  });
 
   summaryContainer.innerHTML = `
     <!-- Coupon -->
     <div class="flex gap-2 mb-4">
-      <input type="text" id="coupon-input" placeholder="كود الخصم (جرب STICKIFY10)" class="flex-grow bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 uppercase focus:outline-none focus:border-zinc-900">
+      <input type="text" id="coupon-input" value="${escapeHtml(state.coupon.code)}" placeholder="كود الخصم (جرب STICKIFY10)" class="flex-grow bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 uppercase focus:outline-none focus:border-zinc-900">
       <button onclick="applyCoupon()" class="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-bold rounded-xl transition">تطبيق</button>
     </div>
 
-    <!-- Free Shipping Indicator -->
+    <!-- Free Shipping Indicator (Fixes Bug 08: evaluated post-discount!) -->
     <div class="mb-4 bg-zinc-50 p-3 rounded-xl border border-zinc-200/80">
       <div class="flex justify-between text-xs font-semibold mb-1">
-        <span class="text-zinc-700">شحن مجاني فوق 200 ج.م</span>
-        <span class="${subtotal >= 200 ? 'text-[#FF5000] font-bold' : 'text-zinc-500'}">
-          ${subtotal >= 200 ? 'تم تفعيل الشحن المجاني! 🚚' : `باقي ${200 - subtotal} ج.م`}
+        <span class="text-zinc-700">شحن مجاني فوق ${CONFIG.FREE_SHIPPING_THRESHOLD} ${CONFIG.CURRENCY}</span>
+        <span class="${calc.isFreeShipping ? 'text-[#FF5000] font-bold' : 'text-zinc-500'}">
+          ${calc.isFreeShipping ? 'تم تفعيل الشحن المجاني! 🚚' : `باقي ${calc.freeShippingRemaining} ${CONFIG.CURRENCY}`}
         </span>
       </div>
       <div class="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
-        <div class="bg-[#FF5000] h-full rounded-full transition-all duration-300" style="width: ${Math.min(100, (subtotal/200)*100)}%"></div>
+        <div class="bg-[#FF5000] h-full rounded-full transition-all duration-300" style="width: ${calc.freeShippingProgress}%"></div>
       </div>
     </div>
 
@@ -848,28 +883,28 @@ function renderCart() {
     <div class="space-y-1.5 text-xs text-zinc-600 border-t border-zinc-200 pt-3 mb-4 font-mono">
       <div class="flex justify-between">
         <span class="font-sans text-zinc-600">المجموع الفرعي:</span>
-        <span class="font-bold text-zinc-900">${subtotal} ج.م</span>
+        <span class="font-bold text-zinc-900">${calc.subtotal} ${CONFIG.CURRENCY}</span>
       </div>
-      ${discount > 0 ? `
+      ${calc.discount > 0 ? `
         <div class="flex justify-between text-[#FF5000] font-bold">
-          <span class="font-sans">الخصم (${state.coupon.code}):</span>
-          <span>-${discount} ج.م</span>
+          <span class="font-sans">الخصم (${escapeHtml(state.coupon.code)}):</span>
+          <span>-${calc.discount} ${CONFIG.CURRENCY}</span>
         </div>
       ` : ''}
       <div class="flex justify-between">
-        <span class="font-sans text-zinc-600">الشحن:</span>
-        <span class="text-zinc-900 font-bold">${shipping === 0 ? '<span class="text-[#FF5000]">مجاناً</span>' : `${shipping} ج.م`}</span>
+        <span class="font-sans text-zinc-600">الشحن (${escapeHtml(state.selectedGovernorate)}):</span>
+        <span class="text-zinc-900 font-bold">${calc.shipping === 0 ? '<span class="text-[#FF5000]">مجاناً</span>' : `${calc.shipping} ${CONFIG.CURRENCY}`}</span>
       </div>
       <div class="flex justify-between text-base font-extrabold text-zinc-900 border-t border-zinc-200 pt-2 font-mono">
         <span class="font-sans">الإجمالي:</span>
-        <span class="text-[#FF5000]">${total} ج.م</span>
+        <span class="text-[#FF5000]">${calc.total} ${CONFIG.CURRENCY}</span>
       </div>
     </div>
 
     <!-- CTAs -->
     <div class="space-y-2">
       <button onclick="checkoutViaWhatsAppDirect()" class="w-full py-3.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm">
-        <span>إرسال الطلب عبر واتساب (01043546503)</span>
+        <span>إرسال الطلب عبر واتساب (${CONFIG.WHATSAPP_DISPLAY})</span>
         <span>💬</span>
       </button>
       <button onclick="openCheckoutModal()" class="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-black text-white font-semibold text-xs flex items-center justify-center gap-2 transition">
@@ -879,19 +914,19 @@ function renderCart() {
   `;
 }
 
-// Dynamic Coupons Check against Admin settings
-function applyCoupon() {
+export function applyCoupon() {
   const input = document.getElementById('coupon-input');
   if (!input) return;
   const val = input.value.trim().toUpperCase();
 
-  const storedCoupons = JSON.parse(localStorage.getItem('stickify21_coupons') || '[]');
-  const validCoupons = storedCoupons.length > 0 ? storedCoupons : defaultCoupons;
+  const storedCoupons = safeJsonParse(localStorage.getItem('stickify21_coupons'), [], 'stickify21_coupons');
+  // Fixes Bug 07: Remove unauthorized secret coupons, fallback only to advertised STICKIFY10
+  const validCoupons = storedCoupons.length > 0 ? storedCoupons : [CONFIG.ADVERTISED_COUPON];
 
-  const found = validCoupons.find(c => c.code === val);
+  const found = validCoupons.find(c => c.code === val && c.active !== false);
   if (found) {
-    state.coupon = { code: found.code, discountPercent: found.discountPercent };
-    showToast(`تم تفعيل كود الخصم "${found.code}" بنسبة ${found.discountPercent}% 🎉`);
+    state.coupon = { code: found.code, discountPercent: found.discountPercent, minOrder: found.minOrder || 0 };
+    showToast(`تم تفعيل كود الخصم "${escapeHtml(found.code)}" بنسبة ${found.discountPercent}% 🎉`);
     renderCart();
   } else {
     showToast('كود الخصم غير صحيح أو منتهي الصلاحية', 'error');
@@ -899,231 +934,9 @@ function applyCoupon() {
 }
 
 // ==========================================
-// MOCKUP STUDIO
+// PACK BUILDER (Fixes Bug 03 & 04)
 // ==========================================
-function renderMockupDevice() {
-  const container = document.getElementById('device-wrapper');
-  if (!container) return;
-
-  const dev = devices[state.activeDevice];
-  container.className = `w-full transition-all duration-300 ${dev.frameClass}`;
-  container.innerHTML = `
-    ${dev.decorationsHtml || ''}
-    <div id="mockup-stickers-layer" class="absolute inset-0 z-10 w-full h-full pointer-events-auto"></div>
-  `;
-  renderPlacedStickers();
-}
-
-function changeMockupDevice(devId) {
-  if (!devices[devId]) return;
-  state.activeDevice = devId;
-  document.querySelectorAll('.device-tab-btn').forEach(btn => {
-    btn.classList.toggle('active-device-btn', btn.dataset.device === devId);
-  });
-  renderMockupDevice();
-}
-
-function addStickerToMockup(productId) {
-  const product = state.products.find(p => p.id === productId);
-  if (!product) return;
-
-  const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
-  const sizeKey = isBookmark ? 'standard' : (state.selectedSizes[productId] || 'medium');
-  const scale = isBookmark ? 1.0 : (sizeKey === 'small' ? 0.75 : (sizeKey === 'large' ? 1.35 : 1.0));
-
-  const newPlaced = {
-    id: 'placed-' + Date.now(),
-    productId: product.id,
-    sku: product.sku,
-    nameAr: product.nameAr,
-    svg: product.svg,
-    image: product.image,
-    isBookmark: isBookmark,
-    sizeKey: sizeKey,
-    x: 42 + (Math.random() * 16),
-    y: 38 + (Math.random() * 16),
-    rotation: isBookmark ? (Math.random() * 10 - 5) : ((Math.random() * 20) - 10),
-    scale: scale
-  };
-
-  state.placedStickers.push(newPlaced);
-  state.selectedPlacedId = newPlaced.id;
-  renderPlacedStickers();
-  const sizeName = isBookmark ? 'فاصل كتب' : (sizeKey === 'small' ? '6 سم Small' : (sizeKey === 'large' ? '10 سم Large' : '8 سم Medium'));
-  showToast(`تم وضع [${product.sku}] مقاس ${sizeName} على المعاينة الواقعية`);
-
-  const studioElem = document.getElementById('mockup-studio-section');
-  if (studioElem && window.innerWidth < 768) {
-    studioElem.scrollIntoView({ behavior: 'smooth' });
-  }
-}
-
-function renderPlacedStickers() {
-  const board = document.getElementById('mockup-stickers-layer');
-  if (!board) return;
-
-  board.innerHTML = state.placedStickers.map(item => `
-    <div id="${item.id}" 
-         class="mockup-placed-sticker ${item.isBookmark ? 'w-16 h-32' : 'w-24 h-24'} ${state.selectedPlacedId === item.id ? 'selected' : ''}"
-         style="left: ${item.x}%; top: ${item.y}%; transform: translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale});"
-         onmousedown="startDragSticker(event, '${item.id}')"
-         ontouchstart="startTouchDragSticker(event, '${item.id}')"
-         onclick="selectPlacedSticker('${item.id}')">
-      ${item.image ? `<img src="${item.image}" alt="" class="w-full h-full object-contain pointer-events-none">` : item.svg}
-    </div>
-  `).join('');
-
-  updatePlacedControls();
-}
-
-function selectPlacedSticker(id) {
-  state.selectedPlacedId = id;
-  renderPlacedStickers();
-}
-
-function updatePlacedControls() {
-  const controls = document.getElementById('mockup-controls');
-  if (!controls) return;
-
-  if (!state.selectedPlacedId || state.placedStickers.length === 0) {
-    controls.innerHTML = `
-      <div class="text-[11px] text-zinc-400 text-center py-2 font-semibold">
-        اضغط على أي استيكر أو بوك مارك لمعاينته واقعياً على اللابتوب أو الموبايل وتجربة المقاسات
-      </div>
-    `;
-    return;
-  }
-
-  const current = state.placedStickers.find(s => s.id === state.selectedPlacedId);
-  if (!current) return;
-
-  controls.innerHTML = `
-    <div class="flex items-center justify-between flex-wrap gap-3 p-3 bg-white rounded-2xl border border-zinc-200 text-xs shadow-sm">
-      <div class="flex items-center gap-2">
-        <span class="font-mono text-[10px] bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-bold border border-zinc-200">#${current.sku}</span>
-        <span class="font-bold text-zinc-900">${current.nameAr}</span>
-      </div>
-
-      <!-- Size Switcher inside Mockup -->
-      ${!current.isBookmark ? `
-        <div class="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl font-bold text-xs">
-          <span class="text-[10px] text-zinc-500 mr-1.5 font-semibold">المقاس:</span>
-          <button onclick="setPlacedStickerSize('small')" class="px-2.5 py-1 rounded-lg transition ${current.sizeKey === 'small' ? 'bg-zinc-900 text-white shadow' : 'text-zinc-600 hover:text-black hover:bg-zinc-200'}">6 سم (S)</button>
-          <button onclick="setPlacedStickerSize('medium')" class="px-2.5 py-1 rounded-lg transition ${current.sizeKey === 'medium' || !current.sizeKey ? 'bg-zinc-900 text-white shadow' : 'text-zinc-600 hover:text-black hover:bg-zinc-200'}">8 سم (M)</button>
-          <button onclick="setPlacedStickerSize('large')" class="px-2.5 py-1 rounded-lg transition ${current.sizeKey === 'large' ? 'bg-zinc-900 text-white shadow' : 'text-zinc-600 hover:text-black hover:bg-zinc-200'}">10 سم (L)</button>
-        </div>
-      ` : ''}
-
-      <!-- Rotate & Delete Actions -->
-      <div class="flex items-center gap-1.5">
-        <button onclick="rotateCurrentSticker(-15)" class="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition" title="تدوير يسار">↺</button>
-        <button onclick="rotateCurrentSticker(15)" class="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition" title="تدوير يمين">↻</button>
-        <button onclick="deleteCurrentSticker()" class="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold transition" title="حذف">✕ حذف</button>
-      </div>
-    </div>
-  `;
-}
-
-function setPlacedStickerSize(sizeKey) {
-  const item = state.placedStickers.find(s => s.id === state.selectedPlacedId);
-  if (!item) return;
-  item.sizeKey = sizeKey;
-  item.scale = sizeKey === 'small' ? 0.75 : (sizeKey === 'large' ? 1.35 : 1.0);
-  renderPlacedStickers();
-  const label = sizeKey === 'small' ? '6 سم (Small)' : (sizeKey === 'large' ? '10 سم (Large)' : '8 سم (Medium)');
-  showToast(`تم تغيير مقاس الاستيكر على المعاينة إلى ${label}`);
-}
-
-function rotateCurrentSticker(deg) {
-  const item = state.placedStickers.find(s => s.id === state.selectedPlacedId);
-  if (!item) return;
-  item.rotation = (item.rotation + deg) % 360;
-  renderPlacedStickers();
-}
-
-function scaleCurrentSticker(delta) {
-  const item = state.placedStickers.find(s => s.id === state.selectedPlacedId);
-  if (!item) return;
-  item.scale = Math.max(0.5, Math.min(2.2, item.scale + delta));
-  renderPlacedStickers();
-}
-
-function deleteCurrentSticker() {
-  state.placedStickers = state.placedStickers.filter(s => s.id !== state.selectedPlacedId);
-  state.selectedPlacedId = state.placedStickers.length > 0 ? state.placedStickers[0].id : null;
-  renderPlacedStickers();
-}
-
-function clearMockupStickers() {
-  state.placedStickers = [];
-  state.selectedPlacedId = null;
-  renderPlacedStickers();
-  showToast('تم إخلاء الشاشة');
-}
-
-let dragItem = null;
-
-function startDragSticker(e, id) {
-  e.preventDefault();
-  dragItem = state.placedStickers.find(s => s.id === id);
-  if (!dragItem) return;
-
-  state.selectedPlacedId = id;
-  const board = document.getElementById('mockup-stickers-layer');
-  const rect = board.getBoundingClientRect();
-
-  function onMouseMove(moveEvent) {
-    if (!dragItem) return;
-    const xPct = ((moveEvent.clientX - rect.left) / rect.width) * 100;
-    const yPct = ((moveEvent.clientY - rect.top) / rect.height) * 100;
-    dragItem.x = Math.max(5, Math.min(95, xPct));
-    dragItem.y = Math.max(5, Math.min(95, yPct));
-    renderPlacedStickers();
-  }
-
-  function onMouseUp() {
-    dragItem = null;
-    window.removeEventListener('mousemove', onMouseMove);
-    window.removeEventListener('mouseup', onMouseUp);
-  }
-
-  window.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('mouseup', onMouseUp);
-}
-
-function startTouchDragSticker(e, id) {
-  if (e.touches.length !== 1) return;
-  dragItem = state.placedStickers.find(s => s.id === id);
-  if (!dragItem) return;
-
-  state.selectedPlacedId = id;
-  const board = document.getElementById('mockup-stickers-layer');
-  const rect = board.getBoundingClientRect();
-
-  function onTouchMove(moveEvent) {
-    if (!dragItem || moveEvent.touches.length !== 1) return;
-    const touch = moveEvent.touches[0];
-    const xPct = ((touch.clientX - rect.left) / rect.width) * 100;
-    const yPct = ((touch.clientY - rect.top) / rect.height) * 100;
-    dragItem.x = Math.max(5, Math.min(95, xPct));
-    dragItem.y = Math.max(5, Math.min(95, yPct));
-    renderPlacedStickers();
-  }
-
-  function onTouchEnd() {
-    dragItem = null;
-    window.removeEventListener('touchmove', onTouchMove);
-    window.removeEventListener('touchend', onTouchEnd);
-  }
-
-  window.addEventListener('touchmove', onTouchMove);
-  window.addEventListener('touchend', onTouchEnd);
-}
-
-// ==========================================
-// PACK BUILDER (5 & 10 only)
-// ==========================================
-function setPackSize(size) {
+export function setPackSize(size) {
   if (size !== 5 && size !== 10) size = 5;
   state.packBuilder.targetSize = size;
   
@@ -1146,26 +959,32 @@ function setPackSize(size) {
   renderPackBuilder();
 }
 
-function addToPack(productId) {
+export function addToPack(productId) {
+  const product = state.products.find(p => p.id === productId);
+  if (!product) return;
+
+  // Fixes Bug 04: Disallow bookmarks in sticker pack
+  if (product.category === 'bookmarks' || product.type === 'bookmark') {
+    showToast('باقات التوفير مخصصة لاستيكرات الفينيل فقط!', 'warning');
+    return;
+  }
+
   if (state.packBuilder.items.length >= state.packBuilder.targetSize) {
     showToast(`اكتملت باقة الـ ${state.packBuilder.targetSize} استيكرات! ضيفها للسلة أو اختر باقة الـ 10.`, 'warning');
     return;
   }
 
-  const product = state.products.find(p => p.id === productId);
-  if (!product) return;
-
   state.packBuilder.items.push(product);
   renderPackBuilder();
-  showToast(`تمت إضافة [${product.sku}] "${product.nameAr}" للباقة`);
+  showToast(`تمت إضافة [${escapeHtml(product.sku)}] "${escapeHtml(product.nameAr)}" للباقة`);
 }
 
-function removePackItem(index) {
+export function removePackItem(index) {
   state.packBuilder.items.splice(index, 1);
   renderPackBuilder();
 }
 
-function renderPackBuilder() {
+export function renderPackBuilder() {
   const slotsContainer = document.getElementById('pack-slots-container');
   const packInfoContainer = document.getElementById('pack-info-container');
   if (!slotsContainer || !packInfoContainer) return;
@@ -1178,10 +997,12 @@ function renderPackBuilder() {
   for (let i = 0; i < target; i++) {
     const item = state.packBuilder.items[i];
     if (item) {
+      const safeImg = sanitizeUrl(item.image);
+      const safeSvg = sanitizeSvg(item.svg);
       slotsHtml += `
         <div class="relative w-20 h-20 rounded-2xl bg-white border border-[#FF5000] p-2 flex items-center justify-center group shadow-sm">
           <div class="w-14 h-14 sticker-diecut-minimal">
-            ${item.image ? `<img src="${item.image}" alt="" class="w-full h-full object-contain">` : item.svg}
+            ${safeImg ? `<img src="${safeImg}" alt="" class="w-full h-full object-contain">` : safeSvg}
           </div>
           <button onclick="removePackItem(${i})" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-zinc-900 text-white font-bold text-[10px] flex items-center justify-center transition hover:bg-red-500 shadow">
             ✕
@@ -1192,17 +1013,14 @@ function renderPackBuilder() {
       slotsHtml += `
         <div class="w-20 h-20 rounded-2xl border-2 border-dashed border-zinc-300 bg-white/60 flex flex-col items-center justify-center text-zinc-400 text-xs">
           <span class="text-lg opacity-40">+</span>
-          <span class="text-[9px] text-zinc-400">${i + 1}</span>
+          <span class="text-[9px] text-zinc-400 font-mono">${i + 1}</span>
         </div>
       `;
     }
   }
   slotsContainer.innerHTML = slotsHtml;
 
-  const rawTotal = state.packBuilder.items.reduce((sum, item) => sum + item.price, 0);
-  let discountRate = target === 5 ? 0.20 : 0.30;
-  const discountedTotal = Math.round(rawTotal * (1 - discountRate));
-  const savings = rawTotal - discountedTotal;
+  const summary = calculatePackSummary(state.packBuilder.items, target);
 
   packInfoContainer.innerHTML = `
     <div class="flex items-center justify-between flex-wrap gap-4 pt-4 border-t border-zinc-200">
@@ -1210,12 +1028,12 @@ function renderPackBuilder() {
         <div class="flex items-center gap-2">
           <span class="text-xs font-bold text-zinc-900">المكتمل: ${currentCount} من ${target}</span>
           <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isFull ? 'bg-[#FF5000]/10 text-[#FF5000]' : 'bg-zinc-100 text-zinc-600'}">
-            ${isFull ? 'الباقة جاهزة!' : `وفر ${(discountRate*100)}% عند اكتمال ${target} قطع`}
+            ${isFull ? 'الباقة جاهزة!' : `وفر ${summary.discountRate * 100}% عند اكتمال ${target} قطع`}
           </span>
         </div>
         <div class="text-xs text-zinc-500 mt-1 font-mono">
-          السعر بعد الخصم: <span class="text-base font-extrabold text-[#FF5000]">${discountedTotal} ج.م</span>
-          ${savings > 0 ? `<span class="line-through text-zinc-400 ml-2">${rawTotal} ج.م</span> (وفرت ${savings} ج.م)` : ''}
+          السعر بعد الخصم: <span class="text-base font-extrabold text-[#FF5000]">${summary.discountedTotal} ${CONFIG.CURRENCY}</span>
+          ${summary.savings > 0 ? `<span class="line-through text-zinc-400 ml-2">${summary.rawTotal} ${CONFIG.CURRENCY}</span> (وفرت ${summary.savings} ${CONFIG.CURRENCY})` : ''}
         </div>
       </div>
 
@@ -1226,36 +1044,48 @@ function renderPackBuilder() {
   `;
 }
 
-function addPackToCart() {
-  if (state.packBuilder.items.length < state.packBuilder.targetSize) {
-    showToast(`اكمل جميع خانات باقة الـ ${state.packBuilder.targetSize} أولاً!`, 'warning');
+// Fixes Bug 03: Pack is added as ONE single cart item to prevent breaking bundle discount
+export function addPackToCart() {
+  const target = state.packBuilder.targetSize;
+  if (state.packBuilder.items.length < target) {
+    showToast(`اكمل جميع خانات باقة الـ ${target} أولاً!`, 'warning');
     return;
   }
 
-  const target = state.packBuilder.targetSize;
-  let discountRate = target === 5 ? 0.20 : 0.30;
+  const summary = calculatePackSummary(state.packBuilder.items, target);
+  const packItemIds = state.packBuilder.items.map(p => p.id);
+  const packLineKey = generateCartLineKey({ type: 'pack', packSize: target, sizeKey: 'medium', itemIds: packItemIds });
 
-  state.packBuilder.items.forEach(prod => {
-    const discountedPrice = Math.round(prod.price * (1 - discountRate));
+  const existingPackIdx = state.cart.findIndex(item => item.id === packLineKey);
+  if (existingPackIdx > -1) {
+    state.cart[existingPackIdx].quantity += 1;
+  } else {
     state.cart.push({
-      id: prod.id + '-pack',
-      sku: prod.sku || 'S21-PK',
-      nameAr: `${prod.nameAr} (باقة ${target})`,
-      name: prod.name,
-      price: discountedPrice,
-      size: '7.5cm',
-      type: prod.type || 'sticker',
-      finish: prod.finish,
-      image: prod.image,
-      svg: prod.svg,
-      quantity: 1
+      id: packLineKey,
+      type: 'pack',
+      packSize: target,
+      nameAr: `باقة توفير (${target} استيكرات)`,
+      name: `Custom Pack (${target} Stickers)`,
+      size: '8 سم (Medium)',
+      sizeKey: 'medium',
+      price: summary.discountedTotal,
+      rawTotal: summary.rawTotal,
+      savings: summary.savings,
+      quantity: 1,
+      items: state.packBuilder.items.map(p => ({
+        id: p.id,
+        sku: p.sku || 'S21',
+        nameAr: p.nameAr,
+        image: p.image,
+        svg: p.svg
+      }))
     });
-  });
+  }
 
   saveCart();
   renderCart();
   updateCartBadge();
-  showToast(`تمت إضافة باقة الـ ${target} استيكرات إلى السلة بخصم ${discountRate*100}%! 🎉`);
+  showToast(`تمت إضافة باقة الـ ${target} استيكرات إلى السلة بخصم ${summary.discountRate * 100}%! 🎉`);
 
   state.packBuilder.items = [];
   renderPackBuilder();
@@ -1263,9 +1093,221 @@ function addPackToCart() {
 }
 
 // ==========================================
-// SUBMIT ORDER (Stores in Admin, Clean WhatsApp)
+// MOCKUP STUDIO (Fixes Bug 02 & Bug 06)
 // ==========================================
-function openCheckoutModal() {
+export function renderMockupDevice() {
+  const container = document.getElementById('device-wrapper');
+  if (!container) return;
+
+  const dev = devices[state.activeDevice] || devices.laptop;
+  container.className = `w-full transition-all duration-300 ${dev.frameClass}`;
+  
+  // Fixes Bug 02: Ensure clean container with single layer
+  container.innerHTML = `
+    ${dev.decorationsHtml || ''}
+    <div id="mockup-stickers-layer" class="absolute inset-0 z-10 w-full h-full pointer-events-auto"></div>
+  `;
+  renderPlacedStickers();
+}
+
+export function changeMockupDevice(devId) {
+  if (!devices[devId]) return;
+  state.activeDevice = devId;
+  document.querySelectorAll('.device-tab-btn').forEach(btn => {
+    btn.classList.toggle('active-device-btn', btn.dataset.device === devId);
+  });
+  renderMockupDevice();
+}
+
+export function addStickerToMockup(productId) {
+  const product = state.products.find(p => p.id === productId);
+  if (!product) return;
+
+  const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
+  const sizeKey = isBookmark ? 'standard' : (state.selectedSizes[productId] || 'medium');
+  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey);
+  const scale = isBookmark ? 1.0 : (sizeObj ? sizeObj.scale : 1.0);
+
+  const newPlaced = {
+    id: 'placed-' + Date.now(),
+    productId: product.id,
+    sku: product.sku,
+    nameAr: product.nameAr,
+    svg: product.svg,
+    image: product.image,
+    isBookmark: isBookmark,
+    sizeKey: sizeKey,
+    x: 42 + (Math.random() * 16),
+    y: 38 + (Math.random() * 16),
+    rotation: isBookmark ? (Math.random() * 8 - 4) : ((Math.random() * 20) - 10),
+    scale: scale
+  };
+
+  state.placedStickers.push(newPlaced);
+  state.selectedPlacedId = newPlaced.id;
+  renderPlacedStickers();
+
+  const sizeName = isBookmark ? 'فاصل كتب' : (sizeObj ? sizeObj.labelAr : '8 سم');
+  showToast(`تم وضع [${escapeHtml(product.sku)}] مقاس ${escapeHtml(sizeName)} على المعاينة`);
+
+  const studioElem = document.getElementById('mockup-studio-section');
+  if (studioElem && window.innerWidth < 768) {
+    studioElem.scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+export function renderPlacedStickers() {
+  const board = document.getElementById('mockup-stickers-layer');
+  if (!board) return;
+
+  board.innerHTML = state.placedStickers.map(item => {
+    const safeImg = sanitizeUrl(item.image);
+    const safeSvg = sanitizeSvg(item.svg);
+
+    return `
+      <div id="${escapeHtml(item.id)}" 
+           class="mockup-placed-sticker ${item.isBookmark ? 'w-16 h-32' : 'w-24 h-24'} ${state.selectedPlacedId === item.id ? 'selected' : ''}"
+           style="left: ${item.x}%; top: ${item.y}%; transform: translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale});"
+           data-placed-id="${escapeHtml(item.id)}">
+        ${safeImg ? `<img src="${safeImg}" alt="" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
+      </div>
+    `;
+  }).join('');
+
+  // Attach Pointer Events listeners directly (Fixes Bug 06: Smooth dragging via Pointer Events)
+  attachPointerDragListeners();
+  updatePlacedControls();
+}
+
+// Fixes Bug 06: Pointer Events with pointer capture and requestAnimationFrame updates
+function attachPointerDragListeners() {
+  const board = document.getElementById('mockup-stickers-layer');
+  if (!board) return;
+
+  board.querySelectorAll('.mockup-placed-sticker').forEach(el => {
+    const id = el.dataset.placedId;
+    el.onpointerdown = (e) => {
+      e.preventDefault();
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch (err) {}
+      state.selectedPlacedId = id;
+      board.querySelectorAll('.mockup-placed-sticker').forEach(s => s.classList.remove('selected'));
+      el.classList.add('selected');
+      updatePlacedControls();
+
+      const item = state.placedStickers.find(s => s.id === id);
+      if (!item) return;
+
+      const boardRect = board.getBoundingClientRect();
+      let rafId = null;
+
+      const onPointerMove = (moveEvt) => {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          const xPct = ((moveEvt.clientX - boardRect.left) / boardRect.width) * 100;
+          const yPct = ((moveEvt.clientY - boardRect.top) / boardRect.height) * 100;
+          
+          // Constrain within bounds (5% to 95%)
+          item.x = Math.max(5, Math.min(95, xPct));
+          item.y = Math.max(5, Math.min(95, yPct));
+
+          el.style.left = `${item.x}%`;
+          el.style.top = `${item.y}%`;
+        });
+      };
+
+      const onPointerUp = (upEvt) => {
+        if (rafId) cancelAnimationFrame(rafId);
+        try {
+          el.releasePointerCapture(upEvt.pointerId);
+        } catch(err) {}
+        el.onpointermove = null;
+        el.onpointerup = null;
+        el.onpointercancel = null;
+      };
+
+      el.onpointermove = onPointerMove;
+      el.onpointerup = onPointerUp;
+      el.onpointercancel = onPointerUp;
+    };
+  });
+}
+
+function updatePlacedControls() {
+  const controls = document.getElementById('mockup-controls');
+  if (!controls) return;
+
+  if (!state.selectedPlacedId || state.placedStickers.length === 0) {
+    controls.innerHTML = `
+      <div class="text-[11px] text-zinc-400 text-center py-2 font-semibold">
+        اضغط على أي استيكر أو بوك مارك لمعاينته واقعياً على اللابتوب أو الموبايل وتجربة المقاسات
+      </div>
+    `;
+    return;
+  }
+
+  const current = state.placedStickers.find(s => s.id === state.selectedPlacedId);
+  if (!current) return;
+
+  controls.innerHTML = `
+    <div class="flex items-center justify-between flex-wrap gap-3 p-3 bg-white rounded-2xl border border-zinc-200 text-xs shadow-sm">
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-[10px] bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded font-bold border border-zinc-200">#${escapeHtml(current.sku)}</span>
+        <span class="font-bold text-zinc-900">${escapeHtml(current.nameAr)}</span>
+      </div>
+
+      ${!current.isBookmark ? `
+        <div class="flex items-center gap-1 bg-zinc-100 p-1 rounded-xl font-bold text-xs">
+          <span class="text-[10px] text-zinc-500 mr-1.5 font-semibold">المقاس:</span>
+          <button onclick="setPlacedStickerSize('small')" class="px-2.5 py-1 rounded-lg transition ${current.sizeKey === 'small' ? 'bg-zinc-900 text-white shadow' : 'text-zinc-600 hover:text-black hover:bg-zinc-200'}">6 سم (S)</button>
+          <button onclick="setPlacedStickerSize('medium')" class="px-2.5 py-1 rounded-lg transition ${current.sizeKey === 'medium' || !current.sizeKey ? 'bg-zinc-900 text-white shadow' : 'text-zinc-600 hover:text-black hover:bg-zinc-200'}">8 سم (M)</button>
+          <button onclick="setPlacedStickerSize('large')" class="px-2.5 py-1 rounded-lg transition ${current.sizeKey === 'large' ? 'bg-zinc-900 text-white shadow' : 'text-zinc-600 hover:text-black hover:bg-zinc-200'}">10 سم (L)</button>
+        </div>
+      ` : ''}
+
+      <div class="flex items-center gap-1.5">
+        <button onclick="rotateCurrentSticker(-15)" class="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition" title="تدوير يسار">↺</button>
+        <button onclick="rotateCurrentSticker(15)" class="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition" title="تدوير يمين">↻</button>
+        <button onclick="deleteCurrentSticker()" class="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold transition" title="حذف">✕ حذف</button>
+      </div>
+    </div>
+  `;
+}
+
+export function setPlacedStickerSize(sizeKey) {
+  const item = state.placedStickers.find(s => s.id === state.selectedPlacedId);
+  if (!item) return;
+  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey);
+  item.sizeKey = sizeKey;
+  item.scale = sizeObj ? sizeObj.scale : 1.0;
+  renderPlacedStickers();
+}
+
+export function rotateCurrentSticker(deg) {
+  const item = state.placedStickers.find(s => s.id === state.selectedPlacedId);
+  if (!item) return;
+  item.rotation = (item.rotation + deg) % 360;
+  renderPlacedStickers();
+}
+
+export function deleteCurrentSticker() {
+  state.placedStickers = state.placedStickers.filter(s => s.id !== state.selectedPlacedId);
+  state.selectedPlacedId = state.placedStickers.length > 0 ? state.placedStickers[0].id : null;
+  renderPlacedStickers();
+}
+
+export function clearMockupStickers() {
+  state.placedStickers = [];
+  state.selectedPlacedId = null;
+  renderPlacedStickers();
+  showToast('تم إخلاء الشاشة');
+}
+
+// ==========================================
+// CHECKOUT & WHATSAPP ORDER SUBMISSION
+// ==========================================
+export function openCheckoutModal() {
   if (state.cart.length === 0) {
     showToast('السلة فارغة!', 'error');
     return;
@@ -1273,11 +1315,25 @@ function openCheckoutModal() {
   document.getElementById('checkout-modal').classList.remove('hidden');
 }
 
-function closeCheckoutModal() {
+export function closeCheckoutModal() {
   document.getElementById('checkout-modal').classList.add('hidden');
 }
 
-function submitOrder(e) {
+export function toggleCartModal(open) {
+  const modal = document.getElementById('cart-modal');
+  if (!modal) return;
+  modal.classList.toggle('hidden', !open);
+}
+
+export function checkoutViaWhatsAppDirect() {
+  if (state.cart.length === 0) {
+    showToast('السلة فارغة!', 'error');
+    return;
+  }
+  openCheckoutModal();
+}
+
+export function submitOrder(e) {
   e.preventDefault();
 
   const name = document.getElementById('order-name').value.trim();
@@ -1292,20 +1348,26 @@ function submitOrder(e) {
     return;
   }
 
-  const { subtotal, discount, shipping, total } = getCartCalculations();
+  state.selectedGovernorate = city;
+  const calc = calculateCart({
+    items: state.cart,
+    coupon: state.coupon,
+    governorate: city
+  });
+
   const orderId = 'S21-' + Math.floor(1000 + Math.random() * 9000);
 
-  // 1. Save Order to Admin History in localStorage
+  // Structured safe order
   const newOrder = {
     id: orderId,
     date: new Date().toLocaleDateString('ar-EG'),
     status: 'جديد',
     customer: { name, phone, city, address, notes },
     payment: payment === 'cod' ? 'عند الاستلام' : 'InstaPay / فودافون كاش',
-    subtotal: subtotal,
-    discount: discount,
-    shipping: shipping,
-    total: total,
+    subtotal: calc.subtotal,
+    discount: calc.discount,
+    shipping: calc.shipping,
+    total: calc.total,
     items: state.cart.map(item => ({
       sku: item.sku || 'S21',
       nameAr: item.nameAr,
@@ -1315,11 +1377,16 @@ function submitOrder(e) {
     }))
   };
 
-  const existingOrders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
+  // Safe storage
+  const existingOrders = safeJsonParse(localStorage.getItem('stickify21_orders'), [], 'stickify21_orders');
   existingOrders.unshift(newOrder);
-  localStorage.setItem('stickify21_orders', JSON.stringify(existingOrders));
+  try {
+    localStorage.setItem('stickify21_orders', JSON.stringify(existingOrders));
+  } catch(err) {
+    console.error('Failed to save order to localStorage:', err);
+  }
 
-  // 2. Clean WhatsApp Message for Customer (NO packing-slip link visible to public!)
+  // Build clean WhatsApp message
   let message = `📦 *طلب جديد من متجر STICKIFY 21* (#${orderId}) 📦\n\n`;
   message += `👤 *الاسم:* ${name}\n`;
   message += `📱 *رقم الهاتف:* ${phone}\n`;
@@ -1327,22 +1394,26 @@ function submitOrder(e) {
   message += `💳 *طريقة الدفع:* ${payment === 'cod' ? 'الدفع عند الاستلام' : 'InstaPay / فودافون كاش'}\n`;
   if (notes) message += `📝 *ملاحظات:* ${notes}\n`;
 
-  message += `\n🏷️ *الاستيكرات والبوك مارك المطلوبة:*\n`;
+  message += `\n🏷️ *المنتجات المطلوبة:*\n`;
   state.cart.forEach((item, i) => {
-    const typeLabel = item.type === 'bookmark' ? 'بوك مارك' : item.size;
-    message += `${i+1}. [${item.sku}] ${item.nameAr} (${typeLabel}) × ${item.quantity} = ${item.price * item.quantity} ج.م\n`;
+    if (item.type === 'pack') {
+      message += `${i+1}. [باقة توفير] ${item.nameAr} (${item.size}) × ${item.quantity} = ${item.price * item.quantity} ${CONFIG.CURRENCY}\n`;
+    } else {
+      const typeLabel = item.type === 'bookmark' ? 'بوك مارك' : item.size;
+      message += `${i+1}. [${item.sku}] ${item.nameAr} (${typeLabel}) × ${item.quantity} = ${item.price * item.quantity} ${CONFIG.CURRENCY}\n`;
+    }
   });
 
-  message += `\n💰 *المجموع:* ${subtotal} ج.م`;
-  if (discount > 0) message += `\n🎁 *الخصم (${state.coupon.code}):* -${discount} ج.م`;
-  message += `\n🚚 *الشحن:* ${shipping === 0 ? 'مجاني' : shipping + ' ج.م'}`;
-  message += `\n✨ *الإجمالي النهائي: ${total} ج.م*\n`;
+  message += `\n💰 *المجموع:* ${calc.subtotal} ${CONFIG.CURRENCY}`;
+  if (calc.discount > 0) message += `\n🎁 *الخصم (${state.coupon.code}):* -${calc.discount} ${CONFIG.CURRENCY}`;
+  message += `\n🚚 *الشحن (${city}):* ${calc.shipping === 0 ? 'مجاني' : calc.shipping + ' ' + CONFIG.CURRENCY}`;
+  message += `\n✨ *الإجمالي النهائي: ${calc.total} ${CONFIG.CURRENCY}*\n`;
   message += `\nشكراً لطلبك من STICKIFY 21! 🚀`;
 
   const encodedMsg = encodeURIComponent(message);
-  const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMsg}`;
+  const whatsappUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodedMsg}`;
 
-  // Clear cart
+  // Reset cart
   state.cart = [];
   saveCart();
   renderCart();
@@ -1355,26 +1426,47 @@ function submitOrder(e) {
   }, 700);
 }
 
-function checkoutViaWhatsAppDirect() {
-  if (state.cart.length === 0) {
-    showToast('السلة فارغة!', 'error');
-    return;
-  }
-  openCheckoutModal();
+// ==========================================
+// TOAST NOTIFICATIONS (XSS Safe)
+// ==========================================
+export function showToast(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  const bg = type === 'error' ? 'bg-red-600 text-white' : (type === 'warning' ? 'bg-amber-500 text-white' : 'bg-zinc-900 text-white');
+  toast.className = `px-4 py-3 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-200 translate-y-3 opacity-0 ${bg}`;
+  
+  // Safe text injection (fixes XSS in toasts)
+  const iconSpan = document.createElement('span');
+  iconSpan.textContent = type === 'error' ? '✕' : (type === 'warning' ? '!' : '✓');
+
+  const textSpan = document.createElement('span');
+  textSpan.textContent = message;
+
+  toast.appendChild(iconSpan);
+  toast.appendChild(textSpan);
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.remove('translate-y-3', 'opacity-0');
+  }, 10);
+
+  setTimeout(() => {
+    toast.classList.add('translate-y-3', 'opacity-0');
+    setTimeout(() => toast.remove(), 250);
+  }, 3000);
 }
 
-function toggleCartModal(open) {
-  const modal = document.getElementById('cart-modal');
-  if (!modal) return;
-  modal.classList.toggle('hidden', !open);
-}
-
+// ==========================================
+// EVENT LISTENERS & GLOBAL EXPOSURE
+// ==========================================
 function setupEventListeners() {
   document.querySelectorAll('.cat-filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.selectedCategory = btn.dataset.category;
       state.selectedSubCategory = 'all';
-      updateFilterButtons();
+      renderCategories();
       renderProducts();
     });
   });
@@ -1406,33 +1498,38 @@ function setupEventListeners() {
       renderProducts();
     });
   }
+
+  const orderCitySelect = document.getElementById('order-city');
+  if (orderCitySelect) {
+    orderCitySelect.addEventListener('change', (e) => {
+      state.selectedGovernorate = e.target.value;
+      renderCart();
+    });
+  }
 }
 
-function updateFilterButtons() {
-  renderCategories();
-}
-
-function showToast(message, type = 'success') {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
-
-  const toast = document.createElement('div');
-  const bg = type === 'error' ? 'bg-red-600 text-white' : (type === 'warning' ? 'bg-amber-500 text-white' : 'bg-zinc-900 text-white');
-  toast.className = `px-4 py-3 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-200 translate-y-3 opacity-0 ${bg}`;
-  toast.innerHTML = `
-    <span>${type === 'error' ? '✕' : (type === 'warning' ? '!' : '✓')}</span>
-    <span>${message}</span>
-  `;
-
-  container.appendChild(toast);
-  setTimeout(() => {
-    toast.classList.remove('translate-y-3', 'opacity-0');
-  }, 10);
-
-  setTimeout(() => {
-    toast.classList.add('translate-y-3', 'opacity-0');
-    setTimeout(() => toast.remove(), 250);
-  }, 3000);
-}
+// Expose handlers to window for inline onclick compatibility
+window.selectCategoryByCard = selectCategoryByCard;
+window.resetFilters = resetFilters;
+window.addToCart = addToCart;
+window.addToPack = addToPack;
+window.setPackSize = setPackSize;
+window.removePackItem = removePackItem;
+window.addPackToCart = addPackToCart;
+window.selectCardSize = selectCardSize;
+window.addStickerToMockup = addStickerToMockup;
+window.changeMockupDevice = changeMockupDevice;
+window.setPlacedStickerSize = setPlacedStickerSize;
+window.rotateCurrentSticker = rotateCurrentSticker;
+window.deleteCurrentSticker = deleteCurrentSticker;
+window.clearMockupStickers = clearMockupStickers;
+window.toggleCartModal = toggleCartModal;
+window.openCheckoutModal = openCheckoutModal;
+window.closeCheckoutModal = closeCheckoutModal;
+window.updateCartQuantity = updateCartQuantity;
+window.removeCartItem = removeCartItem;
+window.applyCoupon = applyCoupon;
+window.checkoutViaWhatsAppDirect = checkoutViaWhatsAppDirect;
+window.submitOrder = submitOrder;
 
 document.addEventListener('DOMContentLoaded', initApp);

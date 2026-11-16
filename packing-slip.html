@@ -8,20 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Readex+Pro:wght@400;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/jpeg" href="logo.jpg">
   
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brandOrange: '#FF5000',
-            brandBlack: '#0E0E10'
-          }
-        }
-      }
-    }
-  </script>
+  <!-- Compiled CSS (Tailwind CLI) -->
+  <link rel="stylesheet" href="dist/styles.css">
 
   <style>
     body {
@@ -150,7 +140,10 @@
 
   </div>
 
-  <script>
+  <script type="module">
+    import { escapeHtml, sanitizeSvg, sanitizeUrl } from './src/utils/escape.js';
+    import { CONFIG } from './src/config/config.js';
+
     let checkedItems = new Set();
     let totalItemsCount = 0;
 
@@ -173,16 +166,21 @@
 
       // 2. Try from localStorage ?id=
       if (!order && idParam) {
-        const storedOrders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
-        order = storedOrders.find(o => o.id === idParam);
+        try {
+          const storedOrders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
+          order = storedOrders.find(o => o.id === idParam);
+        } catch(e) {}
       }
 
       // Fallback sample if no order found
       if (!order) {
-        const storedOrders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
-        if (storedOrders.length > 0) {
-          order = storedOrders[0];
-        } else {
+        try {
+          const storedOrders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
+          if (storedOrders.length > 0) {
+            order = storedOrders[0];
+          }
+        } catch(e) {}
+        if (!order) {
           order = {
             id: 'S21-' + Math.floor(1000 + Math.random() * 9000),
             date: new Date().toLocaleDateString('ar-EG'),
@@ -196,52 +194,57 @@
             payment: 'عند الاستلام',
             total: 125,
             items: [
-              { sku: 'DEV-01', nameAr: 'جيت بوش بالقوة 🚀', size: '7.5cm', qty: 2, price: 35 },
+              { sku: 'DEV-01', nameAr: 'جيت بوش بالقوة 🚀', size: '8 سم', qty: 2, price: 35 },
               { sku: 'BM-01', nameAr: 'فاصل كتب: خير جليس 📖', size: 'بوك مارك', qty: 1, price: 25 },
-              { sku: 'S21-01', nameAr: 'شعار STICKIFY 21 الرسمي 🍊', size: '7.5cm', qty: 1, price: 30 }
+              { sku: 'S21-01', nameAr: 'شعار STICKIFY 21 الرسمي 🍊', size: '8 سم', qty: 1, price: 30 }
             ]
           };
         }
       }
 
-      // Populate Meta
-      document.getElementById('order-id').innerText = order.id || 'S21-9999';
+      // Populate Meta (XSS Safe)
+      document.getElementById('order-id').innerText = order.id || 'S21-XXXX';
       document.getElementById('order-date').innerText = 'التاريخ: ' + (order.date || new Date().toLocaleDateString('ar-EG'));
-      document.getElementById('customer-name').innerText = order.customer.name;
+      document.getElementById('customer-name').innerText = order.customer?.name || '';
       
       const phoneElem = document.getElementById('customer-phone-link');
-      phoneElem.innerText = order.customer.phone;
-      phoneElem.href = 'https://wa.me/2' + order.customer.phone.replace(/[^0-9]/g, '');
+      const rawPhone = (order.customer?.phone || '').replace(/[^0-9]/g, '');
+      phoneElem.innerText = order.customer?.phone || '';
+      phoneElem.href = 'https://wa.me/2' + rawPhone;
 
-      document.getElementById('customer-address').innerText = order.customer.city + ' - ' + order.customer.address;
-      document.getElementById('payment-and-total').innerText = (order.payment || 'عند الاستلام') + ' | ' + order.total + ' ج.م';
+      document.getElementById('customer-address').innerText = (order.customer?.city || '') + ' - ' + (order.customer?.address || '');
+      document.getElementById('payment-and-total').innerText = (order.payment || 'عند الاستلام') + ' | ' + (order.total || 0) + ' ' + CONFIG.CURRENCY;
 
-      if (order.customer.notes) {
+      if (order.customer?.notes) {
         document.getElementById('customer-notes').innerText = order.customer.notes;
         document.getElementById('notes-container').classList.remove('hidden');
       }
 
       // Load products catalog from localStorage for image lookups
-      const storedProds = JSON.parse(localStorage.getItem('stickify21_products') || '[]');
+      let storedProds = [];
+      try {
+        storedProds = JSON.parse(localStorage.getItem('stickify21_products') || '[]');
+      } catch(e) {}
       const prodMap = {};
       storedProds.forEach(p => { prodMap[p.sku] = p; });
 
-      // Populate Items Grid
+      // Populate Items Grid (XSS Safe)
       const container = document.getElementById('items-grid');
-      totalItemsCount = order.items.length;
+      const items = order.items || [];
+      totalItemsCount = items.length;
 
-      container.innerHTML = order.items.map((item, index) => {
+      container.innerHTML = items.map((item, index) => {
         const prod = prodMap[item.sku] || {};
         const isBookmark = item.size === 'بوك مارك' || (item.sku && item.sku.startsWith('BM-'));
-        const hasImg = prod.image || (item.sku === 'S21-01' ? 'logo.jpg' : null);
-        const svgContent = prod.svg || `<div class="font-mono font-bold text-lg text-zinc-500">${item.sku}</div>`;
+        const safeImg = sanitizeUrl(prod.image || (item.sku === 'S21-01' ? 'logo.jpg' : null));
+        const safeSvg = prod.svg ? sanitizeSvg(prod.svg) : `<div class="font-mono font-bold text-lg text-zinc-500">#${escapeHtml(item.sku)}</div>`;
 
         return `
           <div id="item-card-${index}" onclick="toggleItemCheck(${index})" class="item-card group bg-zinc-50 hover:bg-white rounded-2xl border-2 border-zinc-200 p-4 transition-all duration-200 cursor-pointer flex flex-col justify-between select-none shadow-sm">
             
             <div class="flex items-center justify-between mb-3">
               <span class="px-2.5 py-1 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs">
-                #${item.sku}
+                #${escapeHtml(item.sku)}
               </span>
 
               <div class="check-indicator w-6 h-6 rounded-lg border-2 border-zinc-300 flex items-center justify-center text-xs font-black transition">
@@ -251,15 +254,15 @@
 
             <div class="w-full aspect-square bg-white rounded-xl border border-zinc-200/80 p-3 mb-3 flex items-center justify-center overflow-hidden">
               <div class="${isBookmark ? 'w-20 h-32' : 'w-24 h-24'} flex items-center justify-center">
-                ${hasImg ? `<img src="${hasImg}" class="w-full h-full object-contain">` : svgContent}
+                ${safeImg ? `<img src="${safeImg}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
               </div>
             </div>
 
             <div>
-              <h3 class="font-bold text-xs text-zinc-900 mb-1">${item.nameAr}</h3>
+              <h3 class="font-bold text-xs text-zinc-900 mb-1">${escapeHtml(item.nameAr)}</h3>
               <div class="flex items-center justify-between font-mono text-xs text-zinc-600 border-t border-zinc-200 pt-2">
-                <span>المقاس: ${item.size}</span>
-                <span class="px-2 py-0.5 rounded bg-zinc-200 font-extrabold text-zinc-900">الكمية: ${item.qty} قطعة</span>
+                <span>المقاس: ${escapeHtml(item.size)}</span>
+                <span class="px-2 py-0.5 rounded bg-zinc-200 font-extrabold text-zinc-900">الكمية: ${parseInt(item.qty, 10) || 1} قطعة</span>
               </div>
             </div>
 
@@ -270,7 +273,7 @@
       updateProgress();
     }
 
-    function toggleItemCheck(index) {
+    export function toggleItemCheck(index) {
       const card = document.getElementById(`item-card-${index}`);
       if (!card) return;
 
@@ -306,6 +309,7 @@
       }
     }
 
+    window.toggleItemCheck = toggleItemCheck;
     document.addEventListener('DOMContentLoaded', initSlip);
   </script>
 </body>

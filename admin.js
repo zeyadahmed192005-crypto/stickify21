@@ -1,10 +1,27 @@
 /**
  * STICKIFY 21 - Admin Portal Controller
- * PIN Security: 2121
- * Includes Category, Product, Order, and Coupon Management
+ * PIN Security: 2121 (DEMO ONLY: client-side protection, not secure for production)
+ * Category, Product, Order, and Coupon Management
  */
 
+import { CONFIG } from './src/config/config.js';
+import { escapeHtml, sanitizeUrl, sanitizeSvg } from './src/utils/escape.js';
+
 const DEFAULT_PIN = '2121';
+
+// Safe JSON parser
+function safeJsonParse(jsonString, fallback, key = 'unknown') {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString);
+  } catch (err) {
+    console.error(`[STICKIFY 21 Admin] Corrupt JSON in "${key}":`, err);
+    try {
+      localStorage.setItem(`${key}_corrupt_${Date.now()}`, jsonString);
+    } catch(e) {}
+    return fallback;
+  }
+}
 
 // Default Categories
 const defaultCategories = [
@@ -18,10 +35,9 @@ const defaultCategories = [
   { id: 'brand', nameAr: 'شعار البراند', nameEn: 'Brand', icon: '🍊', image: 'logo.jpg' }
 ];
 
-// Default Coupons
+// Default initial coupons (Fixes Bug 07: Only advertised coupon)
 const defaultCoupons = [
-  { code: 'STICKIFY10', discountPercent: 10 },
-  { code: 'STICKIFY21', discountPercent: 21 }
+  CONFIG.ADVERTISED_COUPON
 ];
 
 // Fallback initial products
@@ -100,7 +116,7 @@ let adminState = {
 };
 
 // Initialize
-function initAdmin() {
+export function initAdmin() {
   const isAuth = sessionStorage.getItem('stickify21_admin_auth');
   if (isAuth === 'true') {
     unlockDashboard();
@@ -111,45 +127,39 @@ function initAdmin() {
 
 function loadData() {
   // Orders
-  adminState.orders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
+  adminState.orders = safeJsonParse(localStorage.getItem('stickify21_orders'), [], 'stickify21_orders');
   
   // Categories
-  const storedCats = localStorage.getItem('stickify21_categories');
-  if (storedCats) {
-    try {
-      adminState.categories = JSON.parse(storedCats);
-    } catch(e) {
-      adminState.categories = [...defaultCategories];
-    }
+  const storedCats = safeJsonParse(localStorage.getItem('stickify21_categories'), null, 'stickify21_categories');
+  if (storedCats && Array.isArray(storedCats) && storedCats.length > 0) {
+    adminState.categories = storedCats;
   } else {
     adminState.categories = [...defaultCategories];
-    localStorage.setItem('stickify21_categories', JSON.stringify(adminState.categories));
+    try {
+      localStorage.setItem('stickify21_categories', JSON.stringify(adminState.categories));
+    } catch(e) {}
   }
 
   // Products
-  const storedProds = localStorage.getItem('stickify21_products');
-  if (storedProds) {
-    try {
-      adminState.products = JSON.parse(storedProds);
-    } catch(e) {
-      adminState.products = [...fallbackProducts];
-    }
+  const storedProds = safeJsonParse(localStorage.getItem('stickify21_products'), null, 'stickify21_products');
+  if (storedProds && Array.isArray(storedProds) && storedProds.length > 0) {
+    adminState.products = storedProds;
   } else {
     adminState.products = [...fallbackProducts];
-    localStorage.setItem('stickify21_products', JSON.stringify(adminState.products));
+    try {
+      localStorage.setItem('stickify21_products', JSON.stringify(adminState.products));
+    } catch(e) {}
   }
 
   // Coupons
-  const storedCoupons = localStorage.getItem('stickify21_coupons');
-  if (storedCoupons) {
-    try {
-      adminState.coupons = JSON.parse(storedCoupons);
-    } catch(e) {
-      adminState.coupons = [...defaultCoupons];
-    }
+  const storedCoupons = safeJsonParse(localStorage.getItem('stickify21_coupons'), null, 'stickify21_coupons');
+  if (storedCoupons && Array.isArray(storedCoupons) && storedCoupons.length > 0) {
+    adminState.coupons = storedCoupons;
   } else {
     adminState.coupons = [...defaultCoupons];
-    localStorage.setItem('stickify21_coupons', JSON.stringify(adminState.coupons));
+    try {
+      localStorage.setItem('stickify21_coupons', JSON.stringify(adminState.coupons));
+    } catch(e) {}
   }
 
   renderAll();
@@ -163,10 +173,12 @@ function renderAll() {
   updateBadges();
 }
 
-// PIN Security
-function verifyAdminPin(e) {
+// PIN Security (DEMO ONLY)
+export function verifyAdminPin(e) {
   e.preventDefault();
   const pinInput = document.getElementById('admin-pin-input');
+  if (!pinInput) return;
+
   if (pinInput.value === DEFAULT_PIN) {
     sessionStorage.setItem('stickify21_admin_auth', 'true');
     unlockDashboard();
@@ -177,23 +189,28 @@ function verifyAdminPin(e) {
   }
 }
 
-function unlockDashboard() {
+export function unlockDashboard() {
   adminState.authenticated = true;
-  document.getElementById('admin-lock-screen').classList.add('hidden');
-  document.getElementById('admin-dashboard-app').classList.remove('hidden');
+  const lock = document.getElementById('admin-lock-screen');
+  const dash = document.getElementById('admin-dashboard-app');
+  if (lock) lock.classList.add('hidden');
+  if (dash) dash.classList.remove('hidden');
   loadData();
 }
 
-function lockAdmin() {
+export function lockAdmin() {
   sessionStorage.removeItem('stickify21_admin_auth');
   adminState.authenticated = false;
-  document.getElementById('admin-dashboard-app').classList.add('hidden');
-  document.getElementById('admin-lock-screen').classList.remove('hidden');
-  document.getElementById('admin-pin-input').value = '';
+  const lock = document.getElementById('admin-lock-screen');
+  const dash = document.getElementById('admin-dashboard-app');
+  if (dash) dash.classList.add('hidden');
+  if (lock) lock.classList.remove('hidden');
+  const pinInput = document.getElementById('admin-pin-input');
+  if (pinInput) pinInput.value = '';
 }
 
 // Tab Switching
-function switchTab(tabName) {
+export function switchTab(tabName) {
   adminState.currentTab = tabName;
   ['orders', 'products', 'categories', 'coupons'].forEach(t => {
     const section = document.getElementById(`tab-${t}`);
@@ -220,19 +237,22 @@ function updateBadges() {
 }
 
 // ==========================================
-// ORDERS CONTROLLER
+// ORDERS CONTROLLER (XSS Fixed)
 // ==========================================
-function renderOrders() {
+export function renderOrders() {
   const container = document.getElementById('orders-list-container');
   if (!container) return;
 
   const orders = adminState.orders;
-  const totalRev = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+  const totalRev = orders.reduce((sum, o) => sum + (parseInt(o.total, 10) || 0), 0);
   const pendingCount = orders.filter(o => o.status !== 'مكتمل').length;
 
-  document.getElementById('stat-total-orders').innerText = orders.length;
-  document.getElementById('stat-total-revenue').innerText = `${totalRev} ج.م`;
-  document.getElementById('stat-pending-orders').innerText = pendingCount;
+  const statTotal = document.getElementById('stat-total-orders');
+  const statRev = document.getElementById('stat-total-revenue');
+  const statPending = document.getElementById('stat-pending-orders');
+  if (statTotal) statTotal.innerText = orders.length;
+  if (statRev) statRev.innerText = `${totalRev} ${CONFIG.CURRENCY}`;
+  if (statPending) statPending.innerText = pendingCount;
 
   if (orders.length === 0) {
     container.innerHTML = `
@@ -245,9 +265,9 @@ function renderOrders() {
     return;
   }
 
+  // Fixes SEC-01: Escape all customer free text to prevent XSS
   container.innerHTML = orders.map((order, index) => {
-    const orderDataEncoded = btoa(encodeURIComponent(JSON.stringify(order)));
-    const packingSlipUrl = `packing-slip.html?o=${orderDataEncoded}`;
+    const packingSlipUrl = `packing-slip.html?id=${encodeURIComponent(order.id || '')}`;
     const statusColor = order.status === 'مكتمل' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (order.status === 'تم الشحن' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-700 border-amber-200');
 
     return `
@@ -255,27 +275,27 @@ function renderOrders() {
         
         <div class="space-y-1.5 flex-grow">
           <div class="flex items-center gap-3">
-            <span class="font-mono font-black text-sm text-[#FF5000]">#${order.id || 'S21-ORD'}</span>
-            <span class="text-xs text-zinc-400 font-mono">${order.date || 'اليوم'}</span>
+            <span class="font-mono font-black text-sm text-[#FF5000]">#${escapeHtml(order.id || 'S21-ORD')}</span>
+            <span class="text-xs text-zinc-400 font-mono">${escapeHtml(order.date || 'اليوم')}</span>
             <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusColor}">
-              ${order.status || 'جديد'}
+              ${escapeHtml(order.status || 'جديد')}
             </span>
           </div>
 
-          <div class="flex items-center gap-2 text-xs font-bold text-zinc-900">
-            <span>👤 ${order.customer?.name || 'عميل'}</span>
+          <div class="flex items-center gap-2 text-xs font-bold text-zinc-900 flex-wrap">
+            <span>👤 ${escapeHtml(order.customer?.name || 'عميل')}</span>
             <span class="text-zinc-300">•</span>
-            <span class="font-mono text-zinc-600">📱 ${order.customer?.phone || ''}</span>
+            <span class="font-mono text-zinc-600">📱 ${escapeHtml(order.customer?.phone || '')}</span>
             <span class="text-zinc-300">•</span>
-            <span class="text-zinc-500">📍 ${order.customer?.city || ''}</span>
+            <span class="text-zinc-500">📍 ${escapeHtml(order.customer?.city || '')}</span>
           </div>
 
-          <div class="text-xs text-zinc-500 flex items-center gap-2">
+          <div class="text-xs text-zinc-500 flex items-center gap-2 flex-wrap">
             <span>عدد العناصر: <strong class="text-zinc-900 font-mono">${order.items?.length || 0}</strong></span>
             <span>•</span>
-            <span>طريقة الدفع: <strong class="text-zinc-900">${order.payment || 'عند الاستلام'}</strong></span>
+            <span>طريقة الدفع: <strong class="text-zinc-900">${escapeHtml(order.payment || 'عند الاستلام')}</strong></span>
             <span>•</span>
-            <span>الإجمالي: <strong class="text-[#FF5000] font-mono text-sm">${order.total} ج.م</strong></span>
+            <span>الإجمالي: <strong class="text-[#FF5000] font-mono text-sm">${order.total} ${CONFIG.CURRENCY}</strong></span>
           </div>
         </div>
 
@@ -302,56 +322,63 @@ function renderOrders() {
   }).join('');
 }
 
-function updateOrderStatus(index, newStatus) {
+export function updateOrderStatus(index, newStatus) {
+  if (!adminState.orders[index]) return;
   adminState.orders[index].status = newStatus;
-  localStorage.setItem('stickify21_orders', JSON.stringify(adminState.orders));
+  try {
+    localStorage.setItem('stickify21_orders', JSON.stringify(adminState.orders));
+  } catch(e) {}
   renderOrders();
   showAdminToast(`تم تحديث حالة الطلب إلى "${newStatus}"`);
 }
 
-function deleteOrder(index) {
+export function deleteOrder(index) {
   if (!confirm('هل أنت متأكد من حذف هذا الطلب من السجل؟')) return;
   adminState.orders.splice(index, 1);
-  localStorage.setItem('stickify21_orders', JSON.stringify(adminState.orders));
+  try {
+    localStorage.setItem('stickify21_orders', JSON.stringify(adminState.orders));
+  } catch(e) {}
   renderOrders();
   updateBadges();
   showAdminToast('تم حذف الطلب بنجاح');
 }
 
-function clearAllOrders() {
+export function clearAllOrders() {
   if (!confirm('تحذير: هل تريد مسح سجل الطلبات بالكامل؟')) return;
   adminState.orders = [];
-  localStorage.setItem('stickify21_orders', JSON.stringify([]));
+  try {
+    localStorage.setItem('stickify21_orders', JSON.stringify([]));
+  } catch(e) {}
   renderOrders();
   updateBadges();
   showAdminToast('تم تفريغ السجل بالكامل');
 }
 
 // ==========================================
-// CATEGORIES CONTROLLER (ADD, EDIT, DELETE, IMAGE UPLOAD)
+// CATEGORIES CONTROLLER (XSS Fixed)
 // ==========================================
-function renderCategories() {
+export function renderCategories() {
   const container = document.getElementById('categories-list-container');
   if (!container) return;
 
   container.innerHTML = adminState.categories.map((cat, index) => {
-    // Count products under this category
     const count = adminState.products.filter(p => p.category === cat.id).length;
+    const safeImage = sanitizeUrl(cat.image);
 
     return `
       <div class="bg-zinc-50 hover:bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm flex items-center justify-between gap-3 group transition">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-12 h-12 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-2xl shadow-sm flex-shrink-0 overflow-hidden p-1">
-            ${cat.image ? `<img src="${cat.image}" class="w-full h-full object-contain" alt="${cat.nameAr}">` : `<span class="text-2xl">${cat.icon || '🏷️'}</span>`}
+            ${safeImage ? `<img src="${safeImage}" class="w-full h-full object-contain" alt="${escapeHtml(cat.nameAr)}">` : `<span class="text-2xl">${escapeHtml(cat.icon || '🏷️')}</span>`}
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <h4 class="font-bold text-xs text-zinc-900 truncate">${cat.nameAr}</h4>
-              ${cat.badge ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#FF5000]/10 text-[#FF5000]">${cat.badge}</span>` : ''}
+              <h4 class="font-bold text-xs text-zinc-900 truncate">${escapeHtml(cat.nameAr)}</h4>
+              ${cat.badge ? `<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#FF5000]/10 text-[#FF5000]">${escapeHtml(cat.badge)}</span>` : ''}
               <span class="text-[10px] text-zinc-400 font-mono font-bold">(${count} منتج)</span>
             </div>
             <div class="text-[11px] text-zinc-500 font-mono mt-0.5 truncate">
-              <span>${cat.nameEn || ''}</span> • <span class="text-[#FF5000]">id: ${cat.id}</span>
+              <span>${escapeHtml(cat.nameEn || '')}</span> • <span class="text-[#FF5000]">id: ${escapeHtml(cat.id)}</span>
             </div>
           </div>
         </div>
@@ -370,34 +397,37 @@ function renderCategories() {
   }).join('');
 }
 
-function handleCategoryFileUpload(e) {
+export function handleCategoryFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = function(evt) {
-    document.getElementById('cat-image-url').value = evt.target.result;
+    const input = document.getElementById('cat-image-url');
+    if (input) input.value = evt.target.result;
     updateCategoryPreview();
     showAdminToast('تم تحميل صورة القسم بنجاح! 📸');
   };
   reader.readAsDataURL(file);
 }
 
-function updateCategoryPreview() {
+export function updateCategoryPreview() {
   const previewBox = document.getElementById('cat-preview-box');
-  const imgUrl = document.getElementById('cat-image-url').value.trim();
-  const icon = document.getElementById('cat-icon-input').value.trim();
+  const imgUrl = document.getElementById('cat-image-url')?.value.trim();
+  const icon = document.getElementById('cat-icon-input')?.value.trim();
+  if (!previewBox) return;
 
-  if (imgUrl) {
-    previewBox.innerHTML = `<img src="${imgUrl}" class="w-full h-full object-contain" alt="معاينة">`;
+  const safeUrl = sanitizeUrl(imgUrl);
+  if (safeUrl) {
+    previewBox.innerHTML = `<img src="${safeUrl}" class="w-full h-full object-contain" alt="معاينة">`;
   } else if (icon) {
-    previewBox.innerHTML = `<span class="text-3xl">${icon}</span>`;
+    previewBox.innerHTML = `<span class="text-3xl">${escapeHtml(icon)}</span>`;
   } else {
     previewBox.innerHTML = `<span class="text-3xl">🏷️</span>`;
   }
 }
 
-function editCategory(index) {
+export function editCategory(index) {
   const cat = adminState.categories[index];
   if (!cat) return;
 
@@ -411,7 +441,7 @@ function editCategory(index) {
 
   document.getElementById('cat-form-title').innerText = `تعديل قسم: ${cat.nameAr}`;
   document.getElementById('cat-form-desc').innerText = 'قم بتعديل بيانات أو صورة القسم ثم اضغط حفظ التعديلات';
-  document.getElementById('cat-submit-btn').innerHTML = `<span>✓ حفظ تعديلات قسم "${cat.nameAr}"</span>`;
+  document.getElementById('cat-submit-btn').innerHTML = `<span>✓ حفظ تعديلات قسم "${escapeHtml(cat.nameAr)}"</span>`;
   document.getElementById('cat-cancel-edit-btn').classList.remove('hidden');
 
   updateCategoryPreview();
@@ -424,7 +454,7 @@ function editCategory(index) {
   }
 }
 
-function cancelEditCategory() {
+export function cancelEditCategory() {
   document.getElementById('cat-edit-index').value = '';
   document.getElementById('category-form').reset();
   document.getElementById('cat-image-url').value = '';
@@ -435,7 +465,7 @@ function cancelEditCategory() {
   updateCategoryPreview();
 }
 
-function handleSaveCategory(e) {
+export function handleSaveCategory(e) {
   e.preventDefault();
 
   const editIndexStr = document.getElementById('cat-edit-index').value;
@@ -452,7 +482,6 @@ function handleSaveCategory(e) {
   }
 
   if (editIndexStr === '') {
-    // Adding New
     const exists = adminState.categories.find(c => c.id === id);
     if (exists) {
       showAdminToast('هذا الكود موجود مسبقاً! اختر كود آخر', 'error');
@@ -464,19 +493,17 @@ function handleSaveCategory(e) {
       nameAr: nameAr,
       nameEn: nameEn,
       icon: icon,
-      image: image || null,
+      image: sanitizeUrl(image) || null,
       badge: badge || null
     };
 
     adminState.categories.push(newCat);
-    showAdminToast(`تمت إضافة قسم "${nameAr}" بنجاح! وظهر في المتجر فوراً 🎉`);
+    showAdminToast(`تمت إضافة قسم "${nameAr}" بنجاح!`);
   } else {
-    // Editing Existing
     const idx = parseInt(editIndexStr, 10);
     const oldCat = adminState.categories[idx];
     const oldId = oldCat.id;
 
-    // Check duplicate if id changed
     if (oldId !== id) {
       const exists = adminState.categories.find((c, i) => c.id === id && i !== idx);
       if (exists) {
@@ -484,18 +511,13 @@ function handleSaveCategory(e) {
         return;
       }
 
-      // Update products category if slug changed
-      let updatedProds = 0;
       adminState.products.forEach(p => {
         if (p.category === oldId) {
           p.category = id;
-          updatedProds++;
         }
       });
-      if (updatedProds > 0) {
-        saveProducts();
-        renderProducts();
-      }
+      saveProducts();
+      renderProducts();
     }
 
     adminState.categories[idx] = {
@@ -504,25 +526,29 @@ function handleSaveCategory(e) {
       nameAr: nameAr,
       nameEn: nameEn,
       icon: icon,
-      image: image || null,
+      image: sanitizeUrl(image) || null,
       badge: badge || null
     };
 
     showAdminToast(`تم تحديث بيانات قسم "${nameAr}" بنجاح! ✓`);
   }
 
-  localStorage.setItem('stickify21_categories', JSON.stringify(adminState.categories));
+  try {
+    localStorage.setItem('stickify21_categories', JSON.stringify(adminState.categories));
+  } catch(err) {}
   cancelEditCategory();
   renderCategories();
   updateBadges();
 }
 
-function deleteCategory(index) {
+export function deleteCategory(index) {
   const cat = adminState.categories[index];
   if (!confirm(`هل أنت متأكد من حذف قسم "${cat.nameAr}"؟`)) return;
 
   adminState.categories.splice(index, 1);
-  localStorage.setItem('stickify21_categories', JSON.stringify(adminState.categories));
+  try {
+    localStorage.setItem('stickify21_categories', JSON.stringify(adminState.categories));
+  } catch(err) {}
 
   renderCategories();
   updateBadges();
@@ -530,14 +556,14 @@ function deleteCategory(index) {
 }
 
 // ==========================================
-// PRODUCTS CONTROLLER (ADD, EDIT, DELETE, IMAGE UPLOAD, SEARCH)
+// PRODUCTS CONTROLLER (XSS Fixed)
 // ==========================================
-function handleAdminProductSearch(query) {
+export function handleAdminProductSearch(query) {
   adminState.productSearch = query.trim().toLowerCase();
   renderProducts();
 }
 
-function renderProducts() {
+export function renderProducts() {
   const container = document.getElementById('admin-products-table');
   if (!container) return;
 
@@ -562,36 +588,38 @@ function renderProducts() {
     return;
   }
 
+  // Fixes SEC-01: Escape all product values before rendering into innerHTML
   container.innerHTML = list.map((p) => {
     const realIndex = adminState.products.findIndex(prod => prod.id === p.id);
     const isBookmark = p.category === 'bookmarks' || p.type === 'bookmark';
-    const hasImg = !!p.image;
+    const safeImage = sanitizeUrl(p.image);
+    const safeSvg = sanitizeSvg(p.svg);
 
     return `
       <div class="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex flex-col justify-between group hover:border-zinc-900 transition">
         
         <div class="flex items-center justify-between mb-3">
           <span class="font-mono text-xs font-black text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded">
-            #${p.sku || 'SKU'}
+            #${escapeHtml(p.sku || 'SKU')}
           </span>
           <span class="text-[10px] text-zinc-400 font-bold uppercase">
-            ${p.category}
+            ${escapeHtml(p.category)}
           </span>
         </div>
 
         <div class="w-full aspect-square bg-zinc-50 rounded-xl border border-zinc-100 p-3 mb-3 flex items-center justify-center overflow-hidden">
           <div class="${isBookmark ? 'w-20 h-32' : 'w-24 h-24'} flex items-center justify-center">
-            ${hasImg ? `<img src="${p.image}" class="w-full h-full object-contain" alt="${p.nameAr}">` : p.svg}
+            ${safeImage ? `<img src="${safeImage}" class="w-full h-full object-contain" alt="${escapeHtml(p.nameAr)}">` : safeSvg}
           </div>
         </div>
 
         <div class="space-y-1 mb-3">
-          <h4 class="font-bold text-xs text-zinc-900 truncate">${p.nameAr}</h4>
+          <h4 class="font-bold text-xs text-zinc-900 truncate">${escapeHtml(p.nameAr)}</h4>
           <div class="flex items-center justify-between">
-            <span class="text-[11px] text-zinc-500">${p.finish || 'glossy'}</span>
+            <span class="text-[11px] text-zinc-500">${escapeHtml(p.finish || 'glossy')}</span>
             <div class="flex items-center gap-1">
               <input type="number" value="${p.price}" min="1" onchange="quickUpdatePrice(${realIndex}, this.value)" class="w-16 font-mono font-black text-xs text-center bg-zinc-50 border border-zinc-200 rounded px-1 py-0.5 focus:border-[#FF5000]">
-              <span class="text-[10px] text-zinc-500 font-bold">ج.م</span>
+              <span class="text-[10px] text-zinc-500 font-bold">${CONFIG.CURRENCY}</span>
             </div>
           </div>
         </div>
@@ -611,42 +639,46 @@ function renderProducts() {
   }).join('');
 }
 
-function quickUpdatePrice(index, newPrice) {
+export function quickUpdatePrice(index, newPrice) {
   const priceNum = parseInt(newPrice, 10);
   if (!priceNum || priceNum < 1) return;
+  if (!adminState.products[index]) return;
   adminState.products[index].price = priceNum;
   saveProducts();
-  showAdminToast(`تم تحديث سعر [${adminState.products[index].sku}] إلى ${priceNum} ج.م`);
+  showAdminToast(`تم تحديث سعر [${adminState.products[index].sku}] إلى ${priceNum} ${CONFIG.CURRENCY}`);
 }
 
-function handleProductFileUpload(e) {
+export function handleProductFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = function(evt) {
-    document.getElementById('prod-image').value = evt.target.result;
+    const input = document.getElementById('prod-image');
+    if (input) input.value = evt.target.result;
     updateProductPreview();
     showAdminToast('تم تحميل صورة الاستيكر بنجاح! 📸');
   };
   reader.readAsDataURL(file);
 }
 
-function updateProductPreview() {
+export function updateProductPreview() {
   const previewBox = document.getElementById('prod-preview-box');
-  const imgVal = document.getElementById('prod-image').value.trim();
-  const editId = document.getElementById('prod-edit-id').value;
+  const imgVal = document.getElementById('prod-image')?.value.trim();
+  const editId = document.getElementById('prod-edit-id')?.value;
+  if (!previewBox) return;
 
-  if (imgVal) {
-    previewBox.innerHTML = `<img src="${imgVal}" class="w-full h-full object-contain" alt="معاينة">`;
+  const safeUrl = sanitizeUrl(imgVal);
+  if (safeUrl) {
+    previewBox.innerHTML = `<img src="${safeUrl}" class="w-full h-full object-contain" alt="معاينة">`;
   } else if (editId !== '' && adminState.products[parseInt(editId, 10)]?.svg) {
-    previewBox.innerHTML = adminState.products[parseInt(editId, 10)].svg;
+    previewBox.innerHTML = sanitizeSvg(adminState.products[parseInt(editId, 10)].svg);
   } else {
     previewBox.innerHTML = `<span class="text-zinc-300 text-xs font-mono">معاينة</span>`;
   }
 }
 
-function openProductModal(index = null) {
+export function openProductModal(index = null) {
   const modal = document.getElementById('product-modal');
   const title = document.getElementById('product-modal-title');
   const submitText = document.getElementById('prod-submit-btn-text');
@@ -654,9 +686,8 @@ function openProductModal(index = null) {
   const form = modal.querySelector('form');
   form.reset();
 
-  // Populate Categories Dropdown dynamically from adminState.categories
   catSelect.innerHTML = adminState.categories.map(c => `
-    <option value="${c.id}">${c.icon || '🏷️'} ${c.nameAr}</option>
+    <option value="${escapeHtml(c.id)}">${escapeHtml(c.icon || '🏷️')} ${escapeHtml(c.nameAr)}</option>
   `).join('');
 
   if (index !== null) {
@@ -686,11 +717,11 @@ function openProductModal(index = null) {
   modal.classList.remove('hidden');
 }
 
-function closeProductModal() {
+export function closeProductModal() {
   document.getElementById('product-modal').classList.add('hidden');
 }
 
-function handleSaveProduct(e) {
+export function handleSaveProduct(e) {
   e.preventDefault();
 
   const editIndexStr = document.getElementById('prod-edit-id').value;
@@ -698,7 +729,7 @@ function handleSaveProduct(e) {
   const type = document.getElementById('prod-type').value;
   const nameAr = document.getElementById('prod-name-ar').value.trim();
   const nameEn = document.getElementById('prod-name-en').value.trim() || nameAr;
-  const price = parseInt(document.getElementById('prod-price').value, 10);
+  const price = parseInt(document.getElementById('prod-price').value, 10) || 35;
   const category = document.getElementById('prod-category').value;
   const finish = document.getElementById('prod-finish').value;
   const badge = document.getElementById('prod-badge').value.trim() || (type === 'bookmark' ? 'بوك مارك 🔖' : 'استيكر');
@@ -717,8 +748,8 @@ function handleSaveProduct(e) {
     finish: finish,
     badge: badge,
     desc: desc,
-    image: image || null,
-    svg: !image ? `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="15" width="130" height="130" rx="26" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><text x="80" y="90" font-family="'Space Grotesk'" font-weight="800" font-size="20" fill="#FF5000" text-anchor="middle">${sku}</text></svg>` : null,
+    image: sanitizeUrl(image) || null,
+    svg: !image ? `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="15" width="130" height="130" rx="26" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><text x="80" y="90" font-family="'Space Grotesk'" font-weight="800" font-size="20" fill="#FF5000" text-anchor="middle">${escapeHtml(sku)}</text></svg>` : null,
     dateAdded: Date.now()
   };
 
@@ -745,7 +776,7 @@ function handleSaveProduct(e) {
   closeProductModal();
 }
 
-function deleteProduct(index) {
+export function deleteProduct(index) {
   const p = adminState.products[index];
   if (!confirm(`هل أنت متأكد من حذف المنتج [${p.sku}] "${p.nameAr}"؟`)) return;
   adminState.products.splice(index, 1);
@@ -757,13 +788,15 @@ function deleteProduct(index) {
 }
 
 function saveProducts() {
-  localStorage.setItem('stickify21_products', JSON.stringify(adminState.products));
+  try {
+    localStorage.setItem('stickify21_products', JSON.stringify(adminState.products));
+  } catch(e) {}
 }
 
 // ==========================================
-// COUPONS CONTROLLER
+// COUPONS CONTROLLER (XSS Fixed)
 // ==========================================
-function renderCoupons() {
+export function renderCoupons() {
   const container = document.getElementById('coupons-list-container');
   if (!container) return;
 
@@ -777,7 +810,7 @@ function renderCoupons() {
   container.innerHTML = adminState.coupons.map((c, index) => `
     <div class="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
       <div class="flex items-center gap-3">
-        <span class="font-mono font-black text-sm bg-zinc-200 px-2 py-0.5 rounded text-zinc-900">${c.code}</span>
+        <span class="font-mono font-black text-sm bg-zinc-200 px-2 py-0.5 rounded text-zinc-900">${escapeHtml(c.code)}</span>
         <span class="text-xs font-bold text-emerald-600">خصم ${c.discountPercent}%</span>
       </div>
       <button onclick="deleteCoupon(${index})" class="text-xs text-red-500 hover:text-red-700 font-bold p-1">
@@ -787,7 +820,7 @@ function renderCoupons() {
   `).join('');
 }
 
-function handleCreateCoupon(e) {
+export function handleCreateCoupon(e) {
   e.preventDefault();
   const code = document.getElementById('coupon-code-input').value.trim().toUpperCase();
   const percent = parseInt(document.getElementById('coupon-percent-input').value, 10);
@@ -801,7 +834,9 @@ function handleCreateCoupon(e) {
   }
 
   adminState.coupons.push({ code: code, discountPercent: percent });
-  localStorage.setItem('stickify21_coupons', JSON.stringify(adminState.coupons));
+  try {
+    localStorage.setItem('stickify21_coupons', JSON.stringify(adminState.coupons));
+  } catch(err) {}
   
   document.getElementById('coupon-code-input').value = '';
   document.getElementById('coupon-percent-input').value = '';
@@ -811,30 +846,36 @@ function handleCreateCoupon(e) {
   showAdminToast(`تم تفعيل كود الخصم "${code}" بنسبة ${percent}%`);
 }
 
-function deleteCoupon(index) {
+export function deleteCoupon(index) {
   const c = adminState.coupons[index];
   if (!confirm(`هل أنت متأكد من حذف كود الخصم "${c.code}"؟`)) return;
   adminState.coupons.splice(index, 1);
-  localStorage.setItem('stickify21_coupons', JSON.stringify(adminState.coupons));
+  try {
+    localStorage.setItem('stickify21_coupons', JSON.stringify(adminState.coupons));
+  } catch(err) {}
   renderCoupons();
   updateBadges();
   showAdminToast(`تم حذف كود الخصم "${c.code}"`);
 }
 
-// Toast
-function showAdminToast(message, type = 'success') {
+// Safe Toast
+export function showAdminToast(message, type = 'success') {
   const container = document.getElementById('toast-container');
   if (!container) return;
 
   const toast = document.createElement('div');
   const bg = type === 'error' ? 'bg-red-600' : 'bg-zinc-900';
   toast.className = `px-4 py-3 rounded-xl text-xs font-bold text-white shadow-xl flex items-center gap-2 transform transition-all duration-200 translate-y-3 opacity-0 ${bg}`;
-  toast.innerHTML = `
-    <span>${type === 'error' ? '✕' : '✓'}</span>
-    <span>${message}</span>
-  `;
+  
+  const icon = document.createElement('span');
+  icon.textContent = type === 'error' ? '✕' : '✓';
+  const text = document.createElement('span');
+  text.textContent = message;
 
+  toast.appendChild(icon);
+  toast.appendChild(text);
   container.appendChild(toast);
+
   setTimeout(() => {
     toast.classList.remove('translate-y-3', 'opacity-0');
   }, 10);
@@ -844,5 +885,30 @@ function showAdminToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 250);
   }, 3000);
 }
+
+// Window exposures
+window.verifyAdminPin = verifyAdminPin;
+window.unlockDashboard = unlockDashboard;
+window.lockAdmin = lockAdmin;
+window.switchTab = switchTab;
+window.updateOrderStatus = updateOrderStatus;
+window.deleteOrder = deleteOrder;
+window.clearAllOrders = clearAllOrders;
+window.editCategory = editCategory;
+window.cancelEditCategory = cancelEditCategory;
+window.deleteCategory = deleteCategory;
+window.handleCategoryFileUpload = handleCategoryFileUpload;
+window.updateCategoryPreview = updateCategoryPreview;
+window.handleSaveCategory = handleSaveCategory;
+window.handleAdminProductSearch = handleAdminProductSearch;
+window.quickUpdatePrice = quickUpdatePrice;
+window.openProductModal = openProductModal;
+window.closeProductModal = closeProductModal;
+window.handleProductFileUpload = handleProductFileUpload;
+window.updateProductPreview = updateProductPreview;
+window.handleSaveProduct = handleSaveProduct;
+window.deleteProduct = deleteProduct;
+window.handleCreateCoupon = handleCreateCoupon;
+window.deleteCoupon = deleteCoupon;
 
 document.addEventListener('DOMContentLoaded', initAdmin);

@@ -8,20 +8,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Readex+Pro:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/jpeg" href="logo.jpg">
   
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brandOrange: '#FF5000',
-            brandBlack: '#0E0E10'
-          }
-        }
-      }
-    }
-  </script>
+  <!-- Compiled CSS (Tailwind CLI) -->
+  <link rel="stylesheet" href="dist/styles.css">
 
   <style>
     body {
@@ -54,7 +44,7 @@
       <form onsubmit="verifyAdminPin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-zinc-700 mb-1.5">أدخل رمز الدخول (PIN):</label>
-          <input type="password" id="admin-pin-input" autofocus placeholder="رمز المرور الافتراضي: 2121" class="w-full text-center text-lg tracking-widest font-mono bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-[#FF5000]">
+          <input type="password" id="admin-pin-input" autofocus placeholder="أدخل رمز الدخول" class="w-full text-center text-lg tracking-widest font-mono bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3 text-zinc-900 focus:outline-none focus:border-[#FF5000]">
         </div>
         <button type="submit" class="w-full py-3.5 rounded-2xl bg-[#FF5000] hover:bg-[#E04600] text-white font-bold text-xs transition shadow-sm">
           تسجيل الدخول للإدارة
@@ -440,7 +430,7 @@
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 max-w-sm"></div>
 
-  <!-- Admin JS Engine -->
-  <script src="admin.js"></script>
+  <!-- Admin JS Engine (ES Module) -->
+  <script type="module" src="admin.js"></script>
 </body>
 </html>

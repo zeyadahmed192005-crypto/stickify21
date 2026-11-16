@@ -1,0 +1,126 @@
+/**
+ * STICKIFY 21 - Domain Pricing & Cart Calculation Engine
+ * Single Source of Truth for all prices, discounts, thresholds, and totals.
+ */
+
+import { CONFIG } from '../config/config.js';
+
+/**
+ * Calculates unit price for a given product and size.
+ * @param {object} product
+ * @param {string} sizeKey - 'small' | 'medium' | 'large' | 'standard'
+ * @returns {number} Integer price in EGP
+ */
+export function getProductPriceForSize(product, sizeKey = 'medium') {
+  if (!product) return 0;
+  if (product.category === 'bookmarks' || product.type === 'bookmark') {
+    return Math.round(product.price || CONFIG.BOOKMARK_SPECS.defaultPrice);
+  }
+
+  const base = Math.round(product.price || 35);
+  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey);
+  const offset = sizeObj ? sizeObj.priceOffset : 0;
+  
+  return Math.max(15, base + offset);
+}
+
+/**
+ * Calculates raw, discounted price and savings for a custom pack.
+ * @param {Array<object>} items - Array of products in the pack
+ * @param {number} targetSize - 5 or 10
+ * @returns {{ rawTotal: number, discountedTotal: number, savings: number, discountRate: number }}
+ */
+export function calculatePackSummary(items, targetSize = 5) {
+  const safeTarget = targetSize === 10 ? 10 : 5;
+  const packConfig = CONFIG.PACK_CONFIG[safeTarget];
+  const discountRate = packConfig.discountRate;
+
+  const rawTotal = (items || []).reduce((sum, item) => {
+    const p = item.price || 35;
+    return sum + p;
+  }, 0);
+
+  const discountedTotal = Math.round(rawTotal * (1 - discountRate));
+  const savings = Math.max(0, rawTotal - discountedTotal);
+
+  return {
+    rawTotal,
+    discountedTotal,
+    savings,
+    discountRate
+  };
+}
+
+/**
+ * Calculates comprehensive cart figures.
+ * Free shipping is strictly evaluated on the post-discount subtotal.
+ * @param {object} params
+ * @param {Array<object>} params.items - Cart items
+ * @param {object|null} params.coupon - Active coupon { code, discountPercent, minOrder }
+ * @param {string|null} params.governorate - Selected Egyptian governorate
+ * @returns {object} Cart calculation breakdown
+ */
+export function calculateCart({ items = [], coupon = null, governorate = null }) {
+  const subtotal = items.reduce((sum, item) => {
+    const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
+    const price = Math.max(0, parseInt(item.price, 10) || 0);
+    return sum + (price * qty);
+  }, 0);
+
+  let discount = 0;
+  let couponWarning = null;
+
+  if (coupon && coupon.discountPercent > 0 && subtotal > 0) {
+    const minOrder = coupon.minOrder || 0;
+    if (subtotal < minOrder) {
+      couponWarning = `كود الخصم يتطلب حداً أدنى للطلب ${minOrder} ج.م`;
+    } else {
+      const pct = Math.min(90, Math.max(1, coupon.discountPercent));
+      discount = Math.round(subtotal * (pct / 100));
+      discount = Math.min(discount, subtotal); // Prevent negative total
+    }
+  }
+
+  const postDiscountSubtotal = Math.max(0, subtotal - discount);
+
+  // Free shipping rule: evaluated on post-discount subtotal
+  const threshold = CONFIG.FREE_SHIPPING_THRESHOLD;
+  const isFreeShipping = subtotal > 0 && postDiscountSubtotal >= threshold;
+  const freeShippingRemaining = isFreeShipping ? 0 : Math.max(0, threshold - postDiscountSubtotal);
+  const freeShippingProgress = threshold > 0 ? Math.min(100, Math.round((postDiscountSubtotal / threshold) * 100)) : 100;
+
+  // Shipping rate lookup
+  let shippingRate = CONFIG.DEFAULT_SHIPPING;
+  if (governorate && CONFIG.SHIPPING_RATES[governorate] !== undefined) {
+    shippingRate = CONFIG.SHIPPING_RATES[governorate];
+  }
+
+  const shipping = subtotal === 0 ? 0 : (isFreeShipping ? 0 : shippingRate);
+  const total = postDiscountSubtotal + shipping;
+
+  return {
+    subtotal,
+    discount,
+    postDiscountSubtotal,
+    shipping,
+    total,
+    isFreeShipping,
+    freeShippingRemaining,
+    freeShippingProgress,
+    couponWarning,
+    itemCount: items.reduce((sum, item) => sum + (parseInt(item.quantity, 10) || 1), 0)
+  };
+}
+
+/**
+ * Generates a deterministic unique line key for merging cart items.
+ * @param {object} item
+ * @returns {string} Unique identifier for line merge
+ */
+export function generateCartLineKey(item) {
+  if (item.type === 'pack') {
+    const sortedIds = (item.itemIds || []).slice().sort().join(':');
+    return `pack:${item.packSize || 5}:${item.sizeKey || 'medium'}:${sortedIds}`;
+  }
+  return `item:${item.productId}:${item.sizeKey || 'medium'}`;
+}

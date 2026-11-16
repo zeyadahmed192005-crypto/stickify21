@@ -10,26 +10,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Readex+Pro:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
   
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Favicon -->
+  <link rel="icon" type="image/jpeg" href="logo.jpg">
+  
+  <!-- Compiled CSS (Tailwind CLI) -->
+  <link rel="stylesheet" href="dist/styles.css">
+
+  <!-- Diagnostics for direct file:// launch -->
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brandOrange: '#FF5000',
-            brandOrangeHover: '#E04600',
-            brandBlack: '#0E0E10',
-            brandMuted: '#71717A',
-            surfaceBase: '#FAFAFA'
-          }
-        }
-      }
+    if (window.location.protocol === 'file:') {
+      document.addEventListener('DOMContentLoaded', function() {
+        var banner = document.createElement('div');
+        banner.id = 'file-protocol-warning';
+        banner.className = 'fixed top-0 left-0 right-0 z-50 bg-amber-500 text-zinc-950 px-4 py-2.5 text-center text-xs font-bold shadow-lg border-b border-amber-600 flex flex-wrap items-center justify-center gap-2';
+        banner.innerHTML = '<span>⚠️ تنبيه: تم تشغيل الموقع عبر بروتوكول (file://). لضمان عمل وحدات JavaScript وقاعدة البيانات، يرجى تشغيل خادم محلي:</span><code class="bg-zinc-900 text-white px-2 py-0.5 rounded font-mono">python -m http.server 8000</code><span>أو</span><code class="bg-zinc-900 text-white px-2 py-0.5 rounded font-mono">npx serve .</code><button onclick="this.parentElement.remove()" class="text-xs bg-zinc-900/20 hover:bg-zinc-900/40 rounded px-2 py-0.5 ml-2">✕ إغلاق</button>';
+        document.body.prepend(banner);
+      });
     }
   </script>
-
-  <!-- Custom Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-[#FAFAFA] text-[#0E0E10] min-h-screen selection:bg-[#FF5000] selection:text-white">
 
@@ -364,9 +362,7 @@
             
             <!-- Real Studio Mat Background -->
             <div id="device-wrapper" class="w-full min-h-[380px] relative flex items-center justify-center p-6 overflow-hidden select-none transition-all duration-300">
-              <div id="mockup-stickers-layer" class="absolute inset-0 z-10 w-full h-full pointer-events-auto">
-                <!-- Staged via JS -->
-              </div>
+              <!-- Mockup device and stickers layer injected via JS -->
             </div>
 
             <div id="mockup-controls" class="mt-5">
@@ -552,7 +548,7 @@
     </div>
   </footer>
 
-  <!-- App Script -->
-  <script src="app.js"></script>
+  <!-- App Script (ES Module) -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>
