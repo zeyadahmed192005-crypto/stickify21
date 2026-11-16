@@ -163,3 +163,13 @@ This document records all architectural decisions, ground-truth constraints, and
   - Supported Hooks: `view_item`, `add_to_cart`, `begin_checkout`, `purchase`, and custom events.
   - Privacy First: External analytics scripts are only injected when valid IDs (`CONFIG.ANALYTICS.GA4_ID`, `CONFIG.ANALYTICS.META_PIXEL_ID`) are explicitly configured.
   - Safe Local Development: In prototype mode, events are safely output to `console.debug` for debugging and test verification without throwing errors or transmitting tracking cookies.
+
+### AD-25: End-to-End Test Suite, Comprehensive Regression Automation & Migration Handover
+- **Decision:** Validate the entire system end-to-end using Playwright with 34 deterministic integration tests partitioned across all 6 phases:
+  - Phase 1: Zero console errors on clean boot, sticker sizes & pricing, pack bundle integrity, pointer events drag bounds, coupon configuration, XSS sanitization.
+  - Phase 2: Schema initialization, 6-state order lifecycle with valid/invalid transitions, PBKDF2 Web Crypto passcode authentication, Base64url Order Code WhatsApp export/import, IndexedDB asset storage.
+  - Phase 3: Custom Print Studio tiered volume pricing, deep-linkable product modals (`#/product/:id`), deep-linkable order tracking (`#/track/:id`), multi-payment checkout (COD, InstaPay, Vodafone Cash), neutral car window mockup layer.
+  - Phase 4: Admin KPI cards, orders filter and bulk state changes, UTF-8 BOM CSV export for Excel, product catalog CRUD with auto-SKU, settings management (27-governorate shipping rates, backup/restore, reset demo data), batch packing slip multi-page printing.
+  - Phase 5: SEO meta tags, OpenGraph previews, crawler directives (`robots.txt`, `sitemap.xml`, `noindex`), dynamic Schema.org JSON-LD catalog, legal policy modals (`#/terms`, `#/privacy`), analytics dispatcher.
+  - Phase 6: Full-lifecycle integration scenarios (IndexedDB WebP compression <= 1000px, complete customer purchase flow, complete admin management flow, self-service tracking, resilient error recovery from corrupted JSON).
+- **Execution Protocol:** Tests run against a lightweight local Python HTTP server without external network dependencies, ensuring 100% reproducible offline CI/CD execution.
