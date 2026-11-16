@@ -158,6 +158,8 @@ test.describe('Phase 1 Acceptance Tests', () => {
 
     const sticker = page.locator('.mockup-placed-sticker').first();
     await expect(sticker).toBeVisible();
+    await sticker.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400); // Allow scroll to settle
 
     const initialBox = await sticker.boundingBox();
     expect(initialBox).not.toBeNull();

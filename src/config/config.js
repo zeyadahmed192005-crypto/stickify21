@@ -145,5 +145,51 @@ export const CONFIG = {
     MAX_ATTEMPTS: 5,
     LOCKOUT_MS: 15 * 60 * 1000, // 15 minutes
     SESSION_TIMEOUT_MS: 30 * 60 * 1000 // 30 minutes
+  },
+
+  // Payment Methods
+  PAYMENT_METHODS: {
+    cod: {
+      id: 'cod',
+      labelAr: 'الدفع عند الاستلام (COD)',
+      icon: '💵',
+      instructions: 'الدفع نقداً للمندوب عند استلام الشحنة والتأكد من سلامتها.'
+    },
+    instapay: {
+      id: 'instapay',
+      labelAr: 'انستاباي (InstaPay)',
+      icon: '⚡',
+      handle: 'stickify21@instapay',
+      instructions: 'الدفع عبر تطبيق InstaPay المعتمد إلى المعرّف: stickify21@instapay (يرجى إرسال إشعار التحويل عبر واتساب).'
+    },
+    vodafone_cash: {
+      id: 'vodafone_cash',
+      labelAr: 'فودافون كاش (Vodafone Cash)',
+      icon: '📱',
+      walletNumber: '01043546503',
+      instructions: 'التحويل عبر محفظة فودافون كاش إلى الرقم: 01043546503 (يرجى إرسال لقطة شاشة للتحويل عبر واتساب).'
+    }
+  },
+
+  // Custom Print Order Tiers
+  CUSTOM_PRINT: {
+    MIN_QUANTITY: 10,
+    MAX_FILE_SIZE_MB: 10,
+    TIERS: [
+      { min: 10, max: 49, unitBase: 20, labelAr: '10–49 قطعة (السعر الأساسي)', discountPercent: 0 },
+      { min: 50, max: 99, unitBase: 15, labelAr: '50–99 قطعة (وفر 25% 🔥)', discountPercent: 25 },
+      { min: 100, max: Infinity, unitBase: 10, labelAr: '100+ قطعة (وفر 50% 👑)', discountPercent: 50 }
+    ],
+    FINISH_EXTRAS: {
+      glossy: 0,
+      matte: 0,
+      holographic: 5
+    },
+    SIZE_EXTRAS: {
+      '6cm': 0,
+      '8cm': 0,
+      '10cm': 5,
+      'custom': 5
+    }
   }
 };

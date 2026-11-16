@@ -9,9 +9,10 @@ import { CONFIG } from '../config/config.js';
  * Calculates unit price for a given product and size.
  * @param {object} product
  * @param {string} sizeKey - 'small' | 'medium' | 'large' | 'standard'
+ * @param {string} finish - 'holographic' | 'glossy' | 'matte'
  * @returns {number} Integer price in EGP
  */
-export function getProductPriceForSize(product, sizeKey = 'medium') {
+export function getProductPriceForSize(product, sizeKey = 'medium', finish = 'matte') {
   if (!product) return 0;
   if (product.category === 'bookmarks' || product.type === 'bookmark') {
     return Math.round(product.price || CONFIG.BOOKMARK_SPECS.defaultPrice);
@@ -22,6 +23,37 @@ export function getProductPriceForSize(product, sizeKey = 'medium') {
   const offset = sizeObj ? sizeObj.priceOffset : 0;
   
   return Math.max(15, base + offset);
+}
+
+/**
+ * Calculates tiered pricing breakdown for custom print orders (min 10 pcs).
+ * @param {number} quantity - Quantity of custom prints (min 10)
+ * @param {string} sizeKey - '6cm' | '8cm' | '10cm' | 'custom'
+ * @param {string} finish - 'glossy' | 'matte' | 'holographic'
+ * @returns {object} Tier calculation details
+ */
+export function calculateCustomPrintSummary(quantity = 10, sizeKey = '8cm', finish = 'glossy') {
+  const qty = Math.max(CONFIG.CUSTOM_PRINT.MIN_QUANTITY, parseInt(quantity, 10) || 10);
+  const tier = CONFIG.CUSTOM_PRINT.TIERS.find(t => qty >= t.min && qty <= t.max) || CONFIG.CUSTOM_PRINT.TIERS[0];
+
+  const finishExtra = CONFIG.CUSTOM_PRINT.FINISH_EXTRAS[finish] || 0;
+  const sizeExtra = CONFIG.CUSTOM_PRINT.SIZE_EXTRAS[sizeKey] || 0;
+
+  const unitPrice = tier.unitBase + finishExtra + sizeExtra;
+  const baseUnitPrice = 20 + finishExtra + sizeExtra;
+  const standardTotal = baseUnitPrice * qty;
+  const total = unitPrice * qty;
+  const savings = Math.max(0, standardTotal - total);
+
+  return {
+    quantity: qty,
+    unitPrice,
+    total,
+    standardTotal,
+    savings,
+    tierLabel: tier.labelAr,
+    discountPercent: tier.discountPercent
+  };
 }
 
 /**

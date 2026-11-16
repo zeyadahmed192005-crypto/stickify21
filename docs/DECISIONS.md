@@ -84,3 +84,31 @@ This document records all architectural decisions, ground-truth constraints, and
   - Phone numbers: Egyptian mobile prefixes (`010`, `011`, `012`, `015`), accepts `+20` and `0020`, normalized to standard 11-digit `01xxxxxxxxx`.
   - Governorates: Validated against the 27 official Egyptian governorates with specific shipping tiers.
   - Coupons: Percentage or fixed discounts, minimum subtotal, expiration date, usage limits, and category restrictions, returning Arabic error messages upon failure.
+
+### AD-13: URL Hash Routing Architecture (`#/product/:id`, `#/track`, `#/track/:id`)
+- **Decision:** Implement client-side routing using the URL hash (`window.location.hash`).
+- **Supported Routes:**
+  - `#/product/:id`: Opens the full product modal with size/finish selection, quantity controls, and related products carousel.
+  - `#/track`: Opens the self-service order tracking dialog with an Egyptian order ID / mobile search form.
+  - `#/track/:id`: Directly loads and displays the 6-state order progress timeline for the specified order ID.
+  - `#/custom-print`: Smoothly scrolls to the interactive Custom Print Studio.
+- **Rationale:** Works seamlessly on static local file servers (`python -m http.server`, `npx serve`) without requiring server-side URL rewrite configuration (HTML5 pushState would 404 on page reload).
+
+### AD-14: Custom Print Studio Tiered Volume Pricing (`src/domain/pricing.js`)
+- **Decision:** Provide transparent, automated tiered pricing for custom business/club printing:
+  - 10–49 pieces: 20 EGP / piece
+  - 50–99 pieces: 15 EGP / piece
+  - 100+ pieces: 10 EGP / piece
+  - Finish surcharges: Holographic adds +5 EGP / piece; Large (10cm) adds +10 EGP / piece.
+- **File Handling:** Supports client-side preview of PNG, JPG, and PDF vector artwork with client-side drag-and-drop and size limits (10MB max). Direct WhatsApp order routing formats the complete order specification.
+
+### AD-15: Multi-Payment Options & Egyptian Mobile Wallets
+- **Decision:** Offer three standard Egyptian payment methods at checkout:
+  1. Cash on Delivery (`cod` - الدفع عند الاستلام)
+  2. InstaPay (`instapay` - تحويل فوري عبر إنستاباي إلى المعرّف `stickify21@instapay`)
+  3. Vodafone Cash (`vodafone_cash` - تحويل عبر محفظة فودافون كاش إلى الرقم `01043546503`)
+- **Implementation:** Detailed payment and transfer instructions display dynamically in `#payment-method-details`. Payment method selection is recorded on the order object and formatted into the WhatsApp order message.
+
+### AD-16: Neutral Photorealistic Mockup Surfaces
+- **Decision:** Ensure all Mockup Studio surfaces (Laptop, Phone, Notebook, Water Bottle, Car Window) avoid trademarked logos (e.g. no Apple logo, no ThinkPad logo).
+- **Realistic Car Window:** Implemented with realistic automotive weatherstripping, defroster filament lines, tinted glass reflection, and tempered glass stamp (`TEMPERED GLASS • S21`).

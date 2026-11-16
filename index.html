@@ -66,6 +66,9 @@
           <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FF5000]/10 text-[#FF5000] font-mono font-bold">5 و 10</span>
         </a>
         <a href="#custom-order" class="hover:text-black transition">طباعة مخصصة</a>
+        <a href="#/track" id="nav-track-link" class="hover:text-[#FF5000] transition flex items-center gap-1 font-bold">
+          <span>تتبع طلبك 🔍</span>
+        </a>
       </nav>
 
       <!-- Search & Bag Actions -->
@@ -294,6 +297,9 @@
           <button onclick="changeMockupDevice('notebook')" class="device-tab-btn px-4 py-2 rounded-full text-xs font-semibold transition bg-white text-zinc-700 hover:text-black border border-zinc-200" data-device="notebook">
             كشكول ملاحظات
           </button>
+          <button onclick="changeMockupDevice('car_window')" class="device-tab-btn px-4 py-2 rounded-full text-xs font-semibold transition bg-white text-zinc-700 hover:text-black border border-zinc-200" data-device="car_window">
+            🚗 زجاج سيارة (Car Window)
+          </button>
         </div>
       </div>
 
@@ -343,9 +349,9 @@
 
             <div onclick="addStickerToMockup('stk-6')" class="p-2 rounded-xl bg-zinc-50 border border-zinc-200 hover:border-black cursor-pointer transition text-center group">
               <div class="w-14 h-14 mx-auto flex items-center justify-center">
-                <svg viewBox="0 0 160 160"><ellipse cx="80" cy="50" rx="52" ry="14" fill="#FFC107"/><circle cx="80" cy="88" r="28" fill="#FFF" stroke="#000" stroke-width="4"/></svg>
+                <svg viewBox="0 0 160 160"><rect x="15" y="15" width="130" height="130" rx="26" fill="#18181B" stroke="#FF5000" stroke-width="3"/><ellipse cx="80" cy="95" rx="36" ry="24" fill="#E4E4E7"/><path d="M 45 92 Q 80 128 115 92 Z" fill="#FF5000"/><text x="80" y="55" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FFF" text-anchor="middle">RAMEN</text></svg>
               </div>
-              <span class="text-[10px] font-bold text-zinc-700 block mt-1">لوفي</span>
+              <span class="text-[10px] font-bold text-zinc-700 block mt-1">رامين أنمي 🍜</span>
             </div>
           </div>
 
@@ -378,33 +384,227 @@
   </section>
 
   <!-- ========================================== -->
-  <!-- SECTION: CUSTOM ORDER                      -->
+  <!-- SECTION: CUSTOM ORDER (PRINT STUDIO & TIERED PRICING) -->
   <!-- ========================================== -->
-  <section id="custom-order" class="py-16 border-t border-zinc-200/80 bg-white">
+  <section id="custom-order" class="py-16 border-t border-zinc-200/80 bg-zinc-50/50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="rounded-3xl border border-zinc-200 bg-zinc-50 p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-10">
+        <span class="text-[11px] font-bold uppercase tracking-widest text-[#FF5000] bg-[#FF5000]/10 px-3 py-1 rounded-full">
+          طباعة مخصصة واستيكرات الشركات والمبادرات
+        </span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-zinc-900 mt-2">اطبع تصاميمك الخاصة بدقة قص Die-cut فائقة 🎨</h2>
+        <p class="text-zinc-600 text-xs sm:text-sm mt-1">
+          للشركات، المكتبات، النوادي الطلابية، والمبادرات — تبدأ من 10 قطع بأسعار تنافسية وخصومات حتى 50%!
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        <div class="max-w-xl space-y-3 text-center md:text-right">
-          <span class="text-[11px] font-bold uppercase tracking-widest text-[#FF5000] bg-[#FF5000]/10 px-3 py-1 rounded-full">
-            طباعة مخصصة
-          </span>
-          <h2 class="text-2xl sm:text-3xl font-extrabold text-zinc-900">عايز تطبع استيكرات أو بوك مارك بتصميمك؟</h2>
-          <p class="text-zinc-600 text-xs sm:text-sm leading-relaxed">
-            بنطبعلك استيكراتك الخاصة أو فواصل كتب للمكتبات والمبادرات والشركات بدقة قص Die-cut احترافية تبدأ من 10 قطع. تواصل معنا مباشرة على الواتساب: <strong class="text-zinc-900 font-mono">01043546503</strong>
-          </p>
-          <div class="pt-2">
-            <a href="https://wa.me/201043546503?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20STICKIFY21%D8%8C%20%D8%B9%D8%A7%D9%8A%D8%B2%20%D8%A3%D8%B3%D8%AA%D9%81%D8%B3%D8%B1%20%D8%B9%D9%86%20%D8%B7%D8%A8%D8%A7%D8%B9%D8%A9%20%D8%A7%D8%B3%D8%AA%D9%8A%D9%83%D8%B1%D8%A7%D8%AA%20%D8%A3%D9%88%20%D8%A8%D9%88%D9%83%20%D9%85%D8%A7%D8%B1%D9%83%20%D9%85%D8%AE%D8%B5%D8%B5%D8%A9%20%F0%9F%93%96" target="_blank" class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs transition shadow-sm">
-              <span>تواصل عبر واتساب (01043546503)</span>
-              <span>💬</span>
-            </a>
+        <!-- Left: Upload & Specs Form (8 cols) -->
+        <div class="lg:col-span-8 bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm space-y-6">
+          
+          <!-- File Upload Zone -->
+          <div>
+            <label class="block text-xs font-bold text-zinc-900 mb-2">1. ارفع ملف التصميم (PNG, JPG, PDF - حتى 10MB) *</label>
+            <div id="custom-dropzone" class="border-2 border-dashed border-zinc-300 hover:border-zinc-900 rounded-2xl p-6 text-center cursor-pointer transition bg-zinc-50 hover:bg-zinc-100 flex flex-col items-center justify-center min-h-[140px] relative">
+              <input type="file" id="custom-file-input" accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf" class="hidden" onchange="handleCustomFileSelect(this.files)">
+              
+              <div id="dropzone-prompt" class="space-y-1.5 pointer-events-none">
+                <span class="text-3xl block">📁</span>
+                <p class="text-xs font-bold text-zinc-800">اضغط لاختيار الملف أو اسحبه وأفلته هنا</p>
+                <p class="text-[11px] text-zinc-400">يفضل خلفية شفافة بدقة 300DPI أو ملف Vector</p>
+              </div>
+
+              <!-- Uploaded preview thumbnail container -->
+              <div id="dropzone-preview" class="hidden flex items-center gap-4 text-right w-full">
+                <div id="preview-media-box" class="w-16 h-16 rounded-xl bg-white border border-zinc-200 p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                  <!-- Media thumbnail or PDF icon injected -->
+                </div>
+                <div class="flex-grow min-w-0">
+                  <p id="preview-file-name" class="text-xs font-bold text-zinc-900 truncate">design.png</p>
+                  <p id="preview-file-size" class="text-[11px] font-mono text-zinc-500">2.4 MB</p>
+                  <span class="inline-block mt-1 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">جاهز للطباعة ✓</span>
+                </div>
+                <button type="button" onclick="clearCustomUpload(event)" class="text-xs text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition">
+                  ✕ حذف
+                </button>
+              </div>
+            </div>
+            <p id="custom-file-error" class="text-red-500 text-[11px] font-semibold mt-1 hidden"></p>
           </div>
+
+          <!-- Options Grid: Size & Finish -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 border-t border-zinc-100">
+            
+            <!-- Size Options -->
+            <div>
+              <label class="block text-xs font-bold text-zinc-900 mb-2">2. المقاس المطلوب *</label>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <button type="button" onclick="selectCustomSize('6cm')" id="custom-size-6cm" class="custom-size-btn p-2.5 rounded-xl border border-zinc-200 text-zinc-700 hover:border-black font-semibold text-center transition">
+                  <span>6 سم (صغير)</span>
+                </button>
+                <button type="button" onclick="selectCustomSize('8cm')" id="custom-size-8cm" class="custom-size-btn active-custom-size p-2.5 rounded-xl border border-zinc-900 bg-zinc-900 text-white font-semibold text-center transition">
+                  <span>8 سم (المقاس القياسي)</span>
+                </button>
+                <button type="button" onclick="selectCustomSize('10cm')" id="custom-size-10cm" class="custom-size-btn p-2.5 rounded-xl border border-zinc-200 text-zinc-700 hover:border-black font-semibold text-center transition">
+                  <span>10 سم (كبير +5 ج.م)</span>
+                </button>
+                <button type="button" onclick="selectCustomSize('custom')" id="custom-size-custom" class="custom-size-btn p-2.5 rounded-xl border border-zinc-200 text-zinc-700 hover:border-black font-semibold text-center transition">
+                  <span>مقاس مخصص</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Finish Options -->
+            <div>
+              <label class="block text-xs font-bold text-zinc-900 mb-2">3. الملمس واللمعان *</label>
+              <div class="grid grid-cols-3 gap-2 text-xs">
+                <button type="button" onclick="selectCustomFinish('glossy')" id="custom-finish-glossy" class="custom-finish-btn active-custom-finish p-2.5 rounded-xl border border-zinc-900 bg-zinc-900 text-white font-semibold text-center transition">
+                  <span>لامع (Glossy)</span>
+                </button>
+                <button type="button" onclick="selectCustomFinish('matte')" id="custom-finish-matte" class="custom-finish-btn p-2.5 rounded-xl border border-zinc-200 text-zinc-700 hover:border-black font-semibold text-center transition">
+                  <span>مطفي (Matte)</span>
+                </button>
+                <button type="button" onclick="selectCustomFinish('holographic')" id="custom-finish-holographic" class="custom-finish-btn p-2.5 rounded-xl border border-zinc-200 text-zinc-700 hover:border-black font-semibold text-center transition">
+                  <span>هولوجرام ✨ (+5)</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Quantity Stepper & Cut Type -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 border-t border-zinc-100">
+            
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-xs font-bold text-zinc-900">4. الكمية (الحد الأدنى 10 قطع) *</label>
+                <span id="custom-qty-tier-badge" class="text-[10px] font-bold text-[#FF5000] bg-[#FF5000]/10 px-2 py-0.5 rounded-full">
+                  10–49 قطعة
+                </span>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" onclick="adjustCustomQty(-5)" class="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-lg flex items-center justify-center transition active:scale-95">-</button>
+                <input type="number" id="custom-qty-input" min="10" max="5000" value="10" oninput="handleCustomQtyChange(this.value)" class="w-24 text-center font-mono font-black text-base py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:border-zinc-900">
+                <button type="button" onclick="adjustCustomQty(5)" class="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-lg flex items-center justify-center transition active:scale-95">+</button>
+                <span class="text-xs text-zinc-500 font-medium">قطعة</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-zinc-900 mb-2">5. طريقة القص</label>
+              <select id="custom-cut-type" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900 font-medium">
+                <option value="Die-cut مفرغ حول أطراف التصميم">Die-cut مفرغ بالكامل حول أطراف التصميم (الأكثر طلباً)</option>
+                <option value="Kiss-cut على شيت ملصقات">Kiss-cut نص قص على شيت ملصقات</option>
+                <option value="قص دائري منتظم">قص دائري منتظم (Circle Cut)</option>
+                <option value="قص مستطيل / مربع">قص مستطيل / مربع (Square Cut)</option>
+              </select>
+            </div>
+
+          </div>
+
+          <!-- Customer Contact Inputs -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-zinc-100">
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 mb-1">الاسم أو اسم المؤسسة *</label>
+              <input type="text" id="custom-customer-name" placeholder="مثال: نادي القراءة / م. أحمد" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900">
+              <p id="custom-name-error" class="text-red-500 text-[11px] font-semibold mt-1 hidden"></p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-zinc-700 mb-1">رقم الهاتف (واتساب) *</label>
+              <input type="tel" id="custom-customer-phone" placeholder="مثال: 01012345678" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900 font-mono" dir="ltr">
+              <p id="custom-phone-error" class="text-red-500 text-[11px] font-semibold mt-1 hidden"></p>
+            </div>
+
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold text-zinc-700 mb-1">ملاحظات أو تعليمات خاصة</label>
+              <textarea id="custom-order-notes" rows="2" placeholder="أي تفاصيل خاصة بالأبعاد، موعد التسليم، أو الألوان..." class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900"></textarea>
+            </div>
+          </div>
+
         </div>
 
-        <div class="w-40 h-40 sm:w-48 sm:h-48 rounded-2xl bg-white border border-zinc-200 p-4 flex items-center justify-center shadow-sm">
-          <img src="logo.jpg" alt="" class="w-32 h-auto object-contain">
+        <!-- Right: Live Summary Card & Action (4 cols) -->
+        <div class="lg:col-span-4 space-y-4">
+          
+          <div class="bg-white rounded-3xl border border-zinc-200 p-6 shadow-sm space-y-5">
+            <h3 class="text-sm font-extrabold text-zinc-900 pb-3 border-b border-zinc-100 flex items-center justify-between">
+              <span>حاسبة السعر التقديري</span>
+              <span class="text-xs text-zinc-400 font-mono">Live Quote</span>
+            </h3>
+
+            <div class="space-y-3 text-xs">
+              
+              <div class="flex justify-between items-center text-zinc-600">
+                <span>الكمية:</span>
+                <span id="custom-summary-qty" class="font-mono font-bold text-zinc-900">10 قطع</span>
+              </div>
+
+              <div class="flex justify-between items-center text-zinc-600">
+                <span>سعر القطعة في هذه الشريحة:</span>
+                <span id="custom-summary-unit" class="font-mono font-bold text-zinc-900">20 ج.م</span>
+              </div>
+
+              <div class="flex justify-between items-center text-zinc-600">
+                <span>المقاس واللمعان:</span>
+                <span id="custom-summary-spec" class="font-semibold text-zinc-800">8 سم • لامع</span>
+              </div>
+
+              <div id="custom-summary-savings-row" class="hidden flex justify-between items-center text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg font-bold">
+                <span>توفير خصم الكميات:</span>
+                <span id="custom-summary-savings" class="font-mono">-0 ج.م</span>
+              </div>
+
+              <div class="pt-3 border-t border-zinc-100 flex justify-between items-baseline">
+                <span class="text-sm font-extrabold text-zinc-900">الإجمالي التقديري:</span>
+                <div class="text-left font-mono">
+                  <span id="custom-summary-total" class="text-2xl font-black text-[#FF5000]">200</span>
+                  <span class="text-xs text-zinc-500 font-bold">ج.م</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Volume Discount Legend -->
+            <div class="bg-zinc-50 rounded-2xl p-3 border border-zinc-200/80 text-[11px] space-y-1.5">
+              <p class="font-bold text-zinc-800">شرائح خصومات الكميات:</p>
+              <div class="flex justify-between text-zinc-600">
+                <span>• من 10 إلى 49 قطعة:</span>
+                <span class="font-mono font-semibold">20 ج.م / ق</span>
+              </div>
+              <div class="flex justify-between text-zinc-600">
+                <span>• من 50 إلى 99 قطعة:</span>
+                <span class="font-mono font-bold text-emerald-600">15 ج.م / ق (-25%)</span>
+              </div>
+              <div class="flex justify-between text-zinc-600">
+                <span>• من 100 قطعة فأكثر:</span>
+                <span class="font-mono font-bold text-[#FF5000]">10 ج.م / ق (-50% 👑)</span>
+              </div>
+            </div>
+
+            <button type="button" id="custom-submit-btn" onclick="submitCustomPrintOrder()" class="w-full py-4 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2 active:scale-95">
+              <span>إرسال طلب الطباعة للواتساب 💬</span>
+            </button>
+
+            <p class="text-[10px] text-zinc-400 text-center leading-relaxed">
+              * سيتم فتح محادثة مباشرة مع مسؤولي الطباعة لمراجعة الملف واعتماد أمر الشغل قبل البدء.
+            </p>
+
+          </div>
+
+          <!-- Direct WhatsApp Assistance box -->
+          <div class="bg-zinc-100/80 rounded-2xl p-4 border border-zinc-200 text-center text-xs space-y-1.5">
+            <p class="font-bold text-zinc-800">عايز تسعير لكمية أكبر من 500 قطعة؟</p>
+            <p class="text-zinc-500 text-[11px]">تواصل مع فريق المبيعات مباشرة عبر واتساب:</p>
+            <p class="font-mono font-bold text-zinc-900">01043546503</p>
+          </div>
+
         </div>
 
       </div>
+
     </div>
   </section>
 
@@ -465,54 +665,59 @@
           <p id="order-phone-error" class="text-red-500 text-[11px] font-semibold mt-1 hidden"></p>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">المحافظة (27 محافظة) *</label>
-            <select id="order-city" onchange="handleCheckoutCityChange(this.value)" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-2 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900">
-              <option value="" disabled selected>اختر المحافظة...</option>
-              <option value="القاهرة">القاهرة (35 ج.م)</option>
-              <option value="الجيزة">الجيزة (35 ج.م)</option>
-              <option value="القليوبية">القليوبية (40 ج.م)</option>
-              <option value="الإسكندرية">الإسكندرية (45 ج.م)</option>
-              <option value="البحيرة">البحيرة (50 ج.م)</option>
-              <option value="مطروح">مطروح (75 ج.م)</option>
-              <option value="دمياط">دمياط (50 ج.م)</option>
-              <option value="الدقهلية">الدقهلية (50 ج.م)</option>
-              <option value="كفر الشيخ">كفر الشيخ (50 ج.م)</option>
-              <option value="الغربية">الغربية (50 ج.م)</option>
-              <option value="المنوفية">المنوفية (50 ج.م)</option>
-              <option value="الشرقية">الشرقية (50 ج.م)</option>
-              <option value="بورسعيد">بورسعيد (50 ج.م)</option>
-              <option value="الإسماعيلية">الإسماعيلية (50 ج.م)</option>
-              <option value="السويس">السويس (50 ج.م)</option>
-              <option value="الفيوم">الفيوم (55 ج.م)</option>
-              <option value="بني سويف">بني سويف (55 ج.م)</option>
-              <option value="المنيا">المنيا (60 ج.م)</option>
-              <option value="أسيوط">أسيوط (60 ج.م)</option>
-              <option value="سوهاج">سوهاج (60 ج.م)</option>
-              <option value="قنا">قنا (65 ج.م)</option>
-              <option value="الأقصر">الأقصر (65 ج.م)</option>
-              <option value="أسوان">أسوان (70 ج.م)</option>
-              <option value="شمال سيناء">شمال سيناء (75 ج.م)</option>
-              <option value="جنوب سيناء">جنوب سيناء (75 ج.م)</option>
-              <option value="البحر الأحمر">البحر الأحمر (75 ج.م)</option>
-              <option value="الوادي الجديد">الوادي الجديد (75 ج.م)</option>
-            </select>
-            <p id="order-city-error" class="text-red-500 text-[11px] font-semibold mt-1 hidden"></p>
-          </div>
+        <div>
+          <label class="block text-xs font-semibold text-zinc-700 mb-1">المحافظة (27 محافظة) *</label>
+          <select id="order-city" onchange="handleCheckoutCityChange(this.value)" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900">
+            <option value="" disabled selected>اختر المحافظة لمعرفة مصاريف الشحن...</option>
+            <option value="القاهرة">القاهرة (35 ج.م)</option>
+            <option value="الجيزة">الجيزة (35 ج.م)</option>
+            <option value="القليوبية">القليوبية (40 ج.م)</option>
+            <option value="الإسكندرية">الإسكندرية (45 ج.م)</option>
+            <option value="البحيرة">البحيرة (50 ج.م)</option>
+            <option value="مطروح">مطروح (75 ج.م)</option>
+            <option value="دمياط">دمياط (50 ج.م)</option>
+            <option value="الدقهلية">الدقهلية (50 ج.م)</option>
+            <option value="كفر الشيخ">كفر الشيخ (50 ج.م)</option>
+            <option value="الغربية">الغربية (50 ج.م)</option>
+            <option value="المنوفية">المنوفية (50 ج.م)</option>
+            <option value="الشرقية">الشرقية (50 ج.م)</option>
+            <option value="بورسعيد">بورسعيد (50 ج.م)</option>
+            <option value="الإسماعيلية">الإسماعيلية (50 ج.م)</option>
+            <option value="السويس">السويس (50 ج.م)</option>
+            <option value="الفيوم">الفيوم (55 ج.م)</option>
+            <option value="بني سويف">بني سويف (55 ج.م)</option>
+            <option value="المنيا">المنيا (60 ج.م)</option>
+            <option value="أسيوط">أسيوط (60 ج.م)</option>
+            <option value="سوهاج">سوهاج (60 ج.م)</option>
+            <option value="قنا">قنا (65 ج.م)</option>
+            <option value="الأقصر">الأقصر (65 ج.م)</option>
+            <option value="أسوان">أسوان (70 ج.م)</option>
+            <option value="شمال سيناء">شمال سيناء (75 ج.م)</option>
+            <option value="جنوب سيناء">جنوب سيناء (75 ج.م)</option>
+            <option value="البحر الأحمر">البحر الأحمر (75 ج.م)</option>
+            <option value="الوادي الجديد">الوادي الجديد (75 ج.م)</option>
+          </select>
+          <p id="order-city-error" class="text-red-500 text-[11px] font-semibold mt-1 hidden"></p>
+        </div>
 
-          <div>
-            <label class="block text-xs font-semibold text-zinc-700 mb-1">طريقة الدفع *</label>
-            <div class="flex items-center gap-2 pt-1.5 text-xs text-zinc-800">
-              <label class="flex items-center gap-1 cursor-pointer">
-                <input type="radio" name="payment_method" value="cod" checked class="text-[#FF5000]">
-                <span>عند الاستلام</span>
-              </label>
-              <label class="flex items-center gap-1 cursor-pointer">
-                <input type="radio" name="payment_method" value="instapay" class="text-[#FF5000]">
-                <span>InstaPay</span>
-              </label>
-            </div>
+        <div>
+          <label class="block text-xs font-semibold text-zinc-700 mb-1.5">طريقة الدفع *</label>
+          <div class="grid grid-cols-3 gap-2 text-xs text-zinc-800">
+            <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 cursor-pointer transition text-center font-semibold">
+              <input type="radio" name="payment_method" value="cod" checked onchange="handlePaymentMethodChange(this.value)" class="text-[#FF5000]">
+              <span>عند الاستلام</span>
+            </label>
+            <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 cursor-pointer transition text-center font-semibold">
+              <input type="radio" name="payment_method" value="instapay" onchange="handlePaymentMethodChange(this.value)" class="text-[#FF5000]">
+              <span>InstaPay ⚡</span>
+            </label>
+            <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 cursor-pointer transition text-center font-semibold">
+              <input type="radio" name="payment_method" value="vodafone_cash" onchange="handlePaymentMethodChange(this.value)" class="text-[#FF5000]">
+              <span>فودافون كاش 📱</span>
+            </label>
+          </div>
+          <div id="payment-method-details" class="mt-2 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed">
+            💵 الدفع نقداً للمندوب عند استلام الشحنة ومعاينتها والتأكد من سلامتها.
           </div>
         </div>
 
@@ -590,6 +795,50 @@
     </div>
   </div>
 
+  <!-- ========================================== -->
+  <!-- PRODUCT DETAIL MODAL (#/product/:id)       -->
+  <!-- ========================================== -->
+  <div id="product-detail-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div onclick="closeProductDetailModal()" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
+    
+    <div class="relative bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 max-w-3xl w-full shadow-2xl z-10 max-h-[92vh] overflow-y-auto">
+      <button onclick="closeProductDetailModal()" class="absolute top-5 left-5 text-zinc-400 hover:text-black p-2 rounded-full hover:bg-zinc-100 transition z-20 text-lg leading-none" title="إغلاق (Esc)">✕</button>
+      <div id="product-detail-content" class="space-y-6">
+        <!-- Rendered dynamically via openProductDetailModal -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- ORDER TRACKING MODAL (#/track)             -->
+  <!-- ========================================== -->
+  <div id="order-tracking-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div onclick="closeOrderTrackingModal()" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
+
+    <div class="relative bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl z-10 max-h-[92vh] overflow-y-auto">
+      <button onclick="closeOrderTrackingModal()" class="absolute top-5 left-5 text-zinc-400 hover:text-black p-2 rounded-full hover:bg-zinc-100 transition z-20 text-lg leading-none" title="إغلاق (Esc)">✕</button>
+      
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 mx-auto rounded-full bg-[#FF5000]/10 text-[#FF5000] flex items-center justify-center text-2xl mb-2">
+          🚚
+        </div>
+        <h3 class="text-xl font-extrabold text-zinc-900">تتبع حالة طلبك في STICKIFY 21</h3>
+        <p class="text-xs text-zinc-500 mt-1">أدخل رقم الطلب (S21-YYMMDD-XXXX) أو رقم هاتفك المسجل</p>
+      </div>
+
+      <form id="order-tracking-form" onsubmit="handleTrackOrderSubmit(event)" class="flex gap-2 mb-6">
+        <input type="text" id="track-order-input" placeholder="مثال: S21-261116-ABCD أو 01012345678" class="flex-grow bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-3 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900 font-mono" dir="ltr">
+        <button type="submit" class="px-6 py-3 rounded-2xl bg-zinc-900 hover:bg-[#FF5000] text-white font-bold text-xs transition shadow-sm whitespace-nowrap">
+          <span>بحث 🔍</span>
+        </button>
+      </form>
+
+      <div id="tracking-result-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
   <!-- Floating WhatsApp Quick Button -->
   <a href="https://wa.me/201043546503?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%20STICKIFY%2021%F0%9F%91%8B%20%D8%B9%D9%86%D8%AF%D9%8A%20%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20%D8%A7%D9%84%D8%A7%D8%B3%D8%AA%D9%8A%D9%83%D8%B1%D8%A7%D8%AA%20%D9%88%D9%81%D9%88%D8%A7%D8%B5%D9%84%20%D8%A7%D9%84%D9%83%D8%AA%D8%A8" target="_blank" class="floating-whatsapp fixed bottom-6 right-6 z-40 bg-[#25D366] text-white p-3.5 rounded-full flex items-center gap-2.5 shadow-xl font-bold text-xs">
     <span class="text-lg">💬</span>
@@ -617,6 +866,7 @@
         <a href="#mockup-studio-section" class="hover:text-black transition">المعاينة</a>
         <a href="#pack-builder-section" class="hover:text-black transition">باقات 5 و 10</a>
         <a href="#custom-order" class="hover:text-black transition">طباعة مخصصة</a>
+        <a href="#/track" class="hover:text-[#FF5000] font-bold transition">تتبع طلبك 🔍</a>
       </div>
 
       <div class="text-zinc-400 font-mono text-[11px]">

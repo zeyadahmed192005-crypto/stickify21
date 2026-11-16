@@ -6,12 +6,12 @@
 
 import { CONFIG } from './src/config/config.js';
 import { escapeHtml, sanitizeUrl, sanitizeSvg } from './src/utils/escape.js';
-import { getProductPriceForSize, calculatePackSummary, calculateCart, generateCartLineKey } from './src/domain/pricing.js';
+import { getProductPriceForSize, calculatePackSummary, calculateCart, generateCartLineKey, calculateCustomPrintSummary } from './src/domain/pricing.js';
 import { storage } from './src/data/storage.js';
 import { validateCheckoutForm } from './src/domain/validation.js';
 import { generateOrderId, generateIdempotencyKey, generateOrderCode } from './src/utils/ids.js';
 import { evaluateCoupon } from './src/domain/coupons.js';
-import { formatOrderWhatsAppMessage } from './src/domain/orders.js';
+import { formatOrderWhatsAppMessage, formatCustomPrintWhatsAppMessage } from './src/domain/orders.js';
 import { checkProductStock } from './src/domain/inventory.js';
 
 // Safe JSON parser with fallback and corrupted snapshot
@@ -52,6 +52,23 @@ const state = {
     discountPercent: 0,
     discountFixed: 0,
     type: 'percentage'
+  },
+  paymentMethod: 'cod',
+  productDetail: {
+    productId: null,
+    selectedSize: 'medium',
+    selectedFinish: 'matte',
+    quantity: 1
+  },
+  customPrint: {
+    file: null,
+    fileName: '',
+    fileSize: 0,
+    fileUrl: '',
+    size: '8cm',
+    finish: 'glossy',
+    quantity: 10,
+    cutType: 'Die-cut مفرغ حول أطراف التصميم'
   }
 };
 
@@ -148,6 +165,21 @@ const devices = {
       </div>
       <div class="absolute top-0 bottom-0 right-6 w-3 bg-[#18181B] rounded shadow pointer-events-none opacity-80"></div>
     `
+  },
+  car_window: {
+    id: 'car_window',
+    name: 'زجاج سيارة (Car Window)',
+    frameClass: 'mockup-car-window-realistic relative flex items-center justify-center p-6 min-h-[380px] max-w-[340px] mx-auto overflow-hidden select-none',
+    decorationsHtml: `
+      <!-- Car Window Edge Weatherstrip & Defroster Filament Lines -->
+      <div class="absolute inset-0 border-[6px] border-[#181D24] rounded-[3rem_1.25rem_0.5rem_0.5rem] pointer-events-none"></div>
+      <div class="absolute top-1/4 left-3 right-3 h-[1px] bg-red-950/40 pointer-events-none"></div>
+      <div class="absolute top-2/4 left-3 right-3 h-[1px] bg-red-950/40 pointer-events-none"></div>
+      <div class="absolute top-3/4 left-3 right-3 h-[1px] bg-red-950/40 pointer-events-none"></div>
+      <!-- Tint Reflection Specular Streak -->
+      <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-cyan-400/5 to-transparent pointer-events-none"></div>
+      <div class="absolute bottom-3 left-4 text-[9px] font-mono font-bold text-slate-500 opacity-50 pointer-events-none">TEMPERED GLASS • S21</div>
+    `
   }
 };
 
@@ -166,8 +198,10 @@ export async function initApp() {
   renderCart();
   renderPackBuilder();
   renderMockupDevice();
+  updateCustomPrintSummary();
   setupEventListeners();
   updateCartBadge();
+  initHashRouter();
 
   // Cross-tab sync
   window.addEventListener('storage', async (e) => {
@@ -291,13 +325,13 @@ export function renderProducts() {
         </div>
 
         <!-- Graphic Stage -->
-        <div class="relative w-full aspect-square p-6 flex items-center justify-center rounded-xl bg-zinc-50 border border-zinc-100 mb-4 overflow-hidden ${isHolo ? 'hologram-effect' : ''}">
+        <div onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="relative w-full aspect-square p-6 flex items-center justify-center rounded-xl bg-zinc-50 border border-zinc-100 mb-4 overflow-hidden cursor-pointer ${isHolo ? 'hologram-effect' : ''}">
           <div id="graphic-wrapper-${escapeHtml(product.id)}" class="${stageClass} sticker-diecut-minimal flex items-center justify-center transition-all duration-200">
             ${hasImage && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(product.nameAr)}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
           </div>
 
           <!-- Preview Button: touch-preview-visible fixes Bug 05 (visible on touch devices) -->
-          <button onclick="addStickerToMockup('${escapeHtml(product.id)}')" title="جرب على جهازك" class="touch-preview-visible absolute bottom-2.5 left-2.5 px-3 py-1.5 rounded-lg bg-white/95 text-zinc-900 border border-zinc-200 hover:border-black hover:bg-black hover:text-white transition shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1.5 text-xs font-semibold">
+          <button onclick="event.stopPropagation(); addStickerToMockup('${escapeHtml(product.id)}')" title="جرب على جهازك" class="touch-preview-visible absolute bottom-2.5 left-2.5 px-3 py-1.5 rounded-lg bg-white/95 text-zinc-900 border border-zinc-200 hover:border-black hover:bg-black hover:text-white transition shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1.5 text-xs font-semibold">
             <span>معاينة</span>
             <span>↗</span>
           </button>
@@ -306,7 +340,7 @@ export function renderProducts() {
         <!-- Info & Price -->
         <div class="mb-3">
           <div class="flex items-baseline justify-between gap-2 mb-1.5">
-            <h3 class="font-bold text-sm text-zinc-900 group-hover:text-[#FF5000] transition">${escapeHtml(product.nameAr)}</h3>
+            <h3 onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="font-bold text-sm text-zinc-900 group-hover:text-[#FF5000] transition cursor-pointer">${escapeHtml(product.nameAr)}</h3>
             <div class="text-left font-mono">
               <span id="card-price-${escapeHtml(product.id)}" class="font-extrabold text-zinc-900 text-base whitespace-nowrap">${currentPrice}</span>
               <span class="text-[10px] font-medium text-zinc-500">${CONFIG.CURRENCY}</span>
@@ -720,7 +754,7 @@ export function renderCart() {
         <span>إرسال الطلب عبر واتساب (${CONFIG.WHATSAPP_DISPLAY})</span>
         <span>💬</span>
       </button>
-      <button onclick="openCheckoutModal()" class="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-black text-white font-semibold text-xs flex items-center justify-center gap-2 transition">
+      <button id="open-checkout-btn" onclick="openCheckoutModal()" class="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-black text-white font-semibold text-xs flex items-center justify-center gap-2 transition">
         <span>إتمام الشراء بالبيانات التفصيلية</span>
       </button>
     </div>
@@ -1028,14 +1062,14 @@ function attachPointerDragListeners() {
       let rafId = null;
 
       const onPointerMove = (moveEvt) => {
+        const xPct = ((moveEvt.clientX - boardRect.left) / boardRect.width) * 100;
+        const yPct = ((moveEvt.clientY - boardRect.top) / boardRect.height) * 100;
+        
+        item.x = Math.max(5, Math.min(95, xPct));
+        item.y = Math.max(5, Math.min(95, yPct));
+
         if (rafId) cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(() => {
-          const xPct = ((moveEvt.clientX - boardRect.left) / boardRect.width) * 100;
-          const yPct = ((moveEvt.clientY - boardRect.top) / boardRect.height) * 100;
-          
-          item.x = Math.max(5, Math.min(95, xPct));
-          item.y = Math.max(5, Math.min(95, yPct));
-
           el.style.left = `${item.x}%`;
           el.style.top = `${item.y}%`;
         });
@@ -1043,6 +1077,8 @@ function attachPointerDragListeners() {
 
       const onPointerUp = (upEvt) => {
         if (rafId) cancelAnimationFrame(rafId);
+        el.style.left = `${item.x}%`;
+        el.style.top = `${item.y}%`;
         try {
           el.releasePointerCapture(upEvt.pointerId);
         } catch(err) {}
@@ -1277,7 +1313,10 @@ export async function submitOrder(e) {
     const orderId = generateOrderId(existingIds);
     const idempotencyKey = generateIdempotencyKey();
 
-    const payment = document.querySelector('input[name="payment_method"]:checked')?.value || 'cod';
+    const paymentRadio = document.querySelector('input[name="payment_method"]:checked')?.value || 'cod';
+    const paymentLabel = paymentRadio === 'vodafone_cash' 
+      ? 'فودافون كاش (01043546503)' 
+      : (paymentRadio === 'instapay' ? 'InstaPay (stickify21@instapay)' : 'عند الاستلام (COD)');
 
     const order = {
       id: orderId,
@@ -1292,7 +1331,8 @@ export async function submitOrder(e) {
         address: cleanValues.address,
         notes: cleanValues.notes || ''
       },
-      payment: payment === 'cod' ? 'عند الاستلام' : 'InstaPay',
+      payment: paymentLabel,
+      paymentMethod: paymentRadio,
       subtotal: calc.subtotal,
       discount: calc.discount,
       shippingCost: calc.shipping,
@@ -1400,6 +1440,792 @@ export function closeConfirmationModal() {
 }
 
 // ==========================================
+// PAYMENT METHOD SELECTION & DETAILS
+// ==========================================
+export function handlePaymentMethodChange(method) {
+  state.paymentMethod = method;
+  const detailsEl = document.getElementById('payment-method-details');
+  if (!detailsEl) return;
+  if (method === 'instapay') {
+    detailsEl.innerHTML = `⚡ الدفع عبر تطبيق InstaPay المعتمد إلى المعرّف: <strong class="font-mono text-[#FF5000]">stickify21@instapay</strong> (يرجى إرسال إشعار التحويل عبر واتساب بعد إتمام الطلب لتأكيده).`;
+    detailsEl.className = 'mt-2 p-2.5 rounded-xl bg-purple-50/80 border border-purple-200/80 text-[11px] text-purple-950 leading-relaxed';
+  } else if (method === 'vodafone_cash') {
+    detailsEl.innerHTML = `📱 التحويل عبر محفظة فودافون كاش الذكية إلى الرقم: <strong class="font-mono text-[#FF5000]">01043546503</strong> (يرجى إرسال لقطة شاشة للتحويل عبر واتساب بعد إتمام الطلب لتأكيده).`;
+    detailsEl.className = 'mt-2 p-2.5 rounded-xl bg-rose-50/80 border border-rose-200/80 text-[11px] text-rose-950 leading-relaxed';
+  } else {
+    detailsEl.innerHTML = `💵 الدفع نقداً لمندوب الشحن عند استلام الشحنة ومعاينتها والتأكد من سلامتها.`;
+    detailsEl.className = 'mt-2 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed';
+  }
+}
+
+// ==========================================
+// PRODUCT DETAIL MODAL & HASH ROUTING
+// ==========================================
+export async function openProductDetailModal(productId, updateHash = true) {
+  let product = state.products.find(p => p.id === productId);
+  if (!product) {
+    product = await storage.getProduct(productId);
+  }
+  if (!product) {
+    showToast('المنتج المطلوب غير موجود أو تم حذفه', 'error');
+    if (window.location.hash.startsWith('#/product')) {
+      window.location.hash = '';
+    }
+    return;
+  }
+
+  const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
+  state.productDetail = {
+    productId: product.id,
+    selectedSize: isBookmark ? 'standard' : (state.selectedSizes[product.id] || 'medium'),
+    selectedFinish: product.finish || 'matte',
+    quantity: 1
+  };
+
+  renderProductDetailModal(product);
+
+  const modal = document.getElementById('product-detail-modal');
+  if (modal) modal.classList.remove('hidden');
+
+  if (updateHash && window.location.hash !== `#/product/${product.id}`) {
+    window.location.hash = `#/product/${product.id}`;
+  }
+}
+
+export function closeProductDetailModal() {
+  const modal = document.getElementById('product-detail-modal');
+  if (modal) modal.classList.add('hidden');
+  if (window.location.hash.startsWith('#/product')) {
+    history.pushState('', document.title, window.location.pathname + window.location.search);
+  }
+}
+
+export function selectProductDetailSize(sizeKey) {
+  state.productDetail.selectedSize = sizeKey;
+  const product = state.products.find(p => p.id === state.productDetail.productId);
+  if (product) renderProductDetailModal(product);
+}
+
+export function selectProductDetailFinish(finishKey) {
+  state.productDetail.selectedFinish = finishKey;
+  const product = state.products.find(p => p.id === state.productDetail.productId);
+  if (product) renderProductDetailModal(product);
+}
+
+export function updateProductDetailQty(delta) {
+  const current = state.productDetail.quantity || 1;
+  const next = Math.max(1, Math.min(99, current + delta));
+  state.productDetail.quantity = next;
+  const qtyEl = document.getElementById('product-detail-qty-val');
+  if (qtyEl) qtyEl.textContent = next;
+  
+  const product = state.products.find(p => p.id === state.productDetail.productId);
+  if (product) {
+    const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
+    const unitPrice = getProductPriceForSize(product, state.productDetail.selectedSize, state.productDetail.selectedFinish);
+    const totalPriceEl = document.getElementById('product-detail-total-price');
+    if (totalPriceEl) totalPriceEl.textContent = `${unitPrice * next} ${CONFIG.CURRENCY}`;
+  }
+}
+
+export function addProductDetailToCart() {
+  const product = state.products.find(p => p.id === state.productDetail.productId);
+  if (!product) return;
+
+  const stockCheck = checkProductStock(product);
+  if (!stockCheck.available) {
+    showToast('عذراً، هذا المنتج غير متوفر حالياً', 'error');
+    return;
+  }
+
+  const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
+  const sizeKey = isBookmark ? 'standard' : state.productDetail.selectedSize;
+  const finishKey = state.productDetail.selectedFinish;
+  const unitPrice = getProductPriceForSize(product, sizeKey, finishKey);
+  const qty = state.productDetail.quantity || 1;
+
+  const sizeLabel = isBookmark 
+    ? CONFIG.BOOKMARK_SPECS.dimensions
+    : (sizeKey === 'small' ? '6 سم (Small)' : (sizeKey === 'large' ? '10 سم (Large)' : '8 سم (Medium)'));
+
+  const finishLabel = finishKey === 'holographic' ? 'هولوجرام ✨' : (finishKey === 'glossy' ? 'لامع' : 'مطفي');
+
+  const lineKey = generateCartLineKey({ productId: product.id, sizeKey });
+  const existingIndex = state.cart.findIndex(i => i.id === lineKey);
+
+  if (existingIndex > -1) {
+    state.cart[existingIndex].quantity += qty;
+  } else {
+    state.cart.push({
+      id: lineKey,
+      productId: product.id,
+      sku: product.sku || 'S21',
+      nameAr: product.nameAr,
+      name: product.name,
+      type: isBookmark ? 'bookmark' : 'sticker',
+      size: `${sizeLabel} (${finishLabel})`,
+      sizeKey: sizeKey,
+      finish: finishKey,
+      price: unitPrice,
+      quantity: qty,
+      image: product.image,
+      svg: product.svg
+    });
+  }
+
+  saveCart();
+  renderCart();
+  updateCartBadge();
+  closeProductDetailModal();
+  showToast(`تمت إضافة ${qty} قطعة من "${product.nameAr}" إلى السلة 🛍️`);
+  toggleCartModal(true);
+}
+
+export function addDetailProductToMockup() {
+  if (state.productDetail.productId) {
+    addStickerToMockup(state.productDetail.productId);
+    closeProductDetailModal();
+    document.getElementById('mockup-studio-section')?.scrollIntoView({ behavior: 'smooth' });
+    showToast('تمت إضافة التصميم إلى استوديو المعاينة 💻');
+  }
+}
+
+export function renderProductDetailModal(product) {
+  const container = document.getElementById('product-detail-content');
+  if (!container) return;
+
+  const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
+  const isHolo = state.productDetail.selectedFinish === 'holographic';
+  const hasImage = Boolean(product.image);
+  const safeImage = sanitizeUrl(product.image);
+  const safeSvg = sanitizeSvg(product.svg);
+
+  const stockCheck = checkProductStock(product);
+  const isOutOfStock = !stockCheck.available;
+
+  const currentSizeKey = state.productDetail.selectedSize;
+  const currentFinishKey = state.productDetail.selectedFinish;
+  const unitPrice = getProductPriceForSize(product, currentSizeKey, currentFinishKey);
+  const qty = state.productDetail.quantity || 1;
+  const totalPrice = unitPrice * qty;
+
+  const smallPrice = getProductPriceForSize(product, 'small', currentFinishKey);
+  const medPrice = getProductPriceForSize(product, 'medium', currentFinishKey);
+  const largePrice = getProductPriceForSize(product, 'large', currentFinishKey);
+
+  let stageClass = 'w-40 h-40';
+  if (isBookmark) {
+    stageClass = 'w-32 h-52';
+  } else if (currentSizeKey === 'small') {
+    stageClass = 'w-32 h-32';
+  } else if (currentSizeKey === 'large') {
+    stageClass = 'w-48 h-48';
+  }
+
+  // Related products (from same category, max 3)
+  const relatedProducts = state.products
+    .filter(p => p.id !== product.id && (p.category === product.category || isBookmark === (p.category === 'bookmarks')))
+    .slice(0, 3);
+
+  container.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start pt-2">
+      
+      <!-- Left: Visual Graphic Stage (5 cols) -->
+      <div class="md:col-span-5 flex flex-col items-center">
+        <div class="w-full aspect-square rounded-3xl bg-zinc-50 border border-zinc-200/90 p-8 flex items-center justify-center relative overflow-hidden shadow-inner ${isHolo ? 'hologram-effect' : ''}">
+          <div class="${stageClass} sticker-diecut-minimal flex items-center justify-center transition-all duration-300">
+            ${hasImage && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(product.nameAr)}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
+          </div>
+          <span class="absolute bottom-3 right-3 text-[10px] font-mono text-zinc-400 font-semibold bg-white/80 px-2 py-0.5 rounded-full border border-zinc-200">
+            ${isBookmark ? '350gsm Cardstock' : 'Vinyl Die-Cut'}
+          </span>
+        </div>
+
+        <button onclick="addDetailProductToMockup()" class="mt-4 w-full py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition flex items-center justify-center gap-1.5">
+          <span>تجربة على الأجهزة (المعاينة)</span>
+          <span>💻</span>
+        </button>
+      </div>
+
+      <!-- Right: Product Details & Controls (7 cols) -->
+      <div class="md:col-span-7 space-y-5 text-right">
+        
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-bold px-3 py-1 rounded-full ${isBookmark ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-[#FF5000]/10 text-[#FF5000] border border-[#FF5000]/20'}">
+              ${escapeHtml(product.badge || (isBookmark ? 'فاصل كتب' : 'استيكر فينيل'))}
+            </span>
+            <span class="font-mono text-xs text-zinc-400 font-bold">#${escapeHtml(product.sku)}</span>
+          </div>
+
+          <h2 class="text-2xl font-extrabold text-zinc-900 leading-snug">${escapeHtml(product.nameAr)}</h2>
+          <p class="text-xs font-mono text-zinc-400 mt-0.5">${escapeHtml(product.name || '')}</p>
+          <p class="text-xs text-zinc-600 mt-3 leading-relaxed">${escapeHtml(product.desc)}</p>
+        </div>
+
+        <!-- Size Options -->
+        ${!isBookmark ? `
+          <div>
+            <label class="block text-xs font-bold text-zinc-800 mb-1.5">المقاس:</label>
+            <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-center">
+              <button type="button" onclick="selectProductDetailSize('small')" class="p-2.5 rounded-xl border transition ${currentSizeKey === 'small' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
+                <span>6 سم (Small)</span>
+                <span class="block text-[10px] font-mono mt-0.5 opacity-80">${smallPrice} ج.م</span>
+              </button>
+              <button type="button" onclick="selectProductDetailSize('medium')" class="p-2.5 rounded-xl border transition ${currentSizeKey === 'medium' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
+                <span>8 سم (Medium)</span>
+                <span class="block text-[10px] font-mono mt-0.5 opacity-80">${medPrice} ج.م</span>
+              </button>
+              <button type="button" onclick="selectProductDetailSize('large')" class="p-2.5 rounded-xl border transition ${currentSizeKey === 'large' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
+                <span>10 سم (Large)</span>
+                <span class="block text-[10px] font-mono mt-0.5 opacity-80">${largePrice} ج.م</span>
+              </button>
+            </div>
+          </div>
+        ` : `
+          <div class="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/80 text-xs text-amber-950 space-y-1">
+            <p class="font-bold">🔖 مواصفات فاصل الكتب القياسي:</p>
+            <p class="text-[11px] text-amber-900/90 leading-relaxed">
+              المقاس: ${CONFIG.BOOKMARK_SPECS.dimensions} • كرتون كوشيه مقوى فاخر 350gsm • طبقة حماية سلوفان مطفي ناعمة فاخرة ضد الرطوبة.
+            </p>
+          </div>
+        `}
+
+        <!-- Finish Options -->
+        <div>
+          <label class="block text-xs font-bold text-zinc-800 mb-1.5">اللمسة النهائية واللمعان:</label>
+          <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-center">
+            <button type="button" onclick="selectProductDetailFinish('matte')" class="p-2.5 rounded-xl border transition ${currentFinishKey === 'matte' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
+              <span>مطفي (Matte)</span>
+            </button>
+            <button type="button" onclick="selectProductDetailFinish('glossy')" class="p-2.5 rounded-xl border transition ${currentFinishKey === 'glossy' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
+              <span>لامع (Glossy)</span>
+            </button>
+            <button type="button" onclick="selectProductDetailFinish('holographic')" class="p-2.5 rounded-xl border transition ${currentFinishKey === 'holographic' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
+              <span>هولوجرام ✨</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quantity & Price Summary -->
+        <div class="pt-4 border-t border-zinc-100 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold text-zinc-700">الكمية:</span>
+            <div class="flex items-center gap-2 bg-zinc-100 p-1 rounded-xl">
+              <button type="button" onclick="updateProductDetailQty(-1)" class="w-7 h-7 rounded-lg bg-white hover:bg-zinc-200 font-bold text-sm flex items-center justify-center transition active:scale-95">-</button>
+              <span id="product-detail-qty-val" class="w-8 text-center font-mono font-bold text-xs">${qty}</span>
+              <button type="button" onclick="updateProductDetailQty(1)" class="w-7 h-7 rounded-lg bg-white hover:bg-zinc-200 font-bold text-sm flex items-center justify-center transition active:scale-95">+</button>
+            </div>
+          </div>
+
+          <div class="text-left font-mono">
+            <span class="text-[10px] text-zinc-400 block font-sans">الإجمالي:</span>
+            <span id="product-detail-total-price" class="text-2xl font-black text-[#FF5000]">${totalPrice} ${CONFIG.CURRENCY}</span>
+          </div>
+        </div>
+
+        <!-- Add to cart CTA -->
+        <button ${isOutOfStock ? 'disabled' : 'onclick="addProductDetailToCart()"'} class="w-full py-4 rounded-2xl ${isOutOfStock ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed' : 'bg-zinc-900 hover:bg-[#FF5000] text-white active:scale-95'} font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
+          <span>${isOutOfStock ? 'المنتج نفد من المخزون' : 'إضافة إلى سلة المشتريات 🛍️'}</span>
+        </button>
+
+      </div>
+
+    </div>
+
+    <!-- Related Products -->
+    ${relatedProducts.length > 0 ? `
+      <div class="pt-6 border-t border-zinc-100 mt-6">
+        <h4 class="text-xs font-extrabold text-zinc-900 mb-3 flex items-center justify-between">
+          <span>منتجات مشابهة قد تعجبك:</span>
+          <span class="text-[11px] font-normal text-zinc-400 font-mono">You might also like</span>
+        </h4>
+        <div class="grid grid-cols-3 gap-3">
+          ${relatedProducts.map(rel => {
+            const relSafeImg = sanitizeUrl(rel.image);
+            const relSafeSvg = sanitizeSvg(rel.svg);
+            return `
+              <div onclick="openProductDetailModal('${escapeHtml(rel.id)}')" class="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 hover:border-black cursor-pointer transition text-center group">
+                <div class="w-16 h-16 mx-auto flex items-center justify-center mb-2">
+                  ${rel.image && relSafeImg ? `<img src="${relSafeImg}" alt="" class="w-12 h-12 object-contain">` : relSafeSvg}
+                </div>
+                <p class="text-xs font-bold text-zinc-900 truncate group-hover:text-[#FF5000] transition">${escapeHtml(rel.nameAr)}</p>
+                <p class="text-[11px] font-mono font-bold text-zinc-500 mt-0.5">${rel.price} ${CONFIG.CURRENCY}</p>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+// ==========================================
+// ORDER TRACKING MODAL & SEARCH
+// ==========================================
+export async function openOrderTrackingModal(prefill = '', updateHash = true) {
+  const modal = document.getElementById('order-tracking-modal');
+  if (modal) modal.classList.remove('hidden');
+
+  const input = document.getElementById('track-order-input');
+  if (input && prefill) {
+    input.value = prefill;
+    await searchTrackOrder(prefill);
+  } else {
+    const container = document.getElementById('tracking-result-container');
+    if (container && !input?.value) {
+      container.innerHTML = `
+        <div class="p-6 bg-zinc-50 border border-zinc-200 rounded-2xl text-center text-xs text-zinc-500 leading-relaxed">
+          <span>أدخل رقم الطلب الخاص بك لمتابعة مسار شحن وتجهيز الاستيكرات والبوك مارك لحظة بلحظة.</span>
+        </div>
+      `;
+    }
+  }
+
+  if (updateHash && !window.location.hash.startsWith('#/track')) {
+    window.location.hash = prefill ? `#/track/${prefill}` : '#/track';
+  }
+}
+
+export function closeOrderTrackingModal() {
+  const modal = document.getElementById('order-tracking-modal');
+  if (modal) modal.classList.add('hidden');
+  if (window.location.hash.startsWith('#/track')) {
+    history.pushState('', document.title, window.location.pathname + window.location.search);
+  }
+}
+
+export async function handleTrackOrderSubmit(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('track-order-input');
+  const query = (input?.value || '').trim();
+  if (query) {
+    window.location.hash = `#/track/${encodeURIComponent(query)}`;
+    await searchTrackOrder(query);
+  }
+}
+
+export async function searchTrackOrder(query) {
+  const container = document.getElementById('tracking-result-container');
+  if (!container) return;
+
+  const cleanQuery = (query || '').trim();
+  if (!cleanQuery) {
+    container.innerHTML = `
+      <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 text-center font-semibold">
+        يرجى إدخال رقم الطلب (مثال: S21-261116-ABCD) أو رقم الهاتف
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="py-8 text-center text-xs text-zinc-500 font-mono">
+      <span>جاري البحث في سجلات الطلبات... ⏳</span>
+    </div>
+  `;
+
+  const order = await storage.findOrder(cleanQuery);
+  if (!order) {
+    container.innerHTML = `
+      <div class="p-6 bg-zinc-50 border border-zinc-200 rounded-2xl text-center space-y-3">
+        <div class="text-3xl">🔍</div>
+        <h4 class="font-bold text-sm text-zinc-900">لم يتم العثور على طلب بهذا الرقم</h4>
+        <p class="text-xs text-zinc-500 leading-relaxed max-w-sm mx-auto">
+          لم نتمكن من العثور على طلب مسجل برقم <strong class="font-mono text-zinc-900">${escapeHtml(cleanQuery)}</strong> في متصفحك الحالي.
+        </p>
+        <div class="p-3 bg-amber-50 rounded-xl text-[11px] text-amber-800 text-right leading-relaxed border border-amber-200/60">
+          💡 <strong>ملاحظة (DEMO):</strong> في هذه النسخة المحلية (Prototype)، تُحفظ الطلبات في متصفح العميل فقط حتى يتم تفعيل الخادم المركزي. يمكنك التواصل مع خدمة العملاء لمتابعة طلبك:
+        </div>
+        <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(`مرحباً STICKIFY 21، أود الاستفسار عن حالة طلبي رقم: ${cleanQuery}`)}" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] text-white font-bold text-xs hover:bg-[#20ba59] transition shadow-sm">
+          <span>تواصل مع الدعم عبر واتساب (01043546503)</span>
+          <span>💬</span>
+        </a>
+      </div>
+    `;
+    return;
+  }
+
+  // Visual status timeline
+  const lifecycleSteps = [
+    { key: 'pending', label: 'جديد', icon: '📝' },
+    { key: 'awaiting_confirmation', label: 'بانتظار التأكيد', icon: '⏳' },
+    { key: 'confirmed', label: 'مؤكد', icon: '✓' },
+    { key: 'preparing', label: 'قيد التجهيز', icon: '📦' },
+    { key: 'shipped', label: 'تم الشحن', icon: '🚚' },
+    { key: 'completed', label: 'مكتمل', icon: '🎉' }
+  ];
+
+  const isCancelled = order.status === 'cancelled';
+  const currentStepIdx = lifecycleSteps.findIndex(s => s.key === order.status);
+
+  const timelineHtml = isCancelled ? `
+    <div class="p-4 bg-red-50 border border-red-200 rounded-2xl text-center text-xs text-red-800 font-bold mb-4">
+      ⚠️ تم إلغاء هذا الطلب. إذا كان لديك استفسار يرجى التواصل معنا عبر واتساب.
+    </div>
+  ` : `
+    <div class="py-4 px-2 bg-zinc-50 rounded-2xl border border-zinc-200 mb-5">
+      <div class="flex items-center justify-between relative">
+        <div class="absolute top-4 left-6 right-6 h-1 bg-zinc-200 z-0"></div>
+        <div class="absolute top-4 right-6 h-1 bg-[#FF5000] z-0 transition-all duration-300" style="width: ${Math.max(0, Math.min(100, (currentStepIdx / (lifecycleSteps.length - 1)) * 100))}%;"></div>
+        ${lifecycleSteps.map((step, idx) => {
+          const isPassed = currentStepIdx >= idx;
+          const isCurrent = currentStepIdx === idx;
+          return `
+            <div class="relative z-10 flex flex-col items-center text-center">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${isCurrent ? 'bg-[#FF5000] text-white ring-4 ring-[#FF5000]/20 scale-110' : (isPassed ? 'bg-zinc-900 text-white' : 'bg-white border-2 border-zinc-300 text-zinc-400')}">
+                ${isPassed && !isCurrent ? '✓' : step.icon}
+              </div>
+              <span class="text-[10px] mt-1.5 font-bold whitespace-nowrap ${isCurrent ? 'text-[#FF5000]' : (isPassed ? 'text-zinc-900' : 'text-zinc-400')}">
+                ${step.label}
+              </span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
+  const itemsHtml = (order.items || []).map(it => `
+    <div class="flex items-center justify-between py-2 border-b border-zinc-100 text-xs">
+      <div>
+        <p class="font-bold text-zinc-900">${escapeHtml(it.nameAr || it.name)}</p>
+        <p class="text-[11px] text-zinc-400 font-mono">${escapeHtml(it.size || '')} • الكمية: ${it.quantity}</p>
+      </div>
+      <div class="font-mono font-bold text-zinc-900">
+        ${it.price * it.quantity} ${CONFIG.CURRENCY}
+      </div>
+    </div>
+  `).join('');
+
+  container.innerHTML = `
+    <div class="space-y-4 text-right">
+      <div class="p-4 bg-zinc-50 rounded-2xl border border-zinc-200 flex items-center justify-between">
+        <div>
+          <span class="text-[10px] text-zinc-400 font-mono block">رقم الطلب</span>
+          <span class="font-mono font-black text-sm text-[#FF5000]">${escapeHtml(order.id)}</span>
+        </div>
+        <div class="text-left">
+          <span class="text-[10px] text-zinc-400 font-mono block">تاريخ التسجيل</span>
+          <span class="text-xs font-semibold text-zinc-700">${new Date(order.date || Date.now()).toLocaleDateString('ar-EG')}</span>
+        </div>
+      </div>
+
+      ${timelineHtml}
+
+      <div class="bg-white rounded-2xl border border-zinc-200 p-4 space-y-3">
+        <h5 class="text-xs font-bold text-zinc-900 pb-2 border-b border-zinc-100">تفاصيل الشحن والعميل:</h5>
+        <div class="grid grid-cols-2 gap-2 text-xs text-zinc-600">
+          <div><span class="text-zinc-400">الاسم:</span> <strong class="text-zinc-900">${escapeHtml(order.customer?.name || '')}</strong></div>
+          <div><span class="text-zinc-400">الهاتف:</span> <strong class="text-zinc-900 font-mono">${escapeHtml(order.customer?.phone || '')}</strong></div>
+          <div><span class="text-zinc-400">المحافظة:</span> <strong class="text-zinc-900">${escapeHtml(order.customer?.governorate || order.customer?.city || '')}</strong></div>
+          <div><span class="text-zinc-400">طريقة الدفع:</span> <strong class="text-zinc-900">${escapeHtml(order.payment || 'عند الاستلام')}</strong></div>
+          <div class="col-span-2"><span class="text-zinc-400">العنوان:</span> <strong class="text-zinc-900">${escapeHtml(order.customer?.address || '')}</strong></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-zinc-200 p-4 space-y-2">
+        <h5 class="text-xs font-bold text-zinc-900 pb-1">محتويات الطلب:</h5>
+        ${itemsHtml}
+        <div class="pt-2 border-t border-zinc-100 space-y-1 text-xs">
+          <div class="flex justify-between text-zinc-500"><span>المجموع الفرعي:</span><span class="font-mono">${order.subtotal} ${CONFIG.CURRENCY}</span></div>
+          ${order.discount ? `<div class="flex justify-between text-emerald-600"><span>الخصم:</span><span class="font-mono">-${order.discount} ${CONFIG.CURRENCY}</span></div>` : ''}
+          <div class="flex justify-between text-zinc-500"><span>مصاريف الشحن:</span><span class="font-mono">${order.shippingCost === 0 ? 'مجاناً' : `${order.shippingCost} ${CONFIG.CURRENCY}`}</span></div>
+          <div class="flex justify-between font-extrabold text-sm text-zinc-900 pt-1 border-t border-zinc-100">
+            <span>الإجمالي:</span>
+            <span class="font-mono text-[#FF5000]">${order.total} ${CONFIG.CURRENCY}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2">
+        <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(`مرحباً STICKIFY 21، أود المتابعة بخصوص طلبي رقم: ${order.id}`)}" target="_blank" class="w-full py-3.5 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm">
+          <span>متابعة الطلب مع الدعم الفني على واتساب</span>
+          <span>💬</span>
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+// ==========================================
+// CUSTOM PRINT STUDIO (IndexedDB & Tiered Pricing)
+// ==========================================
+export function handleCustomFileSelect(files) {
+  const errorEl = document.getElementById('custom-file-error');
+  if (errorEl) errorEl.classList.add('hidden');
+
+  if (!files || files.length === 0) return;
+  const file = files[0];
+
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+  if (!allowedTypes.includes(file.type)) {
+    if (errorEl) {
+      errorEl.textContent = 'صيغة الملف غير مدعومة. يرجى رفع ملف بصيغة PNG أو JPG أو PDF.';
+      errorEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const maxBytes = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxBytes) {
+    if (errorEl) {
+      errorEl.textContent = 'حجم الملف يتجاوز الحد المسموح (10MB). يرجى تقليل حجم الملف.';
+      errorEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  state.customPrint.file = file;
+  state.customPrint.fileName = file.name;
+  state.customPrint.fileSize = file.size;
+
+  const dropPrompt = document.getElementById('dropzone-prompt');
+  const dropPreview = document.getElementById('dropzone-preview');
+  const nameEl = document.getElementById('preview-file-name');
+  const sizeEl = document.getElementById('preview-file-size');
+  const mediaBox = document.getElementById('preview-media-box');
+
+  if (nameEl) nameEl.textContent = file.name;
+  if (sizeEl) sizeEl.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+  if (mediaBox) {
+    if (file.type === 'application/pdf') {
+      mediaBox.innerHTML = '<span class="text-3xl">📄</span>';
+    } else {
+      const url = URL.createObjectURL(file);
+      mediaBox.innerHTML = `<img src="${url}" class="w-full h-full object-contain">`;
+    }
+  }
+
+  if (dropPrompt) dropPrompt.classList.add('hidden');
+  if (dropPreview) dropPreview.classList.remove('hidden');
+  showToast('تم تحميل ملف التصميم بنجاح ✓');
+}
+
+export function clearCustomUpload(e) {
+  if (e) e.stopPropagation();
+  state.customPrint.file = null;
+  state.customPrint.fileName = '';
+  state.customPrint.fileSize = 0;
+
+  const fileInput = document.getElementById('custom-file-input');
+  if (fileInput) fileInput.value = '';
+
+  const dropPrompt = document.getElementById('dropzone-prompt');
+  const dropPreview = document.getElementById('dropzone-preview');
+  if (dropPrompt) dropPrompt.classList.remove('hidden');
+  if (dropPreview) dropPreview.classList.add('hidden');
+}
+
+export function selectCustomSize(sizeKey) {
+  state.customPrint.size = sizeKey;
+  document.querySelectorAll('.custom-size-btn').forEach(btn => {
+    btn.classList.remove('border-zinc-900', 'bg-zinc-900', 'text-white', 'active-custom-size');
+    btn.classList.add('border-zinc-200', 'text-zinc-700');
+  });
+  const activeBtn = document.getElementById(`custom-size-${sizeKey}`);
+  if (activeBtn) {
+    activeBtn.classList.remove('border-zinc-200', 'text-zinc-700');
+    activeBtn.classList.add('border-zinc-900', 'bg-zinc-900', 'text-white', 'active-custom-size');
+  }
+  updateCustomPrintSummary();
+}
+
+export function selectCustomFinish(finishKey) {
+  state.customPrint.finish = finishKey;
+  document.querySelectorAll('.custom-finish-btn').forEach(btn => {
+    btn.classList.remove('border-zinc-900', 'bg-zinc-900', 'text-white', 'active-custom-finish');
+    btn.classList.add('border-zinc-200', 'text-zinc-700');
+  });
+  const activeBtn = document.getElementById(`custom-finish-${finishKey}`);
+  if (activeBtn) {
+    activeBtn.classList.remove('border-zinc-200', 'text-zinc-700');
+    activeBtn.classList.add('border-zinc-900', 'bg-zinc-900', 'text-white', 'active-custom-finish');
+  }
+  updateCustomPrintSummary();
+}
+
+export function adjustCustomQty(delta) {
+  const current = state.customPrint.quantity || 10;
+  const next = Math.max(10, current + delta);
+  state.customPrint.quantity = next;
+  const input = document.getElementById('custom-qty-input');
+  if (input) input.value = next;
+  updateCustomPrintSummary();
+}
+
+export function handleCustomQtyChange(val) {
+  const parsed = parseInt(val, 10);
+  if (!isNaN(parsed) && parsed >= 10) {
+    state.customPrint.quantity = parsed;
+    updateCustomPrintSummary();
+  }
+}
+
+export function updateCustomPrintSummary() {
+  const qty = Math.max(10, state.customPrint.quantity || 10);
+  const summary = calculateCustomPrintSummary(qty, state.customPrint.size, state.customPrint.finish);
+
+  const qtyEl = document.getElementById('custom-summary-qty');
+  const unitEl = document.getElementById('custom-summary-unit');
+  const specEl = document.getElementById('custom-summary-spec');
+  const totalEl = document.getElementById('custom-summary-total');
+  const savingsRow = document.getElementById('custom-summary-savings-row');
+  const savingsEl = document.getElementById('custom-summary-savings');
+  const badgeEl = document.getElementById('custom-qty-tier-badge');
+
+  if (qtyEl) qtyEl.textContent = `${qty} قطعة`;
+  if (unitEl) unitEl.textContent = `${summary.unitPrice} ج.م`;
+  
+  const finishLabels = { glossy: 'لامع', matte: 'مطفي', holographic: 'هولوجرام ✨' };
+  const sizeLabels = { '6cm': '6 سم', '8cm': '8 سم', '10cm': '10 سم', 'custom': 'مقاس مخصص' };
+  if (specEl) specEl.textContent = `${sizeLabels[state.customPrint.size] || '8 سم'} • ${finishLabels[state.customPrint.finish] || 'لامع'}`;
+  
+  if (totalEl) totalEl.textContent = summary.total;
+
+  if (summary.savings > 0) {
+    if (savingsRow) savingsRow.classList.remove('hidden');
+    if (savingsEl) savingsEl.textContent = `-${summary.savings} ج.م`;
+  } else {
+    if (savingsRow) savingsRow.classList.add('hidden');
+  }
+
+  if (badgeEl) badgeEl.textContent = summary.tierLabel;
+}
+
+export async function submitCustomPrintOrder() {
+  const nameInput = document.getElementById('custom-customer-name');
+  const phoneInput = document.getElementById('custom-customer-phone');
+  const notesInput = document.getElementById('custom-order-notes');
+  const cutTypeSelect = document.getElementById('custom-cut-type');
+  const nameError = document.getElementById('custom-name-error');
+  const phoneError = document.getElementById('custom-phone-error');
+
+  if (nameError) nameError.classList.add('hidden');
+  if (phoneError) phoneError.classList.add('hidden');
+
+  const name = (nameInput?.value || '').trim();
+  const phone = (phoneInput?.value || '').trim();
+  const notes = (notesInput?.value || '').trim();
+  const cutType = cutTypeSelect?.value || 'Die-cut مفرغ حول أطراف التصميم';
+
+  let hasError = false;
+
+  if (name.length < 3) {
+    if (nameError) {
+      nameError.textContent = 'يرجى كتابة الاسم بالكامل (3 أحرف على الأقل)';
+      nameError.classList.remove('hidden');
+    }
+    hasError = true;
+  }
+
+  const cleanPhone = phone.replace(/\s+/g, '');
+  const egRegex = /^(?:\+20|0020|0)?(1[0125]\d{8})$/;
+  if (!egRegex.test(cleanPhone)) {
+    if (phoneError) {
+      phoneError.textContent = 'يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678)';
+      phoneError.classList.remove('hidden');
+    }
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  const submitBtn = document.getElementById('custom-submit-btn');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.classList.add('opacity-50');
+  }
+
+  try {
+    if (state.customPrint.file) {
+      try {
+        await storage.uploadImage(state.customPrint.file);
+      } catch (err) {
+        console.warn('Could not store image in IndexedDB:', err);
+      }
+    }
+
+    const qty = Math.max(10, state.customPrint.quantity || 10);
+    const summary = calculateCustomPrintSummary(qty, state.customPrint.size, state.customPrint.finish);
+    const customOrderId = 'S21-CUST-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+    const customOrder = {
+      id: customOrderId,
+      name,
+      phone,
+      notes,
+      cutType,
+      size: state.customPrint.size,
+      sizeLabel: state.customPrint.size === '6cm' ? '6 سم' : (state.customPrint.size === '10cm' ? '10 سم' : (state.customPrint.size === 'custom' ? 'مقاس مخصص' : '8 سم')),
+      finish: state.customPrint.finish,
+      quantity: qty,
+      unitPrice: summary.unitPrice,
+      total: summary.total,
+      savings: summary.savings,
+      tierLabel: summary.tierLabel,
+      fileName: state.customPrint.fileName || '',
+      date: new Date().toISOString()
+    };
+
+    const waMsg = formatCustomPrintWhatsAppMessage(customOrder);
+    const waUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}`;
+
+    showToast(`تم تجهيز طلب الطباعة المخصصة ${customOrderId}! 🎉`);
+    window.open(waUrl, '_blank');
+  } catch (err) {
+    console.error('Error submitting custom print order:', err);
+    showToast('حدث خطأ أثناء معالجة طلب الطباعة، يرجى المحاولة مرة أخرى.', 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50');
+    }
+  }
+}
+
+// ==========================================
+// HASH ROUTER
+// ==========================================
+export function initHashRouter() {
+  function handleRoute() {
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#/product/')) {
+      const prodId = hash.replace('#/product/', '').trim();
+      if (prodId) openProductDetailModal(prodId, false);
+    } else if (hash.startsWith('#/track')) {
+      const parts = hash.split('/');
+      const orderId = parts[2] ? decodeURIComponent(parts[2]) : '';
+      openOrderTrackingModal(orderId, false);
+    } else if (hash === '#custom-order' || hash === '#/custom-print') {
+      document.getElementById('custom-order')?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      const prodModal = document.getElementById('product-detail-modal');
+      if (prodModal && !prodModal.classList.contains('hidden')) {
+        prodModal.classList.add('hidden');
+      }
+      const trackModal = document.getElementById('order-tracking-modal');
+      if (trackModal && !trackModal.classList.contains('hidden')) {
+        trackModal.classList.add('hidden');
+      }
+    }
+  }
+
+  window.addEventListener('hashchange', handleRoute);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeProductDetailModal();
+      closeOrderTrackingModal();
+      closeCheckoutModal();
+      toggleCartModal(false);
+    }
+  });
+
+  handleRoute();
+}
+
+// ==========================================
 // TOAST NOTIFICATIONS (XSS Safe)
 // ==========================================
 export function showToast(message, type = 'success') {
@@ -1477,6 +2303,31 @@ function setupEventListeners() {
       handleCheckoutCityChange(e.target.value);
     });
   }
+
+  // Custom print dropzone events
+  const dropzone = document.getElementById('custom-dropzone');
+  const fileInput = document.getElementById('custom-file-input');
+  if (dropzone && fileInput) {
+    dropzone.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') {
+        fileInput.click();
+      }
+    });
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('border-zinc-900', 'bg-zinc-100');
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('border-zinc-900', 'bg-zinc-100');
+    });
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('border-zinc-900', 'bg-zinc-100');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleCustomFileSelect(e.dataTransfer.files);
+      }
+    });
+  }
 }
 
 // Window exposures for HTML event handlers
@@ -1504,5 +2355,24 @@ window.checkoutViaWhatsAppDirect = checkoutViaWhatsAppDirect;
 window.submitOrder = submitOrder;
 window.handleCheckoutCityChange = handleCheckoutCityChange;
 window.closeConfirmationModal = closeConfirmationModal;
+window.handlePaymentMethodChange = handlePaymentMethodChange;
+window.openProductDetailModal = openProductDetailModal;
+window.closeProductDetailModal = closeProductDetailModal;
+window.selectProductDetailSize = selectProductDetailSize;
+window.selectProductDetailFinish = selectProductDetailFinish;
+window.updateProductDetailQty = updateProductDetailQty;
+window.addProductDetailToCart = addProductDetailToCart;
+window.addDetailProductToMockup = addDetailProductToMockup;
+window.openOrderTrackingModal = openOrderTrackingModal;
+window.closeOrderTrackingModal = closeOrderTrackingModal;
+window.handleTrackOrderSubmit = handleTrackOrderSubmit;
+window.searchTrackOrder = searchTrackOrder;
+window.handleCustomFileSelect = handleCustomFileSelect;
+window.clearCustomUpload = clearCustomUpload;
+window.selectCustomSize = selectCustomSize;
+window.selectCustomFinish = selectCustomFinish;
+window.adjustCustomQty = adjustCustomQty;
+window.handleCustomQtyChange = handleCustomQtyChange;
+window.submitCustomPrintOrder = submitCustomPrintOrder;
 
 document.addEventListener('DOMContentLoaded', initApp);

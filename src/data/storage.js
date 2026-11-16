@@ -28,6 +28,11 @@ class StorageService {
     await this.init();
     return this.adapter.getProducts();
   }
+  async getProduct(productId) {
+    await this.init();
+    const products = await this.getProducts();
+    return products.find(p => p.id === productId) || null;
+  }
   async saveProduct(product) {
     await this.init();
     return this.adapter.saveProduct(product);
@@ -45,6 +50,16 @@ class StorageService {
   async getOrderById(orderId) {
     await this.init();
     return this.adapter.getOrderById(orderId);
+  }
+  async findOrder(query) {
+    await this.init();
+    if (!query) return null;
+    const cleanQuery = String(query).trim().toLowerCase();
+    const orders = await this.getOrders();
+    return orders.find(o => 
+      (o.id && o.id.toLowerCase() === cleanQuery) ||
+      (o.customer && o.customer.phone && o.customer.phone.replace(/\D/g, '').endsWith(cleanQuery.replace(/\D/g, '')))
+    ) || null;
   }
   async createOrder(order) {
     await this.init();
@@ -87,6 +102,22 @@ class StorageService {
   async saveSettings(settings) {
     await this.init();
     return this.adapter.saveSettings(settings);
+  }
+
+  // Assets & Uploads (IndexedDB WebP)
+  async uploadImage(file) {
+    await this.init();
+    const { compressImageToWebP, saveAssetToIndexedDb } = await import('./localAdapter.js');
+    const compressed = await compressImageToWebP(file);
+    const assetId = 'asset-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    await saveAssetToIndexedDb(assetId, compressed, { name: file.name, type: file.type });
+    return {
+      id: assetId,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      previewUrl: URL.createObjectURL(compressed)
+    };
   }
 
   // Backup & Restore

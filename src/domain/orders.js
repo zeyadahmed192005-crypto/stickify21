@@ -78,6 +78,15 @@ export function formatOrderWhatsAppMessage(order, orderCode) {
   const govName = c.governorate || c.city || 'القاهرة';
   const shippingLine = order.shippingCost === 0 ? 'مجاني 🎉' : `${order.shippingCost} ج.م`;
 
+  let paymentText = 'الدفع عند الاستلام (COD)';
+  if (order.paymentMethod === 'instapay' || order.payment === 'instapay') {
+    paymentText = 'انستاباي (InstaPay - stickify21@instapay)';
+  } else if (order.paymentMethod === 'vodafone_cash' || order.payment === 'vodafone_cash') {
+    paymentText = 'فودافون كاش (Vodafone Cash - 01043546503)';
+  } else if (order.payment) {
+    paymentText = order.payment;
+  }
+
   return `*طلب جديد من موقع STICKIFY 21* 🚀
 --------------------------------
 *رقم الطلب:* ${order.id}
@@ -96,9 +105,37 @@ ${couponLine}
 💵 *المجموع الفرعي:* ${order.subtotal} ج.م
 🚚 *مصاريف الشحن (${govName}):* ${shippingLine}
 💰 *الإجمالي المستحق:* ${order.total} ج.م
-💳 *طريقة الدفع:* ${order.payment || 'عند الاستلام (COD)'}
+💳 *طريقة الدفع:* ${paymentText}
 --------------------------------
 يرجى تأكيد استلام الطلب وتجهيزه! شكراً STICKIFY 21 ❤️
 
 ${orderCode ? orderCode : ''}`;
+}
+
+/**
+ * Format a custom print order into a WhatsApp message
+ * @param {object} customOrder
+ * @returns {string} WhatsApp message text
+ */
+export function formatCustomPrintWhatsAppMessage(customOrder) {
+  const finishLabels = {
+    glossy: 'لامع (Glossy)',
+    matte: 'مطفي (Matte)',
+    holographic: 'هولوجرام (Holographic ✨)'
+  };
+  const finishStr = finishLabels[customOrder.finish] || customOrder.finish;
+
+  return `*طلب طباعة مخصصة من STICKIFY 21* 🎨
+--------------------------------
+*الاسم:* ${customOrder.name}
+📱 *الهاتف:* ${customOrder.phone}
+📏 *المقاس:* ${customOrder.sizeLabel || customOrder.size}
+✨ *اللمسة النهائية:* ${finishStr}
+📦 *الكمية:* ${customOrder.quantity} قطعة (${customOrder.tierLabel})
+💵 *الإجمالي التقديري:* ${customOrder.total} ج.م (${customOrder.unitPrice} ج.م للقطعة)
+✂️ *نوع القص:* ${customOrder.cutType || 'Die-cut مفرغ حول التصميم'}
+${customOrder.notes ? `📝 *ملاحظات إضافية:* ${customOrder.notes}\n` : ''}
+📁 *ملف التصميم:* ${customOrder.fileName ? customOrder.fileName : 'سأرفقه هنا في المحادثة'}
+--------------------------------
+⚠️ *ملاحظة:* يرجى إرسال ملف التصميم بجودة الطباعة (Vector أو PNG بخلفية شفافة) هنا لمراجعته وتأكيد موعد التسليم!`;
 }

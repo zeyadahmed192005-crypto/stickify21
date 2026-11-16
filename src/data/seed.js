@@ -201,6 +201,23 @@ export const SEED_PRODUCTS = [
     stockQuantity: 40
   },
   {
+    id: 'stk-6',
+    sku: 'ANM-01',
+    name: 'Anime Ramen & Chill',
+    nameAr: 'استيكر رامين ومغامرة أنمي 🍜',
+    category: 'anime',
+    subCategory: 'aesthetic',
+    type: 'sticker',
+    price: 35,
+    finish: 'holographic',
+    badge: 'أنمي فاخر',
+    desc: 'تصميم أنمي رائق لوعاء الرامين البخاري مع عيدان خشبية وتدرجات لونية زاهية.',
+    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="15" width="130" height="130" rx="26" fill="#18181B" stroke="#FF5000" stroke-width="4"/><ellipse cx="80" cy="95" rx="45" ry="32" fill="#E4E4E7" stroke="#0E0E10" stroke-width="4"/><path d="M 40 90 Q 80 135 120 90 Z" fill="#FF5000" stroke="#0E0E10" stroke-width="3"/><circle cx="68" cy="88" r="8" fill="#FFF"/><circle cx="68" cy="88" r="4" fill="#FFC107"/><line x1="45" y1="65" x2="115" y2="78" stroke="#D4AF37" stroke-width="4" stroke-linecap="round"/><line x1="48" y1="58" x2="118" y2="71" stroke="#D4AF37" stroke-width="4" stroke-linecap="round"/><text x="80" y="48" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FFFFFF" text-anchor="middle">RAMEN VIBES</text></svg>`,
+    dateAdded: 3,
+    inStock: true,
+    stockQuantity: 45
+  },
+  {
     id: 'stk-8',
     sku: 'GAM-01',
     name: 'Retro Game Controller',
