@@ -138,3 +138,28 @@ This document records all architectural decisions, ground-truth constraints, and
   - 27 Egyptian Governorates Grid: Granular per-governorate shipping fee inputs with live persistence to `localStorage.stickify21_settings`.
   - Dynamic Sync: Storefront pricing calculator (`calculateCart()` in `src/domain/pricing.js`) dynamically merges merchant overrides with default config rates so shipping changes take effect immediately at checkout.
   - Disaster Recovery: Complete JSON backup export and validated JSON import with pre-import snapshot and confirmation prompt, plus a destructive "Reset Demo Data" action guarded by requiring the admin to type `"RESET"`.
+
+### AD-21: Comprehensive Search Engine Optimization, OpenGraph & Dynamic Product JSON-LD Schema
+- **Decision:** Optimize `index.html` for Egyptian and regional search engines and social sharing platforms:
+  - Meta tags: Arabic title and description targeting university students, book lovers, and laptop sticker enthusiasts in Egypt; canonical URL pointing to `https://stickify21.com/`; mobile theme color `#FF5000`.
+  - OpenGraph / Twitter Cards: Rich snippet previews configured with `og:image`, `og:locale="ar_EG"`, and `summary_large_image` using high-resolution brand assets.
+  - Static JSON-LD: Semantic `Organization` and `WebSite` schemas providing brand identity, contact point, and search action metadata.
+  - Dynamic JSON-LD: The storefront generates a compliant Schema.org `ItemList` containing individual `Product` entries (with SKU, offers in EGP, inStock state, and deep link URL) at runtime based on active catalog data, enabling Google Rich Snippets for e-commerce product listings.
+
+### AD-22: Search Engine Crawler Directives (`robots.txt`, `sitemap.xml`, and noindex protections)
+- **Decision:** Establish clear boundaries for web crawlers:
+  - `robots.txt`: Explicitly blocks search engines from crawling administrative and internal packing interfaces (`Disallow: /admin.html`, `Disallow: /packing-slip.html`), while declaring the location of `sitemap.xml`.
+  - `sitemap.xml`: Declares canonical routes (`/`, `#/custom-print`, `#/track`) with update frequencies and priorities.
+  - Noindex Defense: Both `admin.html` and `packing-slip.html` include `<meta name="robots" content="noindex, nofollow">` to prevent accidental indexing of customer packing lists or admin login panels.
+
+### AD-23: Interactive Legal, Trust, and Operational Policy Modals
+- **Decision:** Present essential e-commerce policies (About Us, Shipping & Returns, Terms & Conditions, Privacy Policy, Customer Support) through a unified accessible modal (`#policy-modal`) with deep linking support:
+  - Tabs Navigation: Instant switching between policy sections without page reloads or layout shift.
+  - Hash Routing: Direct URLs such as `#/terms`, `#/privacy`, `#/shipping-returns`, `#/about`, and `#/contact` automatically open the policy dialog with the requested section pre-selected.
+  - Legal Disclaimer Banner: Prominently identifies terms and shipping rules as an illustrative draft ("مسودة استرشادية") requiring final legal endorsement prior to official commercial launch.
+
+### AD-24: Privacy-Preserving Analytics Dispatcher Hooks (GA4 & Meta Pixel Stubs)
+- **Decision:** Centralize event tracking in `src/utils/analytics.js` (`AnalyticsService`):
+  - Supported Hooks: `view_item`, `add_to_cart`, `begin_checkout`, `purchase`, and custom events.
+  - Privacy First: External analytics scripts are only injected when valid IDs (`CONFIG.ANALYTICS.GA4_ID`, `CONFIG.ANALYTICS.META_PIXEL_ID`) are explicitly configured.
+  - Safe Local Development: In prototype mode, events are safely output to `console.debug` for debugging and test verification without throwing errors or transmitting tracking cookies.

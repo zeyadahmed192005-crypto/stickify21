@@ -3,15 +3,83 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>STICKIFY 21 | استيكرات وفواصل كتب تعبر عن هويتك</title>
+  <title>STICKIFY 21 | استيكرات فينيل وفواصل كتب مقاومة للماء في مصر</title>
+  
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="STICKIFY 21 | استيكرات فينيل وفواصل كتب مقاومة للماء في مصر">
+  <meta name="description" content="متجر STICKIFY 21 في مصر — استيكرات فينيل داي كات مقاومة للمياه وعوامل الجو (6، 8، 10 سم) وفواصل كتب كرتونية فاخرة، وطباعة مخصصة للشركات والجامعات.">
+  <meta name="keywords" content="استيكرات, ستيكرز مصر, فواصل كتب, فينيل استيكر, استيكرات لابتوب, هولوجرافيك, ستيكرز قراءة, طباعة استيكرات, STICKIFY 21">
+  <meta name="author" content="STICKIFY 21">
+  <meta name="theme-color" content="#FF5000">
+  <link rel="canonical" href="https://stickify21.com/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="STICKIFY 21 | استيكرات فينيل وفواصل كتب مقاومة للمياه في مصر">
+  <meta property="og:description" content="تسوق أحدث استيكرات الفينيل المقاومة للمياه وفواصل الكتب الفاخرة، أو اطلب طباعة مخصصة لناديك أو شركتك في مصر مع شحن لكافة المحافظات.">
+  <meta property="og:url" content="https://stickify21.com/">
+  <meta property="og:site_name" content="STICKIFY 21">
+  <meta property="og:locale" content="ar_EG">
+  <meta property="og:image" content="https://stickify21.com/logo.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="شعار براند STICKIFY 21">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="STICKIFY 21 | استيكرات فينيل وفواصل كتب">
+  <meta name="twitter:description" content="تسوق أفضل استيكرات الفينيل المقاومة للماء وفواصل الكتب الفاخرة في مصر مع شحن سريع وتوصيل لكافة المحافظات.">
+  <meta name="twitter:image" content="https://stickify21.com/logo.jpg">
+
+  <!-- Favicon & Touch Icon -->
+  <link rel="icon" type="image/jpeg" href="logo.jpg">
+  <link rel="apple-touch-icon" href="logo.jpg">
+
+  <!-- Structured Data: Organization & WebSite (JSON-LD) -->
+  <script type="application/ld+json" id="jsonld-static-schema">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "name": "STICKIFY 21",
+        "alternateName": "استيكيفاي 21",
+        "url": "https://stickify21.com",
+        "logo": "https://stickify21.com/logo.jpg",
+        "description": "براند مصري متخصص في صناعة استيكرات الفينيل المقاومة للماء وفواصل الكتب الفاخرة والطباعة المخصصة.",
+        "telephone": "+201043546503",
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "telephone": "+201043546503",
+          "contactType": "customer service",
+          "areaServed": "EG",
+          "availableLanguage": ["Arabic", "English"]
+        },
+        "sameAs": [
+          "https://wa.me/201043546503"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "name": "STICKIFY 21",
+        "url": "https://stickify21.com",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://stickify21.com/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Dynamic Product Catalog JSON-LD Placeholder -->
+  <script type="application/ld+json" id="jsonld-products-schema"></script>
   
   <!-- Google Fonts: Readex Pro + Plus Jakarta Sans + Space Grotesk -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Readex+Pro:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- Favicon -->
-  <link rel="icon" type="image/jpeg" href="logo.jpg">
   
   <!-- Compiled CSS (Tailwind CLI) -->
   <link rel="stylesheet" href="dist/styles.css">
@@ -845,32 +913,103 @@
     <span class="hidden sm:inline">تواصل واتساب: 01043546503</span>
   </a>
 
+  <!-- POLICY & LEGAL MODAL                          -->
+  <!-- ========================================== -->
+  <div id="policy-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div onclick="closePolicyModal()" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
+
+    <div class="relative bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl z-10 max-h-[90vh] overflow-y-auto">
+      <button onclick="closePolicyModal()" class="absolute top-5 left-5 text-zinc-400 hover:text-black p-2 rounded-full hover:bg-zinc-100 transition z-20 text-lg leading-none" title="إغلاق (Esc)">✕</button>
+
+      <!-- Tabs Navigation -->
+      <div class="flex items-center gap-2 border-b border-zinc-100 pb-4 mb-4 overflow-x-auto text-xs font-bold">
+        <button onclick="switchPolicyTab('about')" id="policy-tab-btn-about" data-policy-tab="about" class="policy-tab-btn px-3 py-1.5 rounded-xl bg-zinc-900 text-white whitespace-nowrap transition">من نحن</button>
+        <button onclick="switchPolicyTab('shipping_returns')" id="policy-tab-btn-shipping_returns" data-policy-tab="shipping_returns" class="policy-tab-btn px-3 py-1.5 rounded-xl bg-zinc-100 text-zinc-700 whitespace-nowrap transition">الشحن والاسترجاع</button>
+        <button onclick="switchPolicyTab('terms')" id="policy-tab-btn-terms" data-policy-tab="terms" class="policy-tab-btn px-3 py-1.5 rounded-xl bg-zinc-100 text-zinc-700 whitespace-nowrap transition">الشروط والأحكام</button>
+        <button onclick="switchPolicyTab('privacy')" id="policy-tab-btn-privacy" data-policy-tab="privacy" class="policy-tab-btn px-3 py-1.5 rounded-xl bg-zinc-100 text-zinc-700 whitespace-nowrap transition">سياسة الخصوصية</button>
+        <button onclick="switchPolicyTab('contact')" id="policy-tab-btn-contact" data-policy-tab="contact" class="policy-tab-btn px-3 py-1.5 rounded-xl bg-zinc-100 text-zinc-700 whitespace-nowrap transition">تواصل معنا</button>
+      </div>
+
+      <!-- Legal Draft Banner -->
+      <div id="policy-modal-draft-notice" class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-800 flex items-center gap-2">
+        <span class="text-base flex-shrink-0">⚠️</span>
+        <span>مسودة استرشادية لنموذج المتجر المحلي — تخضع للمراجعة والاعتماد القانوني من قِبل مالك المتجر قبل الإطلاق الرسمي.</span>
+      </div>
+
+      <!-- Content Container -->
+      <div id="policy-content" class="text-xs text-zinc-600 leading-relaxed space-y-4">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 max-w-sm"></div>
 
-  <!-- Minimal Footer -->
-  <footer class="bg-white border-t border-zinc-200 py-10 text-xs text-zinc-500">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+  <!-- Footer -->
+  <footer class="bg-white border-t border-zinc-200 py-12 text-xs text-zinc-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
       
-      <div class="flex items-center gap-3">
-        <img src="logo.jpg" alt="STICKIFY21" class="h-7 w-auto object-contain">
-        <span>•</span>
-        <span>جميع الحقوق محفوظة &copy; 2026</span>
-        <span>•</span>
-        <span class="font-mono text-zinc-600">01043546503</span>
+      <!-- Top Grid: Brand info & Navigation Columns -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <!-- Brand Info -->
+        <div class="space-y-3 md:col-span-1">
+          <div class="flex items-center gap-2.5">
+            <img src="logo.jpg" alt="STICKIFY21" width="100" height="28" loading="lazy" class="h-8 w-auto object-contain">
+            <span class="font-extrabold text-sm text-zinc-900">STICKIFY 21</span>
+          </div>
+          <p class="text-[11px] text-zinc-500 leading-relaxed">
+            براند مصري متخصص في صناعة استيكرات الفينيل المقاومة للماء، فواصل الكتب، والطباعة المخصصة للجامعات والشركات.
+          </p>
+          <div class="text-[11px] text-zinc-400 font-mono">
+            <span>واتساب: </span><a href="https://wa.me/201043546503" class="text-[#FF5000] font-bold hover:underline" target="_blank">01043546503</a>
+          </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="space-y-2">
+          <h4 class="font-extrabold text-zinc-900 text-xs uppercase tracking-wider">روابط سريعة</h4>
+          <ul class="space-y-1.5 text-[11px]">
+            <li><a href="#categories-section" class="hover:text-[#FF5000] transition">تصفح الأقسام</a></li>
+            <li><a href="#catalog-products-area" class="hover:text-[#FF5000] transition">كتالوج الاستيكرات</a></li>
+            <li><a href="javascript:void(0)" onclick="selectCategoryByCard('bookmarks')" class="hover:text-[#FF5000] transition">فواصل الكتب 🔖</a></li>
+            <li><a href="#pack-builder-section" class="hover:text-[#FF5000] transition">صانع الباقات (وفر حتى 30%)</a></li>
+            <li><a href="#mockup-studio-section" class="hover:text-[#FF5000] transition">استوديو المعاينة التفاعلي</a></li>
+          </ul>
+        </div>
+
+        <!-- Customer Support & Orders -->
+        <div class="space-y-2">
+          <h4 class="font-extrabold text-zinc-900 text-xs uppercase tracking-wider">الطلبات وخدمة العملاء</h4>
+          <ul class="space-y-1.5 text-[11px]">
+            <li><a href="#/track" class="hover:text-[#FF5000] font-bold transition flex items-center gap-1"><span>🔍 تتبع حالة طلبك</span></a></li>
+            <li><a href="#custom-order" class="hover:text-[#FF5000] transition">طلب طباعة مخصصة (Custom Print)</a></li>
+            <li><a href="javascript:void(0)" onclick="openPolicyModal('shipping_returns')" class="hover:text-[#FF5000] transition">أسعار ومواعيد الشحن للمحافظات</a></li>
+            <li><a href="javascript:void(0)" onclick="openPolicyModal('shipping_returns')" class="hover:text-[#FF5000] transition">سياسة الاسترجاع والاستبدال (14 يوم)</a></li>
+            <li><a href="javascript:void(0)" onclick="openPolicyModal('contact')" class="hover:text-[#FF5000] transition">الدعم والمساعدة عبر واتساب</a></li>
+          </ul>
+        </div>
+
+        <!-- Legal & Policies -->
+        <div class="space-y-2">
+          <h4 class="font-extrabold text-zinc-900 text-xs uppercase tracking-wider">الشروط والسياسات</h4>
+          <ul class="space-y-1.5 text-[11px]">
+            <li><a href="javascript:void(0)" onclick="openPolicyModal('about')" class="hover:text-[#FF5000] transition">من نحن (قصة STICKIFY 21)</a></li>
+            <li><a href="javascript:void(0)" onclick="openPolicyModal('terms')" class="hover:text-[#FF5000] transition">الشروط والأحكام</a></li>
+            <li><a href="javascript:void(0)" onclick="openPolicyModal('privacy')" class="hover:text-[#FF5000] transition">سياسة الخصوصية وأمان البيانات</a></li>
+            <li><a href="admin.html" class="hover:text-zinc-900 transition flex items-center gap-1 font-mono text-zinc-400"><span>🔒 مدخل الإدارة (Admin Demo)</span></a></li>
+          </ul>
+        </div>
       </div>
 
-      <div class="flex items-center gap-6">
-        <a href="#categories-section" class="hover:text-black transition">الأقسام</a>
-        <a href="#catalog-products-area" class="hover:text-black transition">المنتجات</a>
-        <a href="#mockup-studio-section" class="hover:text-black transition">المعاينة</a>
-        <a href="#pack-builder-section" class="hover:text-black transition">باقات 5 و 10</a>
-        <a href="#custom-order" class="hover:text-black transition">طباعة مخصصة</a>
-        <a href="#/track" class="hover:text-[#FF5000] font-bold transition">تتبع طلبك 🔍</a>
-      </div>
-
-      <div class="text-zinc-400 font-mono text-[11px]">
-        STICKIFY 21 — STICK YOUR VIBE
+      <!-- Bottom Bar -->
+      <div class="pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-zinc-400">
+        <div>
+          <span>جميع الحقوق محفوظة &copy; 2026 براند STICKIFY 21 مصر.</span>
+        </div>
+        <div class="font-mono text-[#FF5000] font-bold">
+          STICKIFY 21 — STICK YOUR VIBE
+        </div>
       </div>
 
     </div>

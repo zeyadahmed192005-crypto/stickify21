@@ -11,6 +11,7 @@ export const CONFIG = {
   // Contacts
   WHATSAPP_NUMBER: '201043546503',
   WHATSAPP_DISPLAY: '01043546503',
+  SITE_URL: 'https://stickify21.com',
   
   // Financial & Shipping
   CURRENCY: 'ج.م',
@@ -191,5 +192,13 @@ export const CONFIG = {
       '10cm': 5,
       'custom': 5
     }
+  },
+
+  // Analytics Hooks Configuration (Hooks only; no real keys in prototype)
+  ANALYTICS: {
+    ENABLED: false,
+    GA4_ID: null,       // e.g. 'G-XXXXXXXXXX'
+    META_PIXEL_ID: null,// e.g. '1234567890'
+    DEBUG: true
   }
 };

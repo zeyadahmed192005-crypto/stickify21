@@ -13,6 +13,7 @@ import { generateOrderId, generateIdempotencyKey, generateOrderCode } from './sr
 import { evaluateCoupon } from './src/domain/coupons.js';
 import { formatOrderWhatsAppMessage, formatCustomPrintWhatsAppMessage } from './src/domain/orders.js';
 import { checkProductStock } from './src/domain/inventory.js';
+import { analytics } from './src/utils/analytics.js';
 
 // Safe JSON parser with fallback and corrupted snapshot
 function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
@@ -204,6 +205,7 @@ export async function initApp() {
   state.categories = await storage.getCategories();
   state.products = await storage.getProducts();
 
+  updateProductJsonLd(state.products);
   renderCategories();
   renderProducts();
   renderCart();
@@ -222,6 +224,7 @@ export async function initApp() {
     }
     if (e.key === 'stickify21_products') {
       state.products = await storage.getProducts();
+      updateProductJsonLd(state.products);
       renderProducts();
     }
     if (e.key === 'stickify21_cart') {
@@ -592,6 +595,7 @@ export function addToCart(productId) {
   saveCart();
   renderCart();
   updateCartBadge();
+  analytics.trackAddToCart({ sku: product.sku, productId: product.id, nameAr: product.nameAr, name: product.name, price: price, quantity: 1 });
   showToast(`تمت إضافة [${escapeHtml(product.sku)}] (${escapeHtml(sizeLabel)}) إلى السلة بنجاح 🛒`);
 }
 
@@ -1209,6 +1213,8 @@ export function openCheckoutModal() {
   }
 
   updateCheckoutPricingPreview();
+  const pricing = calculateCart({ items: state.cart, coupon: state.coupon, governorate: state.selectedGovernorate });
+  analytics.trackBeginCheckout(state.cart, pricing.total);
   const modal = document.getElementById('checkout-modal');
   if (modal) modal.classList.remove('hidden');
 }
@@ -1380,6 +1386,7 @@ export async function submitOrder(e) {
 
     // Save order through storage interface FIRST
     await storage.createOrder(order);
+    analytics.trackPurchase(order);
 
     // Increment coupon usage if used
     if (state.coupon.code) {
@@ -1502,6 +1509,7 @@ export async function openProductDetailModal(productId, updateHash = true) {
   };
 
   renderProductDetailModal(product);
+  analytics.trackViewItem(product);
 
   const modal = document.getElementById('product-detail-modal');
   if (modal) modal.classList.remove('hidden');
@@ -2205,6 +2213,229 @@ export async function submitCustomPrintOrder() {
 }
 
 // ==========================================
+// DYNAMIC PRODUCT JSON-LD SCHEMA GENERATOR
+// ==========================================
+export function updateProductJsonLd(products) {
+  let scriptEl = document.getElementById('jsonld-products-schema');
+  if (!scriptEl) {
+    scriptEl = document.createElement('script');
+    scriptEl.id = 'jsonld-products-schema';
+    scriptEl.type = 'application/ld+json';
+    document.head.appendChild(scriptEl);
+  }
+
+  const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : CONFIG.SITE_URL;
+  const items = (products || []).map((p, index) => {
+    const isBookmark = p.category === 'bookmarks' || p.type === 'bookmark';
+    const prodImg = p.image ? (p.image.startsWith('data:') ? p.image : new URL(p.image, origin).href) : `${origin}/logo.jpg`;
+    return {
+      '@type': 'Product',
+      'position': index + 1,
+      'name': p.nameAr || p.name,
+      'description': p.desc || 'استيكر فينيل عالي الجودة ومقاوم للماء من STICKIFY 21',
+      'sku': p.sku || `S21-${p.id}`,
+      'image': prodImg,
+      'offers': {
+        '@type': 'Offer',
+        'priceCurrency': 'EGP',
+        'price': p.price || (isBookmark ? 25 : 35),
+        'availability': p.inStock !== false ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        'url': `${origin}/#/product/${p.id}`,
+        'seller': {
+          '@type': 'Organization',
+          'name': 'STICKIFY 21'
+        }
+      }
+    };
+  });
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    'name': 'كتالوج منتجات STICKIFY 21',
+    'numberOfItems': items.length,
+    'itemListElement': items
+  };
+
+  scriptEl.textContent = JSON.stringify(schema, null, 2);
+}
+
+// ==========================================
+// POLICY MODAL & LEGAL VIEWS
+// ==========================================
+export const POLICY_DATA = {
+  about: {
+    title: 'قصة STICKIFY 21 (Stick Your Vibe)',
+    content: `
+      <div class="space-y-4">
+        <p class="font-bold text-zinc-900 text-sm">
+          أهلاً بك في STICKIFY 21 — استيكرات وفواصل كتب تعبر عن هويتك وشغفك 🍊
+        </p>
+        <p>
+          نحن براند مصري مستقل تأسس لخدمة مجتمع القراء والطلاب والمهندسين وصناع المحتوى في مصر. نؤمن أن اللابتوب، الهواتف الذكية، زجاجات المياه، ورواياتك المفضلة ليست مجرد مقتنيات، بل مساحات تعكس هويتك وأفكارك وشغفك اليومي.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">خاماتنا ومواصفات الإنتاج:</h4>
+        <ul class="list-disc list-inside space-y-1.5 pr-2">
+          <li><strong>استيكرات الفينيل المقاومة للماء (Die-Cut Vinyl):</strong> مقاومة تماماً للمياه، الرطوبة، والخدوش. متوفرة بثلاثة مقاسات قياسية (6 سم، 8 سم، 10 سم) وتشطيبات فاخرة (لامع Glossy، مطفي Matte، وهولوجرافيك Holographic عاكس للإضاءة).</li>
+          <li><strong>فواصل الكتب الفاخرة (Bookmarks):</strong> مطبوعة على ورق كرتون مقوى 350gsm بسلوفان مطفي ناعم الملمس وتصميمات أدبية وسينمائية تلهم القراءة.</li>
+          <li><strong>الطباعة المخصصة (Custom Printing):</strong> نوفر لنوادي الجامعات، الشركات الناشئة، المدارس، والمكتبات خدمة طباعة التصاميم والشعارات الخاصة ابتداءً من 10 قطع وحتى آلاف القطع بأعلى جودة وسرعة تنفيذ.</li>
+        </ul>
+        <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl flex items-center justify-between">
+          <span class="font-bold text-zinc-800">تواصل مباشر مع فريق العمل:</span>
+          <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}" target="_blank" class="font-mono text-[#FF5000] font-bold hover:underline">01043546503</a>
+        </div>
+      </div>
+    `
+  },
+  shipping_returns: {
+    title: 'سياسة الشحن والتوصيل والاستبدال',
+    content: `
+      <div class="space-y-4">
+        <h4 class="font-bold text-zinc-900 text-sm">🚚 الشحن والتوصيل لكافة المحافظات</h4>
+        <p>
+          نقوم بالتوصيل إلى جميع محافظات جمهورية مصر العربية الـ 27 عبر شركات شحن متخصصة تضمن تسليم الشحنات سليمة في أسرع وقت.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="bg-zinc-50 p-3 rounded-2xl border border-zinc-200">
+            <span class="font-bold text-zinc-900 block mb-1">القاهرة الكبرى والإسكندرية:</span>
+            <span class="text-zinc-600">خلال 2 – 4 أيام عمل (تكلفة الشحن 35 – 45 ج.م).</span>
+          </div>
+          <div class="bg-zinc-50 p-3 rounded-2xl border border-zinc-200">
+            <span class="font-bold text-zinc-900 block mb-1">باقي محافظات مصر والصعيد:</span>
+            <span class="text-zinc-600">خلال 3 – 5 أيام عمل (تكلفة الشحن 50 – 75 ج.م).</span>
+          </div>
+        </div>
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 font-bold">
+          🎉 شحن مجاني بالكامل لأي طلب يتجاوز ${CONFIG.FREE_SHIPPING_THRESHOLD} ج.م (يُحتسب بعد تطبيق كود الخصم).
+        </div>
+
+        <h4 class="font-bold text-zinc-900 text-sm pt-2">🔄 سياسة الاسترجاع والاستبدال (14 يوماً)</h4>
+        <ul class="list-disc list-inside space-y-1.5 pr-2">
+          <li>طبقاً لقانون حماية المستهلك المصري، يحق للعميل استبدال أو إرجاع الاستيكرات الجاهزة وفواصل الكتب خلال <strong>14 يوماً</strong> من تاريخ الاستلام، بشرط أن تكون المنتجات بحالتها الأصلية غير مستخدمة.</li>
+          <li>في حال وجود أي عيب طباعة، أو تلف بالمنتج، أو خطأ في المحتوى مقارنة بالطلب، يتحمل متجر STICKIFY 21 كافة مصاريف الشحن للاستبدال أو إعادة كامل المبلغ للعميل فوراً.</li>
+          <li><strong>الطلبات المخصصة (Custom Prints):</strong> نظراً لتصنيعها خصيصاً بناءً على طلب العميل وتصاميمه المعتمدة، لا يمكن استرجاعها إلا في حال وجود عيب مصنعي في خامة الفينيل أو خطأ في أبعاد الطباعة مقارنة بالملف المرسل.</li>
+        </ul>
+      </div>
+    `
+  },
+  terms: {
+    title: 'الشروط والأحكام العامة للمتجر',
+    content: `
+      <div class="space-y-4">
+        <p>
+          مرحباً بكم في STICKIFY 21. تنطبق هذه الشروط والأحكام على كافة عمليات الشراء واستخدام المتجر الإلكتروني.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">1. العملة والأسعار</h4>
+        <p>
+          جميع الأسعار المعروضة في المتجر مقوّمة بـ <strong>الجنيه المصري (EGP / ج.م)</strong>. يحق للمتجر تحديث الأسعار والعروض الترويجية في أي وقت دون إشعار مسبق، مع التزام المتجر بالأسعار المعتمدة للطلبات التي تم تأكيدها بالفعل.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">2. آليات الدفع وتأكيد الحجز</h4>
+        <p>
+          يوفر المتجر خيارات الدفع عند الاستلام (COD)، إنستاباي (InstaPay)، ومحافظ فودافون كاش. في حال الدفع الإلكتروني، يتعين على العميل إرفاق لقطة شاشة أو معرّف التحويل عبر واتساب لمطابقة العملية واعتماد الطلب من الإدارة.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">3. كوبونات الخصم والعروض الترويجية</h4>
+        <p>
+          يتم تطبيق الخصم وفق الشروط المحددة لكل كوبون (الحد الأدنى، تاريخ الانتهاء، وعدد مرات الاستخدام). لا يجوز دمج أكثر من كود خصم في الطلب الواحد ما لم يتم النص على ذلك صراحة.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">4. حقوق الملكية الفكرية</h4>
+        <p>
+          جميع العلامات التجارية، الشعار الرسمي لـ STICKIFY 21، والمحتوى البصري المعروض بالموقع ملك لأصحابها ومحمية بموجب القوانين. التصاميم المتاحة مخصصة للاستخدام الشخصي المستقل.
+        </p>
+      </div>
+    `
+  },
+  privacy: {
+    title: 'سياسة الخصوصية وأمان البيانات',
+    content: `
+      <div class="space-y-4">
+        <p class="font-bold text-zinc-900">
+          خصوصيتك وأمان بياناتك الشخصية أولوية قصوى لدينا في STICKIFY 21.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">1. تخزين البيانات في هذا النموذج الأولي</h4>
+        <p>
+          يعمل هذا المتجر بنظام محلي آمن يعتمد على تقنيات المتصفح الحديثة (LocalStorage و IndexedDB). يتم حفظ محتويات السلة، مسودات الطلبات، والتفضيلات محلياً داخل جهازك فقط، ولا يتم إرسال أي بيانات شخصية إلى أي خوادم طرف ثالث غير مصرح بها.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">2. البيانات المطلوبة للشحن</h4>
+        <p>
+          عند إتمام الطلب، يتم طلب الاسم، رقم الهاتف المحمول، المحافظة، والعنوان التفصيلي. تُستخدم هذه البيانات حصراً لتجهيز الطلبية، التواصل بشأن موعد التسليم، والتنسيق مع شركة الشحن لتوصيل الطلب إلى باب منزلك.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">3. كود الطلب المشفر عبر واتساب (Order Code)</h4>
+        <p>
+          لضمان دقة الطلب وسرعة اعتماده، يتم تضمين كود رقمي مؤمن في نهاية رسالة الواتساب يحتوي على تفاصيل العناصر والكميات ليتمكن فريق الإدارة من استيراد الطلب بدقة 100% دون أخطاء كتابية.
+        </p>
+        <h4 class="font-bold text-zinc-800 text-xs">4. حق التحكم ومسح البيانات</h4>
+        <p>
+          يحق لك في أي وقت مسح بياناتك من خلال إفراغ سلة الشراء أو مسح بيانات الموقع المحلي من إعدادات المتصفح.
+        </p>
+      </div>
+    `
+  },
+  contact: {
+    title: 'تواصل مع فريق STICKIFY 21',
+    content: `
+      <div class="space-y-4">
+        <p>
+          فريق خدمة العملاء والدعم الفني في STICKIFY 21 جاهز للرد على استفساراتك واستقبال طلباتك المخصصة.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
+            <span class="text-xs text-zinc-400 block font-bold mb-1">واتساب المبيعات والدعم:</span>
+            <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}" target="_blank" class="font-mono text-base font-extrabold text-[#25D366] hover:underline flex items-center gap-1.5">
+              <span>💬</span>
+              <span>01043546503</span>
+            </a>
+            <span class="text-[11px] text-zinc-500 block mt-1">متاح يومياً من 10 ص حتى 10 م بتوقيت مصر.</span>
+          </div>
+          <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
+            <span class="text-xs text-zinc-400 block font-bold mb-1">طلبات الطباعة المخصصة والجملة:</span>
+            <span class="font-bold text-zinc-900 block text-sm">نوادي، شركات، مكتبات، وجامعات</span>
+            <span class="text-[11px] text-zinc-500 block mt-1">خصومات تبدأ من 10 قطع وتصل لـ 50% على الكميات الكبيرة.</span>
+          </div>
+        </div>
+        <div class="p-3 bg-zinc-100 rounded-2xl text-[11px] text-zinc-600 font-mono text-center">
+          STICKIFY 21 — Made with Passion in Egypt 🇪🇬
+        </div>
+      </div>
+    `
+  }
+};
+
+export function openPolicyModal(section = 'about') {
+  const modal = document.getElementById('policy-modal');
+  if (!modal) return;
+  switchPolicyTab(section);
+  modal.classList.remove('hidden');
+}
+
+export function closePolicyModal() {
+  const modal = document.getElementById('policy-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+export function switchPolicyTab(section = 'about') {
+  const contentEl = document.getElementById('policy-content');
+  const data = POLICY_DATA[section] || POLICY_DATA.about;
+
+  // Update tab buttons style
+  document.querySelectorAll('.policy-tab-btn').forEach(btn => {
+    btn.classList.remove('bg-zinc-900', 'text-white');
+    btn.classList.add('bg-zinc-100', 'text-zinc-700');
+  });
+  const activeBtn = document.getElementById(`policy-tab-btn-${section}`);
+  if (activeBtn) {
+    activeBtn.classList.remove('bg-zinc-100', 'text-zinc-700');
+    activeBtn.classList.add('bg-zinc-900', 'text-white');
+  }
+
+  if (contentEl) {
+    contentEl.innerHTML = `
+      <h3 id="policy-modal-title" class="font-extrabold text-base text-zinc-900 mb-3">${escapeHtml(data.title)}</h3>
+      <div id="policy-modal-body">${data.content}</div>
+    `;
+  }
+}
+
+// ==========================================
 // HASH ROUTER
 // ==========================================
 export function initHashRouter() {
@@ -2219,6 +2450,16 @@ export function initHashRouter() {
       openOrderTrackingModal(orderId, false);
     } else if (hash === '#custom-order' || hash === '#/custom-print') {
       document.getElementById('custom-order')?.scrollIntoView({ behavior: 'smooth' });
+    } else if (hash === '#/about') {
+      openPolicyModal('about');
+    } else if (hash === '#/shipping' || hash === '#/shipping-returns') {
+      openPolicyModal('shipping_returns');
+    } else if (hash === '#/terms') {
+      openPolicyModal('terms');
+    } else if (hash === '#/privacy') {
+      openPolicyModal('privacy');
+    } else if (hash === '#/contact') {
+      openPolicyModal('contact');
     } else {
       const prodModal = document.getElementById('product-detail-modal');
       if (prodModal && !prodModal.classList.contains('hidden')) {
@@ -2227,6 +2468,10 @@ export function initHashRouter() {
       const trackModal = document.getElementById('order-tracking-modal');
       if (trackModal && !trackModal.classList.contains('hidden')) {
         trackModal.classList.add('hidden');
+      }
+      const policyModal = document.getElementById('policy-modal');
+      if (policyModal && !policyModal.classList.contains('hidden')) {
+        policyModal.classList.add('hidden');
       }
     }
   }
@@ -2237,6 +2482,7 @@ export function initHashRouter() {
       closeProductDetailModal();
       closeOrderTrackingModal();
       closeCheckoutModal();
+      closePolicyModal();
       toggleCartModal(false);
     }
   });
@@ -2393,5 +2639,13 @@ window.selectCustomFinish = selectCustomFinish;
 window.adjustCustomQty = adjustCustomQty;
 window.handleCustomQtyChange = handleCustomQtyChange;
 window.submitCustomPrintOrder = submitCustomPrintOrder;
+window.openPolicyModal = openPolicyModal;
+window.closePolicyModal = closePolicyModal;
+window.switchPolicyTab = switchPolicyTab;
+window.analytics = analytics;
 
-document.addEventListener('DOMContentLoaded', initApp);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}

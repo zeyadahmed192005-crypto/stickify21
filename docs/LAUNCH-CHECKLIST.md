@@ -55,6 +55,35 @@ This checklist tracks all prerequisites and technical tasks required before laun
 - [ ] (Optional) Set up automated order confirmation webhooks via WhatsApp Cloud API.
 
 ### D. Legal & E-Commerce Compliance (Egypt)
-- [ ] Finalize Terms of Service and Privacy Policy pages.
+- [ ] Finalize Terms of Service, Privacy Policy, and Shipping/Returns pages with qualified legal counsel.
 - [ ] Define Return & Refund Policy compliant with Egyptian Consumer Protection Agency regulations (14-day return window for non-custom items; custom prints exempt unless defective).
 - [ ] Display commercial register / tax registration details in the footer if registered.
+
+### E. Server-Side Authoritative Security & Validation
+- [ ] Enforce strict server-side recalculation of order totals, discounts, shipping fees, and free-shipping thresholds (client payloads can be forged).
+- [ ] Authoritative coupon validation: verify coupon expiration, max global uses, per-customer limits, and minimum subtotals on the server before confirming orders.
+- [ ] Real-time inventory deduction with atomic database transactions to prevent overselling popular stickers.
+- [ ] Server-enforced order lifecycle state transitions: reject unauthorized jumps (e.g., jumping from `pending` directly to `completed`).
+- [ ] Rate limiting & anti-abuse on checkout: enforce rate limits (max 3 checkouts per IP/hour) and integrate Turnstile/reCAPTCHA v3 to prevent WhatsApp spam and bot checkouts.
+- [ ] Malware & virus scanning for custom print uploads (ClamAV or cloud object scanning) before files are viewed by staff.
+
+### F. Payment Verification Process & Gateways
+- [ ] Formalize payment confirmation protocol:
+  - **InstaPay:** Connect to InstaPay Instant Payment Network (IPN) API or establish manual verification procedures matching sender mobile/reference code to order ID before moving to `confirmed`.
+  - **Vodafone Cash:** Manual balance audit using registered wallet notifications or integrate with Egyptian payment aggregator (Paymob, Fawry, Kashier).
+  - **Cash on Delivery (COD):** Set up courier API integration (Bosta, Mylerz, Aramex Egypt) for automated tracking number generation and cash remittance.
+
+### G. Analytics, SEO Reality Check & Marketing
+- [ ] Configure real Google Analytics 4 (GA4) Measurement ID (`G-XXXXXXXXXX`) and Meta Pixel ID (`XXXXXXXXXX`) in `src/config/config.js`.
+- [ ] Verify Open Graph and Twitter Card tags with Facebook Sharing Debugger and Twitter Card Validator.
+- [ ] Update `sitemap.xml` with production domain URL and submit via Google Search Console.
+- [ ] **SEO Reality Check:** Metadata and JSON-LD alone do not guarantee rank. Real SEO success requires:
+  - Fast Core Web Vitals (LCP < 2.5s, CLS < 0.1, INP < 200ms).
+  - High-quality Arabic content matching Egyptian search intent (e.g., "استيكرات لابتوب مقاومة للمية", "فواصل كتب هاند ميد").
+  - Authoritative backlinks from Egyptian book clubs, tech communities, and university groups.
+  - Active social proof (Instagram/TikTok sticker unboxing videos and customer showcases).
+
+### H. Production Monitoring & Disaster Recovery
+- [ ] Set up client-side and server-side error monitoring with Sentry or LogRocket.
+- [ ] Uptime monitoring (Better Uptime or Uptime Kuma) with instant WhatsApp/Telegram alerts.
+- [ ] Automated daily database backups with offsite replication and verified recovery testing (RPO < 1 hour, RTO < 4 hours).
