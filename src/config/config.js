@@ -19,7 +19,7 @@ export const CONFIG = {
   DEFAULT_SHIPPING: 35,
   
   // Schema
-  SCHEMA_VERSION: 1,
+  SCHEMA_VERSION: '1.0.0',
 
   // Default Advertised Coupon
   ADVERTISED_COUPON: {
@@ -49,25 +49,56 @@ export const CONFIG = {
     10: { discountRate: 0.30, labelAr: 'باقة 10 استيكرات (-30% 👑)' }
   },
 
-  // Shipping Rates by Egyptian Governorate (editable placeholder table)
+  // 27 Official Egyptian Governorates and Shipping Rates
+  GOVERNORATES: [
+    { id: 'cairo', nameAr: 'القاهرة', rate: 35 },
+    { id: 'giza', nameAr: 'الجيزة', rate: 35 },
+    { id: 'qalyubia', nameAr: 'القليوبية', rate: 40 },
+    { id: 'alexandria', nameAr: 'الإسكندرية', rate: 45 },
+    { id: 'beheira', nameAr: 'البحيرة', rate: 50 },
+    { id: 'matrouh', nameAr: 'مطروح', rate: 75 },
+    { id: 'damietta', nameAr: 'دمياط', rate: 50 },
+    { id: 'dakahlia', nameAr: 'الدقهلية', rate: 50 },
+    { id: 'kafr_el_sheikh', nameAr: 'كفر الشيخ', rate: 50 },
+    { id: 'gharbia', nameAr: 'الغربية', rate: 50 },
+    { id: 'monufia', nameAr: 'المنوفية', rate: 50 },
+    { id: 'sharqia', nameAr: 'الشرقية', rate: 50 },
+    { id: 'port_said', nameAr: 'بورسعيد', rate: 50 },
+    { id: 'ismailia', nameAr: 'الإسماعيلية', rate: 50 },
+    { id: 'suez', nameAr: 'السويس', rate: 50 },
+    { id: 'north_sinai', nameAr: 'شمال سيناء', rate: 75 },
+    { id: 'south_sinai', nameAr: 'جنوب سيناء', rate: 75 },
+    { id: 'fayoum', nameAr: 'الفيوم', rate: 55 },
+    { id: 'beni_suef', nameAr: 'بني سويف', rate: 55 },
+    { id: 'minya', nameAr: 'المنيا', rate: 60 },
+    { id: 'asyut', nameAr: 'أسيوط', rate: 60 },
+    { id: 'sohag', nameAr: 'سوهاج', rate: 60 },
+    { id: 'qena', nameAr: 'قنا', rate: 65 },
+    { id: 'luxor', nameAr: 'الأقصر', rate: 65 },
+    { id: 'aswan', nameAr: 'أسوان', rate: 70 },
+    { id: 'red_sea', nameAr: 'البحر الأحمر', rate: 75 },
+    { id: 'new_valley', nameAr: 'الوادي الجديد', rate: 75 }
+  ],
+
+  // Backward-compatible shipping rate lookup map
   SHIPPING_RATES: {
     'القاهرة': 35,
     'الجيزة': 35,
-    'الإسكندرية': 45,
-    'الدقهلية / المنصورة': 50,
-    'الغربية / طنطا': 50,
-    'الشرقية': 50,
     'القليوبية': 40,
-    'المنوفية': 50,
+    'الإسكندرية': 45,
     'البحيرة': 50,
-    'كفر الشيخ': 50,
+    'مطروح': 75,
     'دمياط': 50,
+    'الدقهلية': 50,
+    'كفر الشيخ': 50,
+    'الغربية': 50,
+    'المنوفية': 50,
+    'الشرقية': 50,
     'بورسعيد': 50,
     'الإسماعيلية': 50,
     'السويس': 50,
     'شمال سيناء': 75,
     'جنوب سيناء': 75,
-    'البحر الأحمر': 75,
     'الفيوم': 55,
     'بني سويف': 55,
     'المنيا': 60,
@@ -76,8 +107,43 @@ export const CONFIG = {
     'قنا': 65,
     'الأقصر': 65,
     'أسوان': 70,
+    'البحر الأحمر': 75,
     'الوادي الجديد': 75,
-    'مطروح': 75,
+    // Aliases for historical data
+    'الدقهلية / المنصورة': 50,
+    'الغربية / طنطا': 50,
     'محافظة أخرى': 50
+  },
+
+  // Order Lifecycle States & Arabic Labels
+  ORDER_STATUSES: {
+    pending: { key: 'pending', labelAr: 'جديد', badgeClass: 'bg-blue-100 text-blue-800 border-blue-200' },
+    awaiting_confirmation: { key: 'awaiting_confirmation', labelAr: 'بانتظار التأكيد', badgeClass: 'bg-amber-100 text-amber-800 border-amber-200' },
+    confirmed: { key: 'confirmed', labelAr: 'مؤكد', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    preparing: { key: 'preparing', labelAr: 'قيد التجهيز', badgeClass: 'bg-purple-100 text-purple-800 border-purple-200' },
+    shipped: { key: 'shipped', labelAr: 'تم الشحن', badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+    completed: { key: 'completed', labelAr: 'مكتمل', badgeClass: 'bg-green-100 text-green-800 border-green-200' },
+    cancelled: { key: 'cancelled', labelAr: 'ملغي', badgeClass: 'bg-red-100 text-red-800 border-red-200' }
+  },
+
+  // Valid status transitions
+  ORDER_TRANSITIONS: {
+    pending: ['awaiting_confirmation', 'confirmed', 'cancelled'],
+    awaiting_confirmation: ['confirmed', 'cancelled'],
+    confirmed: ['preparing', 'cancelled'],
+    preparing: ['shipped', 'cancelled'],
+    shipped: ['completed', 'cancelled'],
+    completed: [],
+    cancelled: []
+  },
+
+  // Admin Security Configuration
+  AUTH: {
+    SALT: 'stickify21_salt_2026',
+    ITERATIONS: 100000,
+    KEY_LENGTH: 32, // bytes
+    MAX_ATTEMPTS: 5,
+    LOCKOUT_MS: 15 * 60 * 1000, // 15 minutes
+    SESSION_TIMEOUT_MS: 30 * 60 * 1000 // 30 minutes
   }
 };

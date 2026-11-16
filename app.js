@@ -7,6 +7,12 @@
 import { CONFIG } from './src/config/config.js';
 import { escapeHtml, sanitizeUrl, sanitizeSvg } from './src/utils/escape.js';
 import { getProductPriceForSize, calculatePackSummary, calculateCart, generateCartLineKey } from './src/domain/pricing.js';
+import { storage } from './src/data/storage.js';
+import { validateCheckoutForm } from './src/domain/validation.js';
+import { generateOrderId, generateIdempotencyKey, generateOrderCode } from './src/utils/ids.js';
+import { evaluateCoupon } from './src/domain/coupons.js';
+import { formatOrderWhatsAppMessage } from './src/domain/orders.js';
+import { checkProductStock } from './src/domain/inventory.js';
 
 // Safe JSON parser with fallback and corrupted snapshot
 function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
@@ -21,202 +27,6 @@ function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
     return fallback;
   }
 }
-
-// Default Categories
-const defaultCategories = [
-  { id: 'bookmarks', nameAr: 'فواصل كتب', nameEn: 'Bookmarks', icon: '🔖', badge: 'جديد' },
-  { id: 'tech', nameAr: 'برمجة وتِك', nameEn: 'Coding', icon: '💻' },
-  { id: 'arabic', nameAr: 'عربي وميمز', nameEn: 'Quotes', icon: '⚡' },
-  { id: 'faculties', nameAr: 'كليات ودراسة', nameEn: 'Faculties', icon: '📐' },
-  { id: 'anime', nameAr: 'أنمي ومانجا', nameEn: 'Anime', icon: '🍖' },
-  { id: 'gaming', nameAr: 'جيمنج وألعاب', nameEn: 'Gaming', icon: '🎮' },
-  { id: 'gym', nameAr: 'جيم وفورمة', nameEn: 'Fitness', icon: '💪' },
-  { id: 'brand', nameAr: 'شعار البراند', nameEn: 'Brand', icon: '🍊', image: 'logo.jpg' }
-];
-
-// Fallback initial products (clean, no unauthorized IP)
-const initialProducts = [
-  {
-    id: 'stk-logo',
-    sku: 'S21-01',
-    name: 'STICKIFY 21 Official Logo',
-    nameAr: 'شعار STICKIFY 21 الرسمي 🍊',
-    category: 'brand',
-    subCategory: 'brand-all',
-    type: 'sticker',
-    price: 30,
-    finish: 'holographic',
-    badge: 'شعار البراند',
-    desc: 'لوجو STICKIFY21 الأصلي بقص Die-cut دقيق وطبقة حماية ضد المياه والحرارة.',
-    image: 'logo.jpg',
-    dateAdded: 15
-  },
-  {
-    id: 'bm-1',
-    sku: 'BM-01',
-    name: 'Classic Literature Bookmark',
-    nameAr: 'فاصل كتب: خير جليس في الزمان كتاب 📖',
-    category: 'bookmarks',
-    subCategory: 'bookmarks-quotes',
-    type: 'bookmark',
-    price: 25,
-    finish: 'matte',
-    badge: 'بوك مارك فاخر 🔖',
-    desc: 'فاصل كتب كرتون مقوى 350gsm بطبقة سلوفان مطفي فاخر مع شريطة أنيقة.',
-    svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#18181B" stroke="#FF5000" stroke-width="3"/><circle cx="50" cy="25" r="4" fill="#FF5000"/><line x1="20" y1="45" x2="80" y2="45" stroke="#E4E4E7" stroke-width="1"/><text x="50" y="85" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FFFFFF" text-anchor="middle">خَيْرُ جَلِيسٍ</text><text x="50" y="105" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FF5000" text-anchor="middle">فِي الزَّمَانِ</text><text x="50" y="125" font-family="'Readex Pro'" font-weight="800" font-size="14" fill="#FFFFFF" text-anchor="middle">كِتَابُ</text><circle cx="50" cy="155" r="14" fill="#27272A"/><text x="50" y="160" font-size="14" text-anchor="middle">📚</text></svg>`,
-    dateAdded: 14
-  },
-  {
-    id: 'bm-2',
-    sku: 'BM-02',
-    name: 'Vintage Melodies Bookmark',
-    nameAr: 'فاصل كتب: نغم وروايات زمان 🎙️',
-    category: 'bookmarks',
-    subCategory: 'bookmarks-vintage',
-    type: 'bookmark',
-    price: 25,
-    finish: 'matte',
-    badge: 'طرب وروايات 🔖',
-    desc: 'تصميم فينتدج راقي لكوكب الشرق، رفيق مثالي لجلسات القراءة مع فنجان الشاي.',
-    svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#FDFBF7" stroke="#0E0E10" stroke-width="3"/><circle cx="50" cy="24" r="4" fill="#0E0E10"/><ellipse cx="40" cy="65" rx="12" ry="8" fill="#0E0E10"/><ellipse cx="60" cy="65" rx="12" ry="8" fill="#0E0E10"/><line x1="48" y1="65" x2="52" y2="65" stroke="#0E0E10" stroke-width="2"/><line x1="20" y1="90" x2="80" y2="90" stroke="#FF5000" stroke-width="2"/><text x="50" y="115" font-family="'Readex Pro'" font-weight="700" font-size="11" fill="#0E0E10" text-anchor="middle">نغم أصيل</text><text x="50" y="132" font-family="'Readex Pro'" font-weight="600" font-size="10" fill="#71717A" text-anchor="middle">روقان زمان</text><text x="50" y="170" font-family="'Space Grotesk'" font-weight="800" font-size="10" fill="#FF5000" text-anchor="middle">S21 BOOKS</text></svg>`,
-    dateAdded: 13
-  },
-  {
-    id: 'bm-3',
-    sku: 'BM-03',
-    name: 'Coffee & Late Night Reading Bookmark',
-    nameAr: 'فاصل كتب: قهوة ورواية هادئة ☕',
-    category: 'bookmarks',
-    subCategory: 'bookmarks-aesthetic',
-    type: 'bookmark',
-    price: 25,
-    finish: 'matte',
-    badge: 'عشاق القراءة 🔖',
-    desc: 'ألوان ترابية هادئة وطباعة عالية الوضوح تدوم لسنوات بين صفحات كتبك المفضلة.',
-    svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#0E0E10" stroke="#E4E4E7" stroke-width="2"/><circle cx="50" cy="25" r="4" fill="#FF5000"/><text x="50" y="65" font-size="24" text-anchor="middle">☕</text><text x="50" y="95" font-family="'Readex Pro'" font-weight="700" font-size="11" fill="#FFFFFF" text-anchor="middle">صفحة كمان</text><text x="50" y="112" font-family="'Readex Pro'" font-weight="600" font-size="10" fill="#FF5000" text-anchor="middle">وهنام خلاص!</text><rect x="25" y="130" width="50" height="4" rx="2" fill="#27272A"/><rect x="35" y="140" width="30" height="4" rx="2" fill="#27272A"/><text x="50" y="172" font-family="'Space Grotesk'" font-weight="700" font-size="9" fill="#71717A" text-anchor="middle">CHAPTER NEXT</text></svg>`,
-    dateAdded: 12
-  },
-  {
-    id: 'stk-1',
-    sku: 'DEV-01',
-    name: 'Git Push --Force',
-    nameAr: 'جيت بوش بالقوة 🚀',
-    category: 'tech',
-    subCategory: 'coding',
-    type: 'sticker',
-    price: 35,
-    finish: 'holographic',
-    badge: 'الأكثر طلباً',
-    desc: 'للمبرمجين الشجعان. تصميم بخط مينيمال حاد وألوان عالية التباين.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="15" width="130" height="130" rx="26" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><circle cx="80" cy="52" r="13" fill="#FF5000"/><circle cx="52" cy="108" r="13" fill="#FFFFFF"/><circle cx="108" cy="108" r="13" fill="#FFFFFF"/><path d="M80 65 L52 95 M80 65 L108 95" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/><text x="80" y="140" font-family="'Space Grotesk', monospace" font-weight="800" font-size="12" fill="#FF5000" text-anchor="middle">GIT --FORCE</text></svg>`,
-    dateAdded: 9
-  },
-  {
-    id: 'stk-3',
-    sku: 'DEV-02',
-    name: '404 Sleep Not Found',
-    nameAr: '404 لا يوجد نوم ☕',
-    category: 'tech',
-    subCategory: 'coding',
-    type: 'sticker',
-    price: 35,
-    finish: 'matte',
-    badge: 'سهرانين',
-    desc: 'مخصص لكل مبرمج ومصمم ومهندس سهران للفجر.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="18" y="24" width="124" height="112" rx="18" fill="#18181B" stroke="#0E0E10" stroke-width="3"/><text x="80" y="74" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="36" fill="#FF5000" text-anchor="middle">404</text><text x="80" y="104" font-family="'Readex Pro', sans-serif" font-weight="600" font-size="13" fill="#FFFFFF" text-anchor="middle">SLEEP NOT FOUND</text></svg>`,
-    dateAdded: 8
-  },
-  {
-    id: 'stk-2',
-    sku: 'ARB-01',
-    name: 'فكّك - FAKKEK',
-    nameAr: 'استيكر فكّك ⚡',
-    category: 'arabic',
-    subCategory: 'memes',
-    type: 'sticker',
-    price: 30,
-    finish: 'glossy',
-    badge: 'تريند مصري',
-    desc: 'روقان مصري خالص يطرد أي ضغط أو طاقة سلبية.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="30" width="130" height="100" rx="22" fill="#FFFFFF" stroke="#0E0E10" stroke-width="5"/><text x="80" y="85" font-family="'Readex Pro', sans-serif" font-weight="800" font-size="34" fill="#0E0E10" text-anchor="middle">فَكّـكْ</text><line x1="45" y1="98" x2="115" y2="98" stroke="#FF5000" stroke-width="5" stroke-linecap="round"/><text x="80" y="118" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="10" fill="#71717A" text-anchor="middle" letter-spacing="2">LET IT GO</text></svg>`,
-    dateAdded: 7
-  },
-  {
-    id: 'stk-5',
-    sku: 'ARB-02',
-    name: 'سيبها لله وتوكل',
-    nameAr: 'سيبها لله وتوكل 🤍',
-    category: 'arabic',
-    subCategory: 'quotes',
-    type: 'sticker',
-    price: 30,
-    finish: 'matte',
-    badge: 'طمأنينة',
-    desc: 'خط عربي كاليجرافي أنيق وبسيط يعطيك سكينة وتركيز.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><circle cx="80" cy="80" r="66" fill="#FFFFFF" stroke="#0E0E10" stroke-width="5"/><circle cx="80" cy="80" r="56" fill="none" stroke="#FF5000" stroke-width="2" stroke-dasharray="3 3"/><text x="80" y="76" font-family="'Readex Pro', sans-serif" font-weight="700" font-size="20" fill="#0E0E10" text-anchor="middle">سِيبْهَا لِله</text><text x="80" y="104" font-family="'Readex Pro', sans-serif" font-weight="600" font-size="13" fill="#FF5000" text-anchor="middle">وَتَوَكَّلْ</text></svg>`,
-    dateAdded: 6
-  },
-  {
-    id: 'stk-eng',
-    sku: 'FAC-01',
-    name: 'Engineering Survival',
-    nameAr: 'باشمهندس تحت الإنشاء 📐',
-    category: 'faculties',
-    subCategory: 'engineering',
-    type: 'sticker',
-    price: 35,
-    finish: 'matte',
-    badge: 'كليات',
-    desc: 'لكل طلاب وخريجي هندسة اللي شغالين بمبدأ سيبها على الله.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="20" y="20" width="120" height="120" rx="24" fill="#FFFFFF" stroke="#0E0E10" stroke-width="5"/><path d="M 80 40 L 50 110 M 80 40 L 110 110 M 60 90 L 100 90" stroke="#0E0E10" stroke-width="6" stroke-linecap="round"/><circle cx="80" cy="40" r="7" fill="#FF5000"/><text x="80" y="132" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FF5000" text-anchor="middle">هندسة</text></svg>`,
-    dateAdded: 5
-  },
-  {
-    id: 'stk-med',
-    sku: 'FAC-02',
-    name: 'Doctor in Progress',
-    nameAr: 'دكتور قريباً - سماعة وطب 🩺',
-    category: 'faculties',
-    subCategory: 'medicine',
-    type: 'sticker',
-    price: 35,
-    finish: 'glossy',
-    badge: 'طب وبشري',
-    desc: 'استيكر مميز لسماعة الطبيب ومج الروتين اليومي في المستشفى.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><circle cx="80" cy="80" r="64" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><path d="M 55 45 L 55 75 Q 80 110 105 75 L 105 45" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="80" cy="115" r="9" fill="#FF5000"/><line x1="80" y1="95" x2="80" y2="106" stroke="#FFFFFF" stroke-width="5"/><text x="80" y="70" font-family="'Readex Pro'" font-weight="800" font-size="16" fill="#FFFFFF" text-anchor="middle">DR</text></svg>`,
-    dateAdded: 4
-  },
-  {
-    id: 'stk-8',
-    sku: 'GAM-01',
-    name: 'Retro Game Controller',
-    nameAr: 'يد تحكم كلاسيكية 🎮',
-    category: 'gaming',
-    subCategory: 'retro',
-    type: 'sticker',
-    price: 35,
-    finish: 'glossy',
-    badge: 'جيمنج',
-    desc: 'لعشاق الألعاب الكلاسيكية وعصر الروقان.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="22" y="44" width="116" height="72" rx="20" fill="#F4F4F5" stroke="#0E0E10" stroke-width="5"/><rect x="42" y="74" width="22" height="7" fill="#0E0E10"/><rect x="49" y="67" width="7" height="22" fill="#0E0E10"/><circle cx="106" cy="74" r="7" fill="#FF5000"/><circle cx="94" cy="85" r="7" fill="#0E0E10"/></svg>`,
-    dateAdded: 2
-  },
-  {
-    id: 'stk-7',
-    sku: 'GYM-01',
-    name: 'Heavy Weights & Discipline',
-    nameAr: 'جيم وانضباط 🏋️',
-    category: 'gym',
-    subCategory: 'fitness',
-    type: 'sticker',
-    price: 35,
-    finish: 'matte',
-    badge: 'فورمة',
-    desc: 'استيكر مميز للشيكر والشنطة يذكرك يومياً بالانضباط.',
-    svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="18" y="22" width="124" height="116" rx="20" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><rect x="25" y="74" width="110" height="12" fill="#E4E4E7"/><rect x="38" y="55" width="14" height="50" rx="3" fill="#FF5000"/><rect x="108" y="55" width="14" height="50" rx="3" fill="#FF5000"/><text x="80" y="122" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="12" fill="#FFFFFF" text-anchor="middle">DISCIPLINE</text></svg>`,
-    dateAdded: 1
-  }
-];
 
 // App State
 const state = {
@@ -239,7 +49,9 @@ const state = {
   },
   coupon: {
     code: '',
-    discountPercent: 0
+    discountPercent: 0,
+    discountFixed: 0,
+    type: 'percentage'
   }
 };
 
@@ -342,28 +154,12 @@ const devices = {
 // ==========================================
 // INITIALIZATION
 // ==========================================
-export function initApp() {
-  // Sync categories
-  const storedCats = safeJsonParse(localStorage.getItem('stickify21_categories'), null, 'stickify21_categories');
-  if (storedCats && Array.isArray(storedCats) && storedCats.length > 0) {
-    state.categories = storedCats;
-  } else {
-    state.categories = [...defaultCategories];
-    try {
-      localStorage.setItem('stickify21_categories', JSON.stringify(state.categories));
-    } catch(e) {}
-  }
+export async function initApp() {
+  await storage.init();
 
-  // Sync products
-  const storedProds = safeJsonParse(localStorage.getItem('stickify21_products'), null, 'stickify21_products');
-  if (storedProds && Array.isArray(storedProds) && storedProds.length > 0) {
-    state.products = storedProds;
-  } else {
-    state.products = [...initialProducts];
-    try {
-      localStorage.setItem('stickify21_products', JSON.stringify(state.products));
-    } catch(e) {}
-  }
+  // Load from unified storage interface
+  state.categories = await storage.getCategories();
+  state.products = await storage.getProducts();
 
   renderCategories();
   renderProducts();
@@ -374,15 +170,16 @@ export function initApp() {
   updateCartBadge();
 
   // Cross-tab sync
-  window.addEventListener('storage', (e) => {
+  window.addEventListener('storage', async (e) => {
     if (e.key === 'stickify21_categories') {
-      state.categories = safeJsonParse(e.newValue, defaultCategories, 'stickify21_categories');
+      state.categories = await storage.getCategories();
       renderCategories();
+    }
+    if (e.key === 'stickify21_products') {
+      state.products = await storage.getProducts();
       renderProducts();
-    } else if (e.key === 'stickify21_products') {
-      state.products = safeJsonParse(e.newValue, initialProducts, 'stickify21_products');
-      renderProducts();
-    } else if (e.key === 'stickify21_cart') {
+    }
+    if (e.key === 'stickify21_cart') {
       state.cart = safeJsonParse(e.newValue, [], 'stickify21_cart');
       renderCart();
       updateCartBadge();
@@ -393,21 +190,31 @@ export function initApp() {
 // ==========================================
 // CATALOG & PRODUCTS
 // ==========================================
-function getFilteredAndSortedProducts() {
-  const q = state.searchQuery.toLowerCase();
-  let list = state.products.filter(p => {
-    const matchCat = state.selectedCategory === 'all' || p.category === state.selectedCategory;
-    const matchSubCat = state.selectedSubCategory === 'all' || p.subCategory === state.selectedSubCategory;
-    const matchFinish = state.activeFinish === 'all' || p.finish === state.activeFinish;
-    const matchSearch = !q ||
-      (p.name && p.name.toLowerCase().includes(q)) || 
-      (p.nameAr && p.nameAr.includes(q)) ||
+export function getFilteredProducts() {
+  let list = [...state.products];
+
+  // Category filter
+  if (state.selectedCategory !== 'all') {
+    list = list.filter(p => p.category === state.selectedCategory);
+  }
+
+  // Finish filter
+  if (state.activeFinish !== 'all') {
+    list = list.filter(p => p.finish === state.activeFinish);
+  }
+
+  // Search query filter
+  if (state.searchQuery) {
+    const q = state.searchQuery.toLowerCase();
+    list = list.filter(p => 
+      (p.nameAr && p.nameAr.toLowerCase().includes(q)) ||
+      (p.name && p.name.toLowerCase().includes(q)) ||
       (p.sku && p.sku.toLowerCase().includes(q)) ||
-      (p.desc && p.desc.includes(q));
+      (p.desc && p.desc.toLowerCase().includes(q))
+    );
+  }
 
-    return matchCat && matchSubCat && matchFinish && matchSearch;
-  });
-
+  // Sort
   if (state.sortBy === 'price-low') {
     list.sort((a, b) => (a.price || 0) - (b.price || 0));
   } else if (state.sortBy === 'price-high') {
@@ -421,27 +228,23 @@ function getFilteredAndSortedProducts() {
 
 export function renderProducts() {
   const container = document.getElementById('products-grid');
-  const countBadge = document.getElementById('products-count');
+  const countBadge = document.getElementById('filtered-count-badge');
+  const emptyState = document.getElementById('catalog-empty-state');
   if (!container) return;
 
-  const products = getFilteredAndSortedProducts();
+  const products = getFilteredProducts();
+
   if (countBadge) {
-    countBadge.innerText = `${products.length} منتج`;
+    countBadge.innerText = `${products.length} تصميم متوفر`;
   }
 
   if (products.length === 0) {
-    container.innerHTML = `
-      <div class="col-span-full py-16 text-center text-zinc-400 bg-white rounded-3xl border border-zinc-200">
-        <div class="text-3xl mb-2">🔍</div>
-        <h3 class="text-sm font-bold text-zinc-700">لا توجد منتجات مطابقة للبحث أو الفلتر</h3>
-        <p class="text-xs text-zinc-400 mt-1">جرب تغيير القسم أو مسح كلمة البحث</p>
-        <button onclick="resetFilters()" class="mt-4 px-4 py-2 rounded-full bg-zinc-900 text-white font-bold text-xs hover:bg-[#FF5000] transition">
-          عرض جميع المنتجات
-        </button>
-      </div>
-    `;
+    container.innerHTML = '';
+    if (emptyState) emptyState.classList.remove('hidden');
     return;
   }
+
+  if (emptyState) emptyState.classList.add('hidden');
 
   container.innerHTML = products.map(product => {
     const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
@@ -449,6 +252,9 @@ export function renderProducts() {
     const hasImage = Boolean(product.image);
     const safeImage = sanitizeUrl(product.image);
     const safeSvg = sanitizeSvg(product.svg);
+
+    const stockCheck = checkProductStock(product);
+    const isOutOfStock = !stockCheck.available;
 
     const currentSizeKey = state.selectedSizes[product.id] || (isBookmark ? 'standard' : 'medium');
     const currentPrice = getProductPriceForSize(product, currentSizeKey);
@@ -479,6 +285,7 @@ export function renderProducts() {
             ${escapeHtml(product.badge)}
           </span>
           <div class="flex items-center gap-1.5 font-mono">
+            ${isOutOfStock ? '<span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold border border-red-200">نفد من المخزون</span>' : ''}
             <span class="text-[10px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-bold border border-zinc-200">#${escapeHtml(product.sku)}</span>
           </div>
         </div>
@@ -535,12 +342,12 @@ export function renderProducts() {
 
         <!-- Actions: Fixes Bug 04 (hide "للباقة" for bookmarks) -->
         <div class="grid ${!isBookmark ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-auto pt-2 border-t border-zinc-100">
-          <button onclick="addToCart('${escapeHtml(product.id)}')" class="w-full py-2.5 px-3 rounded-xl bg-zinc-900 hover:bg-[#FF5000] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm">
-            <span>أضف للسلة</span>
-            <span>+</span>
+          <button ${isOutOfStock ? 'disabled' : `onclick="addToCart('${escapeHtml(product.id)}')"`} class="w-full py-2.5 px-3 rounded-xl ${isOutOfStock ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed' : 'bg-zinc-900 hover:bg-[#FF5000] text-white active:scale-95'} font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm">
+            <span>${isOutOfStock ? 'نفد من المخزون' : 'أضف للسلة'}</span>
+            <span>${isOutOfStock ? '🔒' : '+'}</span>
           </button>
           ${!isBookmark ? `
-            <button onclick="addToPack('${escapeHtml(product.id)}')" class="w-full py-2.5 px-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs flex items-center justify-center gap-1 transition">
+            <button ${isOutOfStock ? 'disabled' : `onclick="addToPack('${escapeHtml(product.id)}')"`} class="w-full py-2.5 px-2 rounded-xl ${isOutOfStock ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800'} font-bold text-xs flex items-center justify-center gap-1 transition">
               <span>للباقة</span>
               <span>📦</span>
             </button>
@@ -578,7 +385,6 @@ export function selectCardSize(productId, sizeKey, e) {
 
   const graphicElem = document.getElementById(`graphic-wrapper-${productId}`);
   if (graphicElem) {
-    // Valid standard Tailwind classes (fixes Bug 01)
     if (sizeKey === 'small') {
       graphicElem.className = 'w-24 h-24 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
     } else if (sizeKey === 'large') {
@@ -648,7 +454,7 @@ export function selectCategoryByCard(catId) {
   renderProducts();
 
   const catalogElem = document.getElementById('catalog-products-area');
-  if (catalogElem) {
+  if (catalogElem && window.innerWidth < 768) {
     catalogElem.scrollIntoView({ behavior: 'smooth' });
   }
 }
@@ -662,49 +468,68 @@ export function resetFilters() {
 
   const searchInput = document.getElementById('search-input');
   if (searchInput) searchInput.value = '';
+
   const sortSelect = document.getElementById('sort-select');
   if (sortSelect) sortSelect.value = 'featured';
 
-  document.querySelectorAll('.finish-filter-btn').forEach((b, i) => {
-    b.classList.toggle('bg-zinc-900', i === 0);
-    b.classList.toggle('text-white', i === 0);
-    b.classList.toggle('text-zinc-600', i !== 0);
+  document.querySelectorAll('.finish-filter-btn').forEach(btn => {
+    btn.classList.remove('bg-zinc-900', 'text-white');
+    btn.classList.add('text-zinc-600');
   });
+  const allFinishBtn = document.querySelector('.finish-filter-btn[data-finish="all"]');
+  if (allFinishBtn) {
+    allFinishBtn.classList.add('bg-zinc-900', 'text-white');
+    allFinishBtn.classList.remove('text-zinc-600');
+  }
 
   renderCategories();
   renderProducts();
 }
 
 // ==========================================
-// CART SYSTEM
+// CART & PRICING
 // ==========================================
-export function addToCart(productId, customSizeKey = null) {
+export function saveCart() {
+  try {
+    localStorage.setItem('stickify21_cart', JSON.stringify(state.cart));
+  } catch(e) {}
+}
+
+export function addToCart(productId) {
   const product = state.products.find(p => p.id === productId);
   if (!product) return;
 
-  const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
-  const selectedKey = customSizeKey || (isBookmark ? 'standard' : (state.selectedSizes[productId] || 'medium'));
-  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === selectedKey);
-  const sizeLabel = isBookmark ? CONFIG.BOOKMARK_SPECS.dimensions : (sizeObj ? sizeObj.labelAr : '8 سم (Medium)');
-  const itemPrice = getProductPriceForSize(product, selectedKey);
+  const stockCheck = checkProductStock(product);
+  if (!stockCheck.available) {
+    showToast(stockCheck.reason || 'هذا المنتج نفد من المخزون حالياً', 'warning');
+    return;
+  }
 
-  const cartItemId = generateCartLineKey({ productId: product.id, sizeKey: selectedKey });
-  const existingIndex = state.cart.findIndex(item => item.id === cartItemId);
+  const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
+  const sizeKey = isBookmark ? 'standard' : (state.selectedSizes[productId] || 'medium');
+  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey);
+  const sizeLabel = isBookmark ? 'فاصل كتب (15×5 سم)' : (sizeObj ? sizeObj.labelAr : '8 سم (Medium)');
+  const price = getProductPriceForSize(product, sizeKey);
+
+  // Deterministic cart line key (Fixes Bug 10)
+  const lineKey = generateCartLineKey({ productId: product.id, sizeKey });
+
+  const existingIndex = state.cart.findIndex(item => item.id === lineKey);
 
   if (existingIndex > -1) {
     state.cart[existingIndex].quantity += 1;
   } else {
     state.cart.push({
-      id: cartItemId,
-      type: isBookmark ? 'bookmark' : 'sticker',
+      id: lineKey,
       productId: product.id,
-      sku: product.sku || 'S21',
-      nameAr: product.nameAr,
+      sku: product.sku,
       name: product.name,
-      price: itemPrice,
+      nameAr: product.nameAr,
+      category: product.category,
+      type: product.type || (isBookmark ? 'bookmark' : 'sticker'),
       size: sizeLabel,
-      sizeKey: selectedKey,
-      finish: product.finish,
+      sizeKey: sizeKey,
+      price: price,
       image: product.image,
       svg: product.svg,
       quantity: 1
@@ -714,7 +539,7 @@ export function addToCart(productId, customSizeKey = null) {
   saveCart();
   renderCart();
   updateCartBadge();
-  showToast(`تمت إضافة [${escapeHtml(product.sku)}] مقاس ${escapeHtml(sizeLabel)} بسعر ${itemPrice} ${CONFIG.CURRENCY} للسلة 🛍️`);
+  showToast(`تمت إضافة [${escapeHtml(product.sku)}] (${escapeHtml(sizeLabel)}) إلى السلة بنجاح 🛒`);
 }
 
 export function updateCartQuantity(index, delta) {
@@ -729,24 +554,13 @@ export function updateCartQuantity(index, delta) {
 }
 
 export function removeCartItem(index) {
-  const removed = state.cart.splice(index, 1);
+  state.cart.splice(index, 1);
   saveCart();
   renderCart();
   updateCartBadge();
-  if (removed[0]) {
-    showToast(`تم حذف "${escapeHtml(removed[0].nameAr)}" من السلة`, 'info');
-  }
 }
 
-function saveCart() {
-  try {
-    localStorage.setItem('stickify21_cart', JSON.stringify(state.cart));
-  } catch (err) {
-    console.error('[STICKIFY 21] Failed to save cart:', err);
-  }
-}
-
-function updateCartBadge() {
+export function updateCartBadge() {
   const totalCount = state.cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
   const badge = document.getElementById('cart-badge');
   if (badge) {
@@ -782,7 +596,6 @@ export function renderCart() {
     const safeSvg = sanitizeSvg(item.svg);
 
     if (isPack) {
-      // Fixes Bug 03: Render pack bundle as a single cohesive unit
       return `
         <div class="p-3.5 rounded-xl bg-orange-50/50 border border-[#FF5000]/30 space-y-2">
           <div class="flex items-center justify-between gap-2">
@@ -914,27 +727,31 @@ export function renderCart() {
   `;
 }
 
-export function applyCoupon() {
+export async function applyCoupon() {
   const input = document.getElementById('coupon-input');
   if (!input) return;
-  const val = input.value.trim().toUpperCase();
+  const val = input.value.trim();
 
-  const storedCoupons = safeJsonParse(localStorage.getItem('stickify21_coupons'), [], 'stickify21_coupons');
-  // Fixes Bug 07: Remove unauthorized secret coupons, fallback only to advertised STICKIFY10
-  const validCoupons = storedCoupons.length > 0 ? storedCoupons : [CONFIG.ADVERTISED_COUPON];
+  const coupons = await storage.getCoupons();
+  const calc = calculateCart({ items: state.cart, coupon: null, governorate: state.selectedGovernorate });
+  const result = evaluateCoupon(val, coupons, { subtotal: calc.subtotal, items: state.cart });
 
-  const found = validCoupons.find(c => c.code === val && c.active !== false);
-  if (found) {
-    state.coupon = { code: found.code, discountPercent: found.discountPercent, minOrder: found.minOrder || 0 };
-    showToast(`تم تفعيل كود الخصم "${escapeHtml(found.code)}" بنسبة ${found.discountPercent}% 🎉`);
+  if (result.valid) {
+    state.coupon = {
+      code: result.coupon.code,
+      discountPercent: result.coupon.type === 'percentage' ? result.coupon.value : 0,
+      discountFixed: result.coupon.type === 'fixed' ? result.coupon.value : 0,
+      type: result.coupon.type
+    };
+    showToast(`تم تفعيل كود الخصم "${escapeHtml(result.coupon.code)}" بنجاح! 🎉`);
     renderCart();
   } else {
-    showToast('كود الخصم غير صحيح أو منتهي الصلاحية', 'error');
+    showToast(result.error || 'كود الخصم غير صحيح أو منتهي الصلاحية', 'error');
   }
 }
 
 // ==========================================
-// PACK BUILDER (Fixes Bug 03 & 04)
+// PACK BUILDER
 // ==========================================
 export function setPackSize(size) {
   if (size !== 5 && size !== 10) size = 5;
@@ -948,11 +765,11 @@ export function setPackSize(size) {
   const btn10 = document.getElementById('pack-btn-10');
   if (btn5 && btn10) {
     if (size === 5) {
-      btn5.className = 'px-5 py-2.5 rounded-full text-xs font-bold bg-[#FF5000] text-white shadow-sm transition';
-      btn10.className = 'px-5 py-2.5 rounded-full text-xs font-semibold text-zinc-700 hover:text-black transition';
+      btn5.className = 'pack-size-pill py-2.5 px-4 rounded-xl border font-bold text-xs transition bg-zinc-900 text-white border-zinc-900 shadow-sm';
+      btn10.className = 'pack-size-pill py-2.5 px-4 rounded-xl border font-bold text-xs transition bg-white text-zinc-700 border-zinc-200 hover:border-black';
     } else {
-      btn5.className = 'px-5 py-2.5 rounded-full text-xs font-semibold text-zinc-700 hover:text-black transition';
-      btn10.className = 'px-5 py-2.5 rounded-full text-xs font-bold bg-[#FF5000] text-white shadow-sm transition';
+      btn5.className = 'pack-size-pill py-2.5 px-4 rounded-xl border font-bold text-xs transition bg-white text-zinc-700 border-zinc-200 hover:border-black';
+      btn10.className = 'pack-size-pill py-2.5 px-4 rounded-xl border font-bold text-xs transition bg-zinc-900 text-white border-zinc-900 shadow-sm';
     }
   }
 
@@ -963,20 +780,32 @@ export function addToPack(productId) {
   const product = state.products.find(p => p.id === productId);
   if (!product) return;
 
-  // Fixes Bug 04: Disallow bookmarks in sticker pack
-  if (product.category === 'bookmarks' || product.type === 'bookmark') {
-    showToast('باقات التوفير مخصصة لاستيكرات الفينيل فقط!', 'warning');
+  const stockCheck = checkProductStock(product);
+  if (!stockCheck.available) {
+    showToast(stockCheck.reason || 'هذا المنتج نفد من المخزون', 'warning');
     return;
   }
 
-  if (state.packBuilder.items.length >= state.packBuilder.targetSize) {
-    showToast(`اكتملت باقة الـ ${state.packBuilder.targetSize} استيكرات! ضيفها للسلة أو اختر باقة الـ 10.`, 'warning');
+  // Pack rule: Stickers only (Bookmarks are rejected per Bug 04)
+  if (product.category === 'bookmarks' || product.type === 'bookmark') {
+    showToast('الباقات مخصصة لاستيكرات اللابتوب والموبايل فقط!', 'warning');
+    return;
+  }
+
+  const target = state.packBuilder.targetSize;
+  if (state.packBuilder.items.length >= target) {
+    showToast(`اكتملت خانات باقة الـ ${target} استيكرات! يمكنك إضافتها للسلة الآن.`, 'warning');
     return;
   }
 
   state.packBuilder.items.push(product);
   renderPackBuilder();
-  showToast(`تمت إضافة [${escapeHtml(product.sku)}] "${escapeHtml(product.nameAr)}" للباقة`);
+  showToast(`تمت إضافة [${escapeHtml(product.sku)}] للباقة (${state.packBuilder.items.length} من ${target})`);
+
+  const builderElem = document.getElementById('pack-builder-section');
+  if (builderElem && window.innerWidth < 768) {
+    builderElem.scrollIntoView({ behavior: 'smooth' });
+  }
 }
 
 export function removePackItem(index) {
@@ -991,7 +820,7 @@ export function renderPackBuilder() {
 
   const target = state.packBuilder.targetSize;
   const currentCount = state.packBuilder.items.length;
-  const isFull = currentCount === target;
+  const isFull = currentCount >= target;
 
   let slotsHtml = '';
   for (let i = 0; i < target; i++) {
@@ -1044,7 +873,6 @@ export function renderPackBuilder() {
   `;
 }
 
-// Fixes Bug 03: Pack is added as ONE single cart item to prevent breaking bundle discount
 export function addPackToCart() {
   const target = state.packBuilder.targetSize;
   if (state.packBuilder.items.length < target) {
@@ -1102,7 +930,6 @@ export function renderMockupDevice() {
   const dev = devices[state.activeDevice] || devices.laptop;
   container.className = `w-full transition-all duration-300 ${dev.frameClass}`;
   
-  // Fixes Bug 02: Ensure clean container with single layer
   container.innerHTML = `
     ${dev.decorationsHtml || ''}
     <div id="mockup-stickers-layer" class="absolute inset-0 z-10 w-full h-full pointer-events-auto"></div>
@@ -1174,12 +1001,10 @@ export function renderPlacedStickers() {
     `;
   }).join('');
 
-  // Attach Pointer Events listeners directly (Fixes Bug 06: Smooth dragging via Pointer Events)
   attachPointerDragListeners();
   updatePlacedControls();
 }
 
-// Fixes Bug 06: Pointer Events with pointer capture and requestAnimationFrame updates
 function attachPointerDragListeners() {
   const board = document.getElementById('mockup-stickers-layer');
   if (!board) return;
@@ -1208,7 +1033,6 @@ function attachPointerDragListeners() {
           const xPct = ((moveEvt.clientX - boardRect.left) / boardRect.width) * 100;
           const yPct = ((moveEvt.clientY - boardRect.top) / boardRect.height) * 100;
           
-          // Constrain within bounds (5% to 95%)
           item.x = Math.max(5, Math.min(95, xPct));
           item.y = Math.max(5, Math.min(95, yPct));
 
@@ -1266,34 +1090,38 @@ function updatePlacedControls() {
         </div>
       ` : ''}
 
-      <div class="flex items-center gap-1.5">
-        <button onclick="rotateCurrentSticker(-15)" class="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition" title="تدوير يسار">↺</button>
-        <button onclick="rotateCurrentSticker(15)" class="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition" title="تدوير يمين">↻</button>
-        <button onclick="deleteCurrentSticker()" class="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold transition" title="حذف">✕ حذف</button>
+      <div class="flex items-center gap-2">
+        <button onclick="rotateCurrentSticker()" class="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition" title="تدوير الاستيكر">
+          🔄 تدوير
+        </button>
+        <button onclick="deleteCurrentSticker()" class="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition" title="إزالة من المعاينة">
+          🗑️ إزالة
+        </button>
       </div>
     </div>
   `;
 }
 
 export function setPlacedStickerSize(sizeKey) {
-  const item = state.placedStickers.find(s => s.id === state.selectedPlacedId);
-  if (!item) return;
-  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey);
-  item.sizeKey = sizeKey;
-  item.scale = sizeObj ? sizeObj.scale : 1.0;
+  const current = state.placedStickers.find(s => s.id === state.selectedPlacedId);
+  if (!current || current.isBookmark) return;
+
+  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey) || CONFIG.STICKER_SIZES[1];
+  current.sizeKey = sizeKey;
+  current.scale = sizeObj.scale;
   renderPlacedStickers();
 }
 
-export function rotateCurrentSticker(deg) {
-  const item = state.placedStickers.find(s => s.id === state.selectedPlacedId);
-  if (!item) return;
-  item.rotation = (item.rotation + deg) % 360;
+export function rotateCurrentSticker() {
+  const current = state.placedStickers.find(s => s.id === state.selectedPlacedId);
+  if (!current) return;
+  current.rotation = (current.rotation + 15) % 360;
   renderPlacedStickers();
 }
 
 export function deleteCurrentSticker() {
   state.placedStickers = state.placedStickers.filter(s => s.id !== state.selectedPlacedId);
-  state.selectedPlacedId = state.placedStickers.length > 0 ? state.placedStickers[0].id : null;
+  state.selectedPlacedId = null;
   renderPlacedStickers();
 }
 
@@ -1301,28 +1129,76 @@ export function clearMockupStickers() {
   state.placedStickers = [];
   state.selectedPlacedId = null;
   renderPlacedStickers();
-  showToast('تم إخلاء الشاشة');
+  showToast('تم إفراغ شاشة المعاينة');
 }
 
 // ==========================================
-// CHECKOUT & WHATSAPP ORDER SUBMISSION
+// MODALS & CHECKOUT FLOW
 // ==========================================
+export function toggleCartModal(open) {
+  const modal = document.getElementById('cart-modal');
+  if (modal) {
+    modal.classList.toggle('hidden', !open);
+  }
+}
+
 export function openCheckoutModal() {
   if (state.cart.length === 0) {
     showToast('السلة فارغة!', 'error');
     return;
   }
-  document.getElementById('checkout-modal').classList.remove('hidden');
+
+  const citySelect = document.getElementById('order-city');
+  if (citySelect && state.selectedGovernorate) {
+    citySelect.value = state.selectedGovernorate;
+  }
+
+  updateCheckoutPricingPreview();
+  const modal = document.getElementById('checkout-modal');
+  if (modal) modal.classList.remove('hidden');
 }
 
 export function closeCheckoutModal() {
-  document.getElementById('checkout-modal').classList.add('hidden');
+  const modal = document.getElementById('checkout-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
-export function toggleCartModal(open) {
-  const modal = document.getElementById('cart-modal');
-  if (!modal) return;
-  modal.classList.toggle('hidden', !open);
+export function handleCheckoutCityChange(city) {
+  state.selectedGovernorate = city;
+  updateCheckoutPricingPreview();
+  renderCart();
+}
+
+export function updateCheckoutPricingPreview() {
+  const container = document.getElementById('checkout-pricing-preview');
+  if (!container) return;
+
+  const calc = calculateCart({
+    items: state.cart,
+    coupon: state.coupon,
+    governorate: state.selectedGovernorate
+  });
+
+  container.innerHTML = `
+    <div class="flex justify-between">
+      <span class="font-sans text-zinc-600">المجموع الفرعي:</span>
+      <span class="font-bold text-zinc-900">${calc.subtotal} ${CONFIG.CURRENCY}</span>
+    </div>
+    ${calc.discount > 0 ? `
+      <div class="flex justify-between text-[#FF5000] font-bold">
+        <span class="font-sans">الخصم (${escapeHtml(state.coupon.code)}):</span>
+        <span>-${calc.discount} ${CONFIG.CURRENCY}</span>
+      </div>
+    ` : ''}
+    <div class="flex justify-between">
+      <span class="font-sans text-zinc-600">مصاريف الشحن (${escapeHtml(state.selectedGovernorate || 'لم تحدد')}):</span>
+      <span class="text-zinc-900 font-bold">${calc.shipping === 0 ? '<span class="text-[#FF5000]">مجاناً 🎉</span>' : `${calc.shipping} ${CONFIG.CURRENCY}`}</span>
+    </div>
+    <div class="flex justify-between text-sm font-extrabold text-zinc-900 border-t border-zinc-200/80 pt-1 mt-1 font-mono">
+      <span class="font-sans">الإجمالي المطلوب:</span>
+      <span class="text-[#FF5000]">${calc.total} ${CONFIG.CURRENCY}</span>
+    </div>
+  `;
 }
 
 export function checkoutViaWhatsAppDirect() {
@@ -1333,97 +1209,194 @@ export function checkoutViaWhatsAppDirect() {
   openCheckoutModal();
 }
 
-export function submitOrder(e) {
-  e.preventDefault();
+export async function submitOrder(e) {
+  if (e) e.preventDefault();
 
-  const name = document.getElementById('order-name').value.trim();
-  const phone = document.getElementById('order-phone').value.trim();
-  const address = document.getElementById('order-address').value.trim();
-  const city = document.getElementById('order-city').value;
-  const payment = document.querySelector('input[name="payment_method"]:checked')?.value || 'cod';
-  const notes = document.getElementById('order-notes').value.trim();
+  const nameInput = document.getElementById('order-name');
+  const phoneInput = document.getElementById('order-phone');
+  const citySelect = document.getElementById('order-city');
+  const addressInput = document.getElementById('order-address');
+  const notesInput = document.getElementById('order-notes');
+  const submitBtn = document.getElementById('checkout-submit-btn');
 
-  if (!name || !phone || !address) {
-    showToast('يرجى ملء البيانات المطلوبة', 'error');
-    return;
-  }
-
-  state.selectedGovernorate = city;
-  const calc = calculateCart({
-    items: state.cart,
-    coupon: state.coupon,
-    governorate: city
-  });
-
-  const orderId = 'S21-' + Math.floor(1000 + Math.random() * 9000);
-
-  // Structured safe order
-  const newOrder = {
-    id: orderId,
-    date: new Date().toLocaleDateString('ar-EG'),
-    status: 'جديد',
-    customer: { name, phone, city, address, notes },
-    payment: payment === 'cod' ? 'عند الاستلام' : 'InstaPay / فودافون كاش',
-    subtotal: calc.subtotal,
-    discount: calc.discount,
-    shipping: calc.shipping,
-    total: calc.total,
-    items: state.cart.map(item => ({
-      sku: item.sku || 'S21',
-      nameAr: item.nameAr,
-      size: item.type === 'bookmark' ? 'بوك مارك' : item.size,
-      qty: item.quantity,
-      price: item.price
-    }))
+  const rawFormData = {
+    name: nameInput?.value,
+    phone: phoneInput?.value,
+    governorate: citySelect?.value,
+    address: addressInput?.value,
+    notes: notesInput?.value
   };
 
-  // Safe storage
-  const existingOrders = safeJsonParse(localStorage.getItem('stickify21_orders'), [], 'stickify21_orders');
-  existingOrders.unshift(newOrder);
-  try {
-    localStorage.setItem('stickify21_orders', JSON.stringify(existingOrders));
-  } catch(err) {
-    console.error('Failed to save order to localStorage:', err);
-  }
-
-  // Build clean WhatsApp message
-  let message = `📦 *طلب جديد من متجر STICKIFY 21* (#${orderId}) 📦\n\n`;
-  message += `👤 *الاسم:* ${name}\n`;
-  message += `📱 *رقم الهاتف:* ${phone}\n`;
-  message += `📍 *عنوان التوصيل:* ${address} - ${city}\n`;
-  message += `💳 *طريقة الدفع:* ${payment === 'cod' ? 'الدفع عند الاستلام' : 'InstaPay / فودافون كاش'}\n`;
-  if (notes) message += `📝 *ملاحظات:* ${notes}\n`;
-
-  message += `\n🏷️ *المنتجات المطلوبة:*\n`;
-  state.cart.forEach((item, i) => {
-    if (item.type === 'pack') {
-      message += `${i+1}. [باقة توفير] ${item.nameAr} (${item.size}) × ${item.quantity} = ${item.price * item.quantity} ${CONFIG.CURRENCY}\n`;
-    } else {
-      const typeLabel = item.type === 'bookmark' ? 'بوك مارك' : item.size;
-      message += `${i+1}. [${item.sku}] ${item.nameAr} (${typeLabel}) × ${item.quantity} = ${item.price * item.quantity} ${CONFIG.CURRENCY}\n`;
+  // Reset inline errors
+  ['name', 'phone', 'city', 'address', 'notes'].forEach(field => {
+    const errEl = document.getElementById(`order-${field}-error`);
+    if (errEl) {
+      errEl.textContent = '';
+      errEl.classList.add('hidden');
     }
   });
 
-  message += `\n💰 *المجموع:* ${calc.subtotal} ${CONFIG.CURRENCY}`;
-  if (calc.discount > 0) message += `\n🎁 *الخصم (${state.coupon.code}):* -${calc.discount} ${CONFIG.CURRENCY}`;
-  message += `\n🚚 *الشحن (${city}):* ${calc.shipping === 0 ? 'مجاني' : calc.shipping + ' ' + CONFIG.CURRENCY}`;
-  message += `\n✨ *الإجمالي النهائي: ${calc.total} ${CONFIG.CURRENCY}*\n`;
-  message += `\nشكراً لطلبك من STICKIFY 21! 🚀`;
+  const validationResult = validateCheckoutForm(rawFormData);
+  if (!validationResult.isValid) {
+    // Show inline errors
+    Object.entries(validationResult.errors).forEach(([field, msg]) => {
+      const fieldId = field === 'governorate' ? 'city' : field;
+      const errEl = document.getElementById(`order-${fieldId}-error`);
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+      }
+    });
+    showToast('يرجى تصحيح الأخطاء في نموذج الطلب', 'error');
+    return;
+  }
 
-  const encodedMsg = encodeURIComponent(message);
-  const whatsappUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodedMsg}`;
+  if (state.cart.length === 0) {
+    showToast('سلة المشتريات فارغة!', 'error');
+    return;
+  }
 
-  // Reset cart
-  state.cart = [];
-  saveCart();
-  renderCart();
-  updateCartBadge();
-  closeCheckoutModal();
+  // Double-submit protection
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+  }
 
-  showToast('تم تأكيد الطلب بنجاح! يتم الآن تحويلك إلى واتساب...');
-  setTimeout(() => {
-    window.open(whatsappUrl, '_blank');
-  }, 700);
+  try {
+    const cleanValues = validationResult.values;
+    state.selectedGovernorate = cleanValues.governorate;
+
+    const calc = calculateCart({
+      items: state.cart,
+      coupon: state.coupon,
+      governorate: cleanValues.governorate
+    });
+
+    const existingOrders = await storage.getOrders();
+    const existingIds = existingOrders.map(o => o.id);
+    const orderId = generateOrderId(existingIds);
+    const idempotencyKey = generateIdempotencyKey();
+
+    const payment = document.querySelector('input[name="payment_method"]:checked')?.value || 'cod';
+
+    const order = {
+      id: orderId,
+      idempotencyKey,
+      date: new Date().toISOString(),
+      status: 'awaiting_confirmation',
+      customer: {
+        name: cleanValues.name,
+        phone: cleanValues.phone,
+        governorate: cleanValues.governorate,
+        city: cleanValues.governorate,
+        address: cleanValues.address,
+        notes: cleanValues.notes || ''
+      },
+      payment: payment === 'cod' ? 'عند الاستلام' : 'InstaPay',
+      subtotal: calc.subtotal,
+      discount: calc.discount,
+      shippingCost: calc.shipping,
+      total: calc.total,
+      couponCode: state.coupon.code || null,
+      items: state.cart.map(item => ({
+        id: item.id,
+        productId: item.productId,
+        sku: item.sku || 'S21',
+        nameAr: item.nameAr,
+        name: item.name,
+        type: item.type || 'sticker',
+        size: item.size || '8 سم',
+        quantity: item.quantity || 1,
+        price: item.price,
+        items: item.items
+      })),
+      statusHistory: [
+        {
+          status: 'awaiting_confirmation',
+          timestamp: new Date().toISOString(),
+          note: 'تم إنشاء الطلب من المتجر بانتظار التأكيد'
+        }
+      ]
+    };
+
+    // Save order through storage interface FIRST
+    await storage.createOrder(order);
+
+    // Increment coupon usage if used
+    if (state.coupon.code) {
+      await storage.incrementCouponUsage(state.coupon.code);
+    }
+
+    // Generate Order Code and WhatsApp message
+    const orderCode = generateOrderCode(order);
+    const whatsappMsg = formatOrderWhatsAppMessage(order, orderCode);
+    const whatsappUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMsg)}`;
+
+    // Clear cart ONLY AFTER order is saved successfully
+    state.cart = [];
+    saveCart();
+    renderCart();
+    updateCartBadge();
+    closeCheckoutModal();
+
+    // Show Confirmation Modal
+    openConfirmationModal(order, whatsappUrl, whatsappMsg);
+
+    // Open WhatsApp popup
+    try {
+      window.open(whatsappUrl, '_blank');
+    } catch (popupErr) {
+      console.warn('Popup blocked, customer can use modal buttons', popupErr);
+    }
+
+    showToast(`تم تسجيل الطلب ${orderId} بنجاح! 🚀`);
+  } catch (err) {
+    console.error('Failed to create order:', err);
+    showToast('حدث خطأ أثناء حفظ الطلب، لم يتم مسح السلة. يرجى المحاولة مرة أخرى.', 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+  }
+}
+
+export function openConfirmationModal(order, whatsappUrl, whatsappMsg) {
+  const modal = document.getElementById('order-confirmation-modal');
+  const idEl = document.getElementById('confirmed-order-id');
+  const reopenBtn = document.getElementById('reopen-whatsapp-btn');
+  const copyBtn = document.getElementById('copy-order-msg-btn');
+  const copyBtnText = document.getElementById('copy-btn-text');
+
+  if (idEl) idEl.textContent = order.id;
+
+  if (reopenBtn) {
+    reopenBtn.onclick = () => {
+      window.open(whatsappUrl, '_blank');
+    };
+  }
+
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(whatsappMsg);
+        if (copyBtnText) copyBtnText.textContent = 'تم نسخ الرسالة بنجاح! ✓';
+        showToast('تم نسخ نص رسالة الطلب للحافظة بنجاح');
+        setTimeout(() => {
+          if (copyBtnText) copyBtnText.textContent = 'نسخ نص رسالة الطلب يدوياً';
+        }, 3000);
+      } catch (e) {
+        showToast('تعذر النسخ التلقائي، يمكنك تحديد النص ونسخه يدوياً', 'warning');
+      }
+    };
+  }
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+export function closeConfirmationModal() {
+  const modal = document.getElementById('order-confirmation-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 // ==========================================
@@ -1437,7 +1410,6 @@ export function showToast(message, type = 'success') {
   const bg = type === 'error' ? 'bg-red-600 text-white' : (type === 'warning' ? 'bg-amber-500 text-white' : 'bg-zinc-900 text-white');
   toast.className = `px-4 py-3 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-200 translate-y-3 opacity-0 ${bg}`;
   
-  // Safe text injection (fixes XSS in toasts)
   const iconSpan = document.createElement('span');
   iconSpan.textContent = type === 'error' ? '✕' : (type === 'warning' ? '!' : '✓');
 
@@ -1502,13 +1474,12 @@ function setupEventListeners() {
   const orderCitySelect = document.getElementById('order-city');
   if (orderCitySelect) {
     orderCitySelect.addEventListener('change', (e) => {
-      state.selectedGovernorate = e.target.value;
-      renderCart();
+      handleCheckoutCityChange(e.target.value);
     });
   }
 }
 
-// Expose handlers to window for inline onclick compatibility
+// Window exposures for HTML event handlers
 window.selectCategoryByCard = selectCategoryByCard;
 window.resetFilters = resetFilters;
 window.addToCart = addToCart;
@@ -1531,5 +1502,7 @@ window.removeCartItem = removeCartItem;
 window.applyCoupon = applyCoupon;
 window.checkoutViaWhatsAppDirect = checkoutViaWhatsAppDirect;
 window.submitOrder = submitOrder;
+window.handleCheckoutCityChange = handleCheckoutCityChange;
+window.closeConfirmationModal = closeConfirmationModal;
 
 document.addEventListener('DOMContentLoaded', initApp);

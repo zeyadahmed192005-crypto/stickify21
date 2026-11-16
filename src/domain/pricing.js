@@ -56,7 +56,7 @@ export function calculatePackSummary(items, targetSize = 5) {
  * Free shipping is strictly evaluated on the post-discount subtotal.
  * @param {object} params
  * @param {Array<object>} params.items - Cart items
- * @param {object|null} params.coupon - Active coupon { code, discountPercent, minOrder }
+ * @param {object|null} params.coupon - Active coupon { code, discountPercent, discountFixed, type, minOrder }
  * @param {string|null} params.governorate - Selected Egyptian governorate
  * @returns {object} Cart calculation breakdown
  */
@@ -70,14 +70,18 @@ export function calculateCart({ items = [], coupon = null, governorate = null })
   let discount = 0;
   let couponWarning = null;
 
-  if (coupon && coupon.discountPercent > 0 && subtotal > 0) {
+  if (coupon && subtotal > 0) {
     const minOrder = coupon.minOrder || 0;
     if (subtotal < minOrder) {
       couponWarning = `كود الخصم يتطلب حداً أدنى للطلب ${minOrder} ج.م`;
     } else {
-      const pct = Math.min(90, Math.max(1, coupon.discountPercent));
-      discount = Math.round(subtotal * (pct / 100));
-      discount = Math.min(discount, subtotal); // Prevent negative total
+      if (coupon.type === 'fixed' || coupon.discountFixed) {
+        discount = Math.round(Number(coupon.discountFixed || coupon.value || 0));
+      } else {
+        const pct = Math.min(100, Math.max(0, Number(coupon.discountPercent || coupon.value || 0)));
+        discount = Math.round(subtotal * (pct / 100));
+      }
+      discount = Math.max(0, Math.min(discount, subtotal)); // Prevent negative total
     }
   }
 
@@ -91,8 +95,14 @@ export function calculateCart({ items = [], coupon = null, governorate = null })
 
   // Shipping rate lookup
   let shippingRate = CONFIG.DEFAULT_SHIPPING;
-  if (governorate && CONFIG.SHIPPING_RATES[governorate] !== undefined) {
-    shippingRate = CONFIG.SHIPPING_RATES[governorate];
+  if (governorate) {
+    // Lookup by exact name or in CONFIG.SHIPPING_RATES or CONFIG.GOVERNORATES
+    if (CONFIG.SHIPPING_RATES[governorate] !== undefined) {
+      shippingRate = CONFIG.SHIPPING_RATES[governorate];
+    } else {
+      const govObj = CONFIG.GOVERNORATES.find(g => g.nameAr === governorate || g.id === governorate);
+      if (govObj) shippingRate = govObj.rate;
+    }
   }
 
   const shipping = subtotal === 0 ? 0 : (isFreeShipping ? 0 : shippingRate);

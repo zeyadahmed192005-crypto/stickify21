@@ -52,3 +52,35 @@ This document records all architectural decisions, ground-truth constraints, and
 
 ### AD-07: Double-Click / `file://` Protocol Guard
 - **Decision:** Include a clean fallback overlay in `index.html` that detects `window.location.protocol === 'file:'` and guides the user in Arabic and English on running `python -m http.server` or `npx serve .`.
+
+### AD-08: Data Layer Abstraction & Storage Architecture (`src/data/storage.js`)
+- **Decision:** Provide a unified asynchronous storage service interface (`StorageService`) backed by `LocalAdapter` with a documented `RemoteAdapter` REST stub for future migration.
+- **Rules:**
+  - Structured data (catalog, orders, coupons, settings) resides in `localStorage`.
+  - Binary image uploads (product images, custom print artwork) reside in `IndexedDB` (`stickify21_db`, store `images`) with client-side WebP compression (max 1000px, quality 0.85).
+  - All storage keys carry `schemaVersion: '1.0.0'`. Corrupted JSON is safely backed up to `*_corrupt_<timestamp>` and replaced with a clean fallback.
+  - Initial seed data is populated only on first run.
+
+### AD-09: Order Lifecycle & State Machine (`src/domain/orders.js`)
+- **Decision:** Enforce a strict state transition matrix with an audit log (`statusHistory`).
+- **States:** `pending` (جديد) -> `awaiting_confirmation` (بانتظار التأكيد) -> `confirmed` (مؤكد) -> `preparing` (قيد التجهيز) -> `shipped` (تم الشحن) -> `completed` (مكتمل); plus `cancelled` (ملغي) from non-final states. Invalid jumps (e.g., `pending` directly to `shipped`) are rejected.
+- **IDs:** Unique, non-guessable IDs generated via Web Crypto API: `S21-YYMMDD-XXXX`.
+
+### AD-10: WhatsApp Order Bridge & Order Code (`src/utils/ids.js`)
+- **Decision:** Bridge the browser-local prototype gap by encoding the order payload into a compact base64url "Order Code" (`S21CODE:<base64url>`) appended to the WhatsApp order message.
+- **Admin Import:** The admin dashboard features an "استيراد طلب من واتساب" tool that pastes the message, decodes the Order Code, validates its structure, and saves the order locally.
+- **Notice:** Clearly labeled in code and UI as a DEMO bridge; Base64 is encoding, not cryptographic security.
+
+### AD-11: Admin Access Security with Web Crypto PBKDF2 (`src/domain/auth.js`)
+- **Decision:** Secure the prototype admin panel with salted PBKDF2 hashing (100,000 iterations of SHA-256) via the native Web Crypto API.
+- **Rules:**
+  - Default initial PIN is `2121`.
+  - Rate limiting: 5 failed attempts trigger a 15-minute lockout.
+  - Session management: Inactive sessions timeout automatically after 30 minutes.
+  - Reset procedure: Clearing the `stickify21_admin_passcode_hash` key from localStorage restores the default PIN.
+
+### AD-12: Egyptian Commerce Domain Validation (`src/domain/validation.js`)
+- **Decision:** Enforce Egyptian market rules for all customer submissions:
+  - Phone numbers: Egyptian mobile prefixes (`010`, `011`, `012`, `015`), accepts `+20` and `0020`, normalized to standard 11-digit `01xxxxxxxxx`.
+  - Governorates: Validated against the 27 official Egyptian governorates with specific shipping tiers.
+  - Coupons: Percentage or fixed discounts, minimum subtotal, expiration date, usage limits, and category restrictions, returning Arabic error messages upon failure.
