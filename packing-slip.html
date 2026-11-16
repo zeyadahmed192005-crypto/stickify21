@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STICKIFY 21 | إذن تجهيز وفحص الطلب</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Readex+Pro:wght@400;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brandOrange: '#FF5000',
+            brandBlack: '#0E0E10'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Readex Pro', 'Plus Jakarta Sans', sans-serif;
+      background-color: #F8F8FA;
+      color: #0E0E10;
+      -webkit-font-smoothing: antialiased;
+    }
+    .item-card.checked {
+      border-color: #10B981 !important;
+      background-color: #F0FDF4 !important;
+    }
+    .item-card.checked .check-indicator {
+      background-color: #10B981 !important;
+      color: white !important;
+    }
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      body {
+        background-color: white !important;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen">
+
+  <div class="max-w-4xl mx-auto space-y-6">
+    
+    <!-- Top Bar / Action Buttons -->
+    <div class="no-print flex items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm flex-wrap">
+      <div class="flex items-center gap-2">
+        <a href="admin.html" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+          <span>← لوحة الإدارة (Admin)</span>
+        </a>
+        <a href="index.html" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition">
+          المتجر
+        </a>
+        <span class="text-xs text-zinc-300 hidden sm:inline">|</span>
+        <span class="text-xs font-bold text-zinc-500 hidden sm:inline">إذن تجهيز الطلبية بالصور (خاص بالإدارة)</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="window.print()" class="px-4 py-2 rounded-xl bg-[#FF5000] hover:bg-[#E04600] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+          <span>🖨️ طباعة إذن التجهيز</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Packing Slip Main Card -->
+    <div class="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
+      
+      <!-- Header with Logo and Slip ID -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-zinc-200">
+        <div class="flex items-center gap-3">
+          <img src="logo.jpg" alt="STICKIFY21" class="h-12 w-auto object-contain">
+          <div>
+            <h1 class="font-extrabold text-xl text-zinc-900">إذن تجهيز طلبية #<span id="order-id" class="font-mono text-[#FF5000]">S21-XXXX</span></h1>
+            <p class="text-xs text-zinc-500 mt-0.5">براند STICKIFY 21 — استيكرات وفواصل كتب</p>
+          </div>
+        </div>
+
+        <div class="text-left font-mono text-xs text-zinc-500">
+          <div id="order-date">التاريخ: --/--/----</div>
+          <div class="text-[#FF5000] font-bold mt-0.5 font-sans">جاهز للتجميع والتغليف 📦</div>
+        </div>
+      </div>
+
+      <!-- Customer Details Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 py-6 border-b border-zinc-200 text-xs">
+        <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
+          <span class="text-zinc-400 block text-[10px] font-bold mb-1">اسم العميل:</span>
+          <span id="customer-name" class="font-bold text-zinc-900 text-sm">--</span>
+        </div>
+
+        <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
+          <span class="text-zinc-400 block text-[10px] font-bold mb-1">رقم الهاتف (واتساب):</span>
+          <a id="customer-phone-link" href="#" target="_blank" class="font-mono font-bold text-[#FF5000] text-sm hover:underline">--</a>
+        </div>
+
+        <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
+          <span class="text-zinc-400 block text-[10px] font-bold mb-1">المحافظة والعنوان:</span>
+          <span id="customer-address" class="font-bold text-zinc-900 block truncate">--</span>
+        </div>
+
+        <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
+          <span class="text-zinc-400 block text-[10px] font-bold mb-1">طريقة الدفع والإجمالي:</span>
+          <span id="payment-and-total" class="font-bold text-zinc-900 font-mono">--</span>
+        </div>
+      </div>
+
+      <!-- Preparation Progress Bar -->
+      <div class="no-print my-6 bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
+        <div class="flex items-center justify-between text-xs font-bold mb-2">
+          <span class="text-zinc-700">مؤشر تجهيز الاستيكرات من الأدراج:</span>
+          <span id="progress-text" class="text-[#FF5000] font-mono">0 / 0 تم تجهيزه</span>
+        </div>
+        <div class="w-full bg-zinc-200 h-2.5 rounded-full overflow-hidden">
+          <div id="progress-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-300 w-0"></div>
+        </div>
+      </div>
+
+      <!-- Items Visual Checklist Grid -->
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-bold text-base text-zinc-900">الاستيكرات المطلوبة (اضغط على الكارت لتحديده كتم التجهيز):</h2>
+          <span class="text-[11px] text-zinc-400">انقر فوق أي استيكر بعد وضعه في الشحنة</span>
+        </div>
+
+        <div id="items-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+
+      <!-- Notes if any -->
+      <div id="notes-container" class="mt-6 p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 text-xs hidden">
+        <span class="font-bold text-amber-900 block mb-1">📝 ملاحظات العميل:</span>
+        <p id="customer-notes" class="text-amber-800 leading-relaxed"></p>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    let checkedItems = new Set();
+    let totalItemsCount = 0;
+
+    function initSlip() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const dataParam = urlParams.get('o') || urlParams.get('data');
+      const idParam = urlParams.get('id');
+
+      let order = null;
+
+      // 1. Try from ?o= base64
+      if (dataParam) {
+        try {
+          const jsonStr = decodeURIComponent(atob(dataParam));
+          order = JSON.parse(jsonStr);
+        } catch (e) {
+          console.error("Error decoding order param", e);
+        }
+      }
+
+      // 2. Try from localStorage ?id=
+      if (!order && idParam) {
+        const storedOrders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
+        order = storedOrders.find(o => o.id === idParam);
+      }
+
+      // Fallback sample if no order found
+      if (!order) {
+        const storedOrders = JSON.parse(localStorage.getItem('stickify21_orders') || '[]');
+        if (storedOrders.length > 0) {
+          order = storedOrders[0];
+        } else {
+          order = {
+            id: 'S21-' + Math.floor(1000 + Math.random() * 9000),
+            date: new Date().toLocaleDateString('ar-EG'),
+            customer: {
+              name: 'معاينة تجريبية للطلب',
+              phone: '01043546503',
+              city: 'القاهرة',
+              address: 'مدينة نصر - شارع عباس العقاد',
+              notes: 'طلب تجريبي لمعاينة شاشة التجهيز'
+            },
+            payment: 'عند الاستلام',
+            total: 125,
+            items: [
+              { sku: 'DEV-01', nameAr: 'جيت بوش بالقوة 🚀', size: '7.5cm', qty: 2, price: 35 },
+              { sku: 'BM-01', nameAr: 'فاصل كتب: خير جليس 📖', size: 'بوك مارك', qty: 1, price: 25 },
+              { sku: 'S21-01', nameAr: 'شعار STICKIFY 21 الرسمي 🍊', size: '7.5cm', qty: 1, price: 30 }
+            ]
+          };
+        }
+      }
+
+      // Populate Meta
+      document.getElementById('order-id').innerText = order.id || 'S21-9999';
+      document.getElementById('order-date').innerText = 'التاريخ: ' + (order.date || new Date().toLocaleDateString('ar-EG'));
+      document.getElementById('customer-name').innerText = order.customer.name;
+      
+      const phoneElem = document.getElementById('customer-phone-link');
+      phoneElem.innerText = order.customer.phone;
+      phoneElem.href = 'https://wa.me/2' + order.customer.phone.replace(/[^0-9]/g, '');
+
+      document.getElementById('customer-address').innerText = order.customer.city + ' - ' + order.customer.address;
+      document.getElementById('payment-and-total').innerText = (order.payment || 'عند الاستلام') + ' | ' + order.total + ' ج.م';
+
+      if (order.customer.notes) {
+        document.getElementById('customer-notes').innerText = order.customer.notes;
+        document.getElementById('notes-container').classList.remove('hidden');
+      }
+
+      // Load products catalog from localStorage for image lookups
+      const storedProds = JSON.parse(localStorage.getItem('stickify21_products') || '[]');
+      const prodMap = {};
+      storedProds.forEach(p => { prodMap[p.sku] = p; });
+
+      // Populate Items Grid
+      const container = document.getElementById('items-grid');
+      totalItemsCount = order.items.length;
+
+      container.innerHTML = order.items.map((item, index) => {
+        const prod = prodMap[item.sku] || {};
+        const isBookmark = item.size === 'بوك مارك' || (item.sku && item.sku.startsWith('BM-'));
+        const hasImg = prod.image || (item.sku === 'S21-01' ? 'logo.jpg' : null);
+        const svgContent = prod.svg || `<div class="font-mono font-bold text-lg text-zinc-500">${item.sku}</div>`;
+
+        return `
+          <div id="item-card-${index}" onclick="toggleItemCheck(${index})" class="item-card group bg-zinc-50 hover:bg-white rounded-2xl border-2 border-zinc-200 p-4 transition-all duration-200 cursor-pointer flex flex-col justify-between select-none shadow-sm">
+            
+            <div class="flex items-center justify-between mb-3">
+              <span class="px-2.5 py-1 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs">
+                #${item.sku}
+              </span>
+
+              <div class="check-indicator w-6 h-6 rounded-lg border-2 border-zinc-300 flex items-center justify-center text-xs font-black transition">
+                ✓
+              </div>
+            </div>
+
+            <div class="w-full aspect-square bg-white rounded-xl border border-zinc-200/80 p-3 mb-3 flex items-center justify-center overflow-hidden">
+              <div class="${isBookmark ? 'w-20 h-32' : 'w-24 h-24'} flex items-center justify-center">
+                ${hasImg ? `<img src="${hasImg}" class="w-full h-full object-contain">` : svgContent}
+              </div>
+            </div>
+
+            <div>
+              <h3 class="font-bold text-xs text-zinc-900 mb-1">${item.nameAr}</h3>
+              <div class="flex items-center justify-between font-mono text-xs text-zinc-600 border-t border-zinc-200 pt-2">
+                <span>المقاس: ${item.size}</span>
+                <span class="px-2 py-0.5 rounded bg-zinc-200 font-extrabold text-zinc-900">الكمية: ${item.qty} قطعة</span>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+
+      updateProgress();
+    }
+
+    function toggleItemCheck(index) {
+      const card = document.getElementById(`item-card-${index}`);
+      if (!card) return;
+
+      if (checkedItems.has(index)) {
+        checkedItems.delete(index);
+        card.classList.remove('checked');
+      } else {
+        checkedItems.add(index);
+        card.classList.add('checked');
+      }
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const count = checkedItems.size;
+      const progressText = document.getElementById('progress-text');
+      const progressBar = document.getElementById('progress-bar');
+      
+      if (progressText) {
+        progressText.innerText = `${count} من ${totalItemsCount} تم تجهيزه`;
+      }
+      if (progressBar && totalItemsCount > 0) {
+        const pct = Math.round((count / totalItemsCount) * 100);
+        progressBar.style.width = pct + '%';
+        if (pct === 100) {
+          progressText.innerText = `اكتمل تجهيز الطلبية بالكامل! (100% جاهز للشحن 🚀)`;
+          progressText.classList.remove('text-[#FF5000]');
+          progressText.classList.add('text-emerald-600');
+        } else {
+          progressText.classList.remove('text-emerald-600');
+          progressText.classList.add('text-[#FF5000]');
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initSlip);
+  </script>
+</body>
+</html>
