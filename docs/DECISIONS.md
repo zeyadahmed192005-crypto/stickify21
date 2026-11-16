@@ -112,3 +112,29 @@ This document records all architectural decisions, ground-truth constraints, and
 ### AD-16: Neutral Photorealistic Mockup Surfaces
 - **Decision:** Ensure all Mockup Studio surfaces (Laptop, Phone, Notebook, Water Bottle, Car Window) avoid trademarked logos (e.g. no Apple logo, no ThinkPad logo).
 - **Realistic Car Window:** Implemented with realistic automotive weatherstripping, defroster filament lines, tinted glass reflection, and tempered glass stamp (`TEMPERED GLASS • S21`).
+
+### AD-17: Admin Dashboard KPI Analytics & Conversion Estimation
+- **Decision:** Surface 5 real-time operational metric cards at the top of the admin dashboard:
+  1. Total Sales (EGP): Sum of all non-cancelled orders.
+  2. Total Orders: Count of all recorded customer orders.
+  3. Awaiting Confirmation: Urgent count of new orders needing merchant review.
+  4. Shipped Orders: Orders currently in transit with logistics.
+  5. Conversion Rate Estimate: Computed from completed checkouts relative to recorded cart-creation events (`stickify21_cart_creations`), providing merchants with visibility into funnel efficiency without third-party tracking cookies.
+
+### AD-18: Orders Bulk Operations & UTF-8 BOM CSV Export
+- **Decision:** Support merchant bulk workflow with multi-selection checkboxes:
+  - Bulk status updates ("تأكيد المحدد", "شحن المحدد") validating each transition through `isValidStatusTransition()` and logging audit entries.
+  - CSV Export: Prepended with UTF-8 Byte Order Mark (`\uFEFF`) to guarantee immediate native rendering of Arabic typography and Egyptian addresses in Microsoft Excel on Windows without manual encoding imports.
+  - Test Harness Guard: Uses `navigator.webdriver` check to prevent browser download locks in automated Playwright test execution while saving `window.__lastExportedCsv` for content verification.
+
+### AD-19: Batch Packing Slip Printing Architecture
+- **Decision:** Extend `packing-slip.html` to support both single order view (`?id=S21-XXX` or `?o=BASE64`) and multi-order batch printing (`?ids=id1,id2,id3`).
+- **Print Formatting:** Each order rendered in batch mode includes a `.packing-slip-sheet` wrapper with CSS `page-break-after: always` and `@media print` rules, enabling merchants to print 10–50 order slips in a single printer job.
+- **Visual Checklist:** Interactive client-side packing progress bar with drawer/shelf SKU tags and item thumbnails ensures zero warehouse packing mistakes.
+
+### AD-20: Dynamic Store Settings & 27-Governorate Shipping Configuration
+- **Decision:** Provide complete merchant control over store operations through Tab 5 (الإعدادات والنسخ):
+  - General store parameters: WhatsApp support number, free shipping subtotal threshold, and default shipping fee.
+  - 27 Egyptian Governorates Grid: Granular per-governorate shipping fee inputs with live persistence to `localStorage.stickify21_settings`.
+  - Dynamic Sync: Storefront pricing calculator (`calculateCart()` in `src/domain/pricing.js`) dynamically merges merchant overrides with default config rates so shipping changes take effect immediately at checkout.
+  - Disaster Recovery: Complete JSON backup export and validated JSON import with pre-import snapshot and confirmation prompt, plus a destructive "Reset Demo Data" action guarded by requiring the admin to type `"RESET"`.

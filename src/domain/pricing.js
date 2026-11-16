@@ -120,20 +120,43 @@ export function calculateCart({ items = [], coupon = null, governorate = null })
   const postDiscountSubtotal = Math.max(0, subtotal - discount);
 
   // Free shipping rule: evaluated on post-discount subtotal
-  const threshold = CONFIG.FREE_SHIPPING_THRESHOLD;
+  let threshold = CONFIG.FREE_SHIPPING_THRESHOLD;
+  let ratesMap = { ...CONFIG.SHIPPING_RATES };
+  let defaultShipping = CONFIG.DEFAULT_SHIPPING;
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const rawSettings = localStorage.getItem('stickify21_settings');
+      if (rawSettings) {
+        const parsed = JSON.parse(rawSettings);
+        if (parsed.freeShippingThreshold !== undefined) {
+          threshold = Number(parsed.freeShippingThreshold);
+        }
+        if (parsed.shippingRates) {
+          ratesMap = { ...ratesMap, ...parsed.shippingRates };
+        }
+        if (parsed.defaultShipping !== undefined) {
+          defaultShipping = Number(parsed.defaultShipping);
+        }
+      }
+    }
+  } catch (e) {}
+
   const isFreeShipping = subtotal > 0 && postDiscountSubtotal >= threshold;
   const freeShippingRemaining = isFreeShipping ? 0 : Math.max(0, threshold - postDiscountSubtotal);
   const freeShippingProgress = threshold > 0 ? Math.min(100, Math.round((postDiscountSubtotal / threshold) * 100)) : 100;
 
   // Shipping rate lookup
-  let shippingRate = CONFIG.DEFAULT_SHIPPING;
+  let shippingRate = defaultShipping;
   if (governorate) {
-    // Lookup by exact name or in CONFIG.SHIPPING_RATES or CONFIG.GOVERNORATES
-    if (CONFIG.SHIPPING_RATES[governorate] !== undefined) {
-      shippingRate = CONFIG.SHIPPING_RATES[governorate];
+    // Lookup by exact name or in ratesMap or CONFIG.GOVERNORATES
+    if (ratesMap[governorate] !== undefined) {
+      shippingRate = ratesMap[governorate];
     } else {
       const govObj = CONFIG.GOVERNORATES.find(g => g.nameAr === governorate || g.id === governorate);
-      if (govObj) shippingRate = govObj.rate;
+      if (govObj) {
+        shippingRate = ratesMap[govObj.nameAr] !== undefined ? ratesMap[govObj.nameAr] : govObj.rate;
+      }
     }
   }
 

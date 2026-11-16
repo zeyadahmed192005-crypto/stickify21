@@ -189,6 +189,17 @@ const devices = {
 export async function initApp() {
   await storage.init();
 
+  // Load store settings
+  try {
+    const settings = await storage.getSettings();
+    if (settings) {
+      if (settings.whatsappNumber) CONFIG.WHATSAPP_NUMBER = settings.whatsappNumber;
+      if (settings.freeShippingThreshold !== undefined) CONFIG.FREE_SHIPPING_THRESHOLD = settings.freeShippingThreshold;
+      if (settings.defaultShipping !== undefined) CONFIG.DEFAULT_SHIPPING = settings.defaultShipping;
+      if (settings.shippingRates) CONFIG.SHIPPING_RATES = { ...CONFIG.SHIPPING_RATES, ...settings.shippingRates };
+    }
+  } catch(e) {}
+
   // Load from unified storage interface
   state.categories = await storage.getCategories();
   state.products = await storage.getProducts();
@@ -523,6 +534,13 @@ export function resetFilters() {
 // ==========================================
 // CART & PRICING
 // ==========================================
+function recordCartCreation() {
+  try {
+    const cur = parseInt(localStorage.getItem('stickify21_cart_creations') || '0', 10);
+    localStorage.setItem('stickify21_cart_creations', String(cur + 1));
+  } catch(e) {}
+}
+
 export function saveCart() {
   try {
     localStorage.setItem('stickify21_cart', JSON.stringify(state.cart));
@@ -553,6 +571,7 @@ export function addToCart(productId) {
   if (existingIndex > -1) {
     state.cart[existingIndex].quantity += 1;
   } else {
+    if (state.cart.length === 0) recordCartCreation();
     state.cart.push({
       id: lineKey,
       productId: product.id,

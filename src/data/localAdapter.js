@@ -303,11 +303,16 @@ export const LocalAdapter = {
 
   // Settings
   async getSettings() {
-    return safeLoad(STORAGE_KEYS.SETTINGS, {
+    const defaultSettings = {
       brandName: CONFIG.BRAND_NAME,
       whatsappNumber: CONFIG.WHATSAPP_NUMBER,
-      freeShippingThreshold: CONFIG.FREE_SHIPPING_THRESHOLD
-    });
+      freeShippingThreshold: CONFIG.FREE_SHIPPING_THRESHOLD,
+      defaultShipping: CONFIG.DEFAULT_SHIPPING,
+      shippingRates: { ...CONFIG.SHIPPING_RATES },
+      governorates: CONFIG.GOVERNORATES.map(g => ({ ...g }))
+    };
+    const loaded = safeLoad(STORAGE_KEYS.SETTINGS, defaultSettings);
+    return { ...defaultSettings, ...loaded };
   },
   async saveSettings(settings) {
     safeSave(STORAGE_KEYS.SETTINGS, settings);
