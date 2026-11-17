@@ -316,3 +316,29 @@ html.dark .border-zinc-200, html.dark .border-zinc-100 {
   }
 }
 
+/* Mobile Touch Target Accessibility (P2-1: >= 44px on <= 640px viewports) */
+@media (max-width: 640px) {
+  header button,
+  header a,
+  main button,
+  section button,
+  input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  header button,
+  header a,
+  main button,
+  section button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .size-pill-btn {
+    flex-direction: column;
+    line-height: 1.15;
+  }
+}
+
+
