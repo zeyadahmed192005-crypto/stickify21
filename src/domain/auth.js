@@ -6,6 +6,7 @@ import { CONFIG } from '../config/config.js';
 const AUTH_CONFIG = CONFIG.AUTH;
 const STORAGE_HASH_KEY = 'stickify21_admin_passcode_hash';
 const STORAGE_SALT_KEY = 'stickify21_admin_passcode_salt';
+const STORAGE_SESSION_KEY = 'stickify21_admin_session';
 const SESSION_AUTH_KEY = 'stickify21_admin_authenticated';
 const SESSION_LAST_ACTIVE_KEY = 'stickify21_admin_last_active';
 const RATE_LIMIT_KEY = 'stickify21_admin_rate_limit';
@@ -151,9 +152,24 @@ export async function verifyAdminPasscode(enteredPasscode) {
 
   if (enteredHash === storedHash) {
     clearRateLimit();
-    // Establish session in sessionStorage
+    // Establish session in localStorage (R11: 12-hour sliding expiry across tabs)
+    const sessionObj = {
+      token: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'tok-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+      createdAt: Date.now(),
+      lastActive: Date.now(),
+      expiresAt: Date.now() + AUTH_CONFIG.SESSION_TIMEOUT_MS
+    };
+    localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessionObj));
     sessionStorage.setItem(SESSION_AUTH_KEY, 'true');
     sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(Date.now()));
+
+    // Broadcast login
+    try {
+      const bc = new BroadcastChannel('stickify21_auth_channel');
+      bc.postMessage({ type: 'login', token: sessionObj.token });
+      bc.close();
+    } catch(e) {}
+
     return { success: true };
   } else {
     const newStatus = recordFailedAttempt();
@@ -201,6 +217,25 @@ export async function changeAdminPasscode(oldPasscode, newPasscode) {
  * @returns {boolean}
  */
 export function isAdminAuthenticated() {
+  // Check localStorage session first (R11)
+  try {
+    const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+    if (raw) {
+      const session = JSON.parse(raw);
+      const now = Date.now();
+      if (!session || !session.expiresAt || now > session.expiresAt) {
+        adminLogout();
+        return false;
+      }
+      // Sliding expiry: refresh lastActive and expiresAt if active
+      session.lastActive = now;
+      session.expiresAt = now + AUTH_CONFIG.SESSION_TIMEOUT_MS;
+      localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session));
+      return true;
+    }
+  } catch (e) {}
+
+  // Fallback check on sessionStorage for legacy or single-tab sessions
   const isAuth = sessionStorage.getItem(SESSION_AUTH_KEY) === 'true';
   if (!isAuth) return false;
 
@@ -210,21 +245,52 @@ export function isAdminAuthenticated() {
   const lastActive = Number(lastActiveStr);
   const now = Date.now();
 
-  // 30 min session timeout check
   if (now - lastActive > AUTH_CONFIG.SESSION_TIMEOUT_MS) {
     adminLogout();
     return false;
   }
 
-  // Refresh active timestamp
   sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(now));
   return true;
 }
 
 /**
- * Terminate admin session
+ * Terminate admin session across all tabs (R11)
  */
 export function adminLogout() {
+  localStorage.removeItem(STORAGE_SESSION_KEY);
   sessionStorage.removeItem(SESSION_AUTH_KEY);
   sessionStorage.removeItem(SESSION_LAST_ACTIVE_KEY);
+
+  // Broadcast logout event across tabs
+  try {
+    const bc = new BroadcastChannel('stickify21_auth_channel');
+    bc.postMessage({ type: 'logout' });
+    bc.close();
+  } catch (e) {}
+}
+
+/**
+ * Set up cross-tab synchronization listener
+ * @param {Function} onLogout Callback when logout occurs in another tab
+ */
+export function setupAuthSync(onLogout) {
+  if (typeof window === 'undefined') return;
+
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_SESSION_KEY && !e.newValue) {
+      if (typeof onLogout === 'function') onLogout();
+    }
+  });
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const bc = new BroadcastChannel('stickify21_auth_channel');
+      bc.onmessage = (event) => {
+        if (event.data && event.data.type === 'logout') {
+          if (typeof onLogout === 'function') onLogout();
+        }
+      };
+    } catch(e) {}
+  }
 }

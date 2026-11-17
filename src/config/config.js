@@ -20,7 +20,7 @@ export const CONFIG = {
   DEFAULT_SHIPPING: 35,
   
   // Schema
-  SCHEMA_VERSION: '1.0.0',
+  SCHEMA_VERSION: '2.0.0',
 
   // Default Advertised Coupon
   ADVERTISED_COUPON: {
@@ -122,6 +122,7 @@ export const CONFIG = {
     awaiting_confirmation: { key: 'awaiting_confirmation', labelAr: 'بانتظار التأكيد', badgeClass: 'bg-amber-100 text-amber-800 border-amber-200' },
     confirmed: { key: 'confirmed', labelAr: 'مؤكد', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
     preparing: { key: 'preparing', labelAr: 'قيد التجهيز', badgeClass: 'bg-purple-100 text-purple-800 border-purple-200' },
+    ready: { key: 'ready', labelAr: 'تم التجهيز', badgeClass: 'bg-teal-100 text-teal-800 border-teal-200' },
     shipped: { key: 'shipped', labelAr: 'تم الشحن', badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
     completed: { key: 'completed', labelAr: 'مكتمل', badgeClass: 'bg-green-100 text-green-800 border-green-200' },
     cancelled: { key: 'cancelled', labelAr: 'ملغي', badgeClass: 'bg-red-100 text-red-800 border-red-200' }
@@ -132,7 +133,8 @@ export const CONFIG = {
     pending: ['awaiting_confirmation', 'confirmed', 'cancelled'],
     awaiting_confirmation: ['confirmed', 'cancelled'],
     confirmed: ['preparing', 'cancelled'],
-    preparing: ['shipped', 'cancelled'],
+    preparing: ['ready', 'shipped', 'cancelled'],
+    ready: ['shipped', 'cancelled'],
     shipped: ['completed', 'cancelled'],
     completed: [],
     cancelled: []
@@ -145,7 +147,7 @@ export const CONFIG = {
     KEY_LENGTH: 32, // bytes
     MAX_ATTEMPTS: 5,
     LOCKOUT_MS: 15 * 60 * 1000, // 15 minutes
-    SESSION_TIMEOUT_MS: 30 * 60 * 1000 // 30 minutes
+    SESSION_TIMEOUT_MS: 12 * 60 * 60 * 1000 // 12 hours sliding expiry (R11)
   },
 
   // Payment Methods

@@ -65,6 +65,10 @@ class StorageService {
     await this.init();
     return this.adapter.createOrder(order);
   }
+  async updateOrder(order) {
+    await this.init();
+    return this.adapter.updateOrder(order);
+  }
   async updateOrderStatus(orderId, newStatus, note) {
     await this.init();
     return this.adapter.updateOrderStatus(orderId, newStatus, note);

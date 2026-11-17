@@ -173,3 +173,52 @@ This document records all architectural decisions, ground-truth constraints, and
   - Phase 5: SEO meta tags, OpenGraph previews, crawler directives (`robots.txt`, `sitemap.xml`, `noindex`), dynamic Schema.org JSON-LD catalog, legal policy modals (`#/terms`, `#/privacy`), analytics dispatcher.
   - Phase 6: Full-lifecycle integration scenarios (IndexedDB WebP compression <= 1000px, complete customer purchase flow, complete admin management flow, self-service tracking, resilient error recovery from corrupted JSON).
 - **Execution Protocol:** Tests run against a lightweight local Python HTTP server without external network dependencies, ensuring 100% reproducible offline CI/CD execution.
+
+---
+
+## 3. Round 2 Architectural Decisions
+
+### AD-26: Composite Order Lines Structure & Backward Compatibility Adapter (R1)
+- **Decision:** Shift from a flat order item array to structured `lines[]` distinguishing `single`, `bookmark`, and `pack` types.
+- **Pack Line Format:**
+  `{ type: 'pack', size: 5|10, discountRate: 0.2|0.3, items: [{ sku, name, sizeKey, finish, unitPrice, image }], packPrice: number }`
+- **Compatibility Adapter (`normalizeOrderLines`):** Old flat orders lacking `lines[]` automatically convert on the fly without database mutation or data loss, grouping any pack items into valid composite lines.
+- **Surface Coverage:** Sub-items with SKU, name, size, and finish are visible across:
+  1. Cart drawer
+  2. Detailed checkout summary
+  3. WhatsApp order message (numbered sub-list under pack header)
+  4. Base64url Order Code version 2 (`S21CODE:v2:...`)
+  5. Admin orders list (expandable pack dropdown)
+  6. Admin order details drawer
+  7. Single-page packing slip
+
+### AD-27: Seven-State Order Lifecycle with Intermediate Staging (`ready` / تم التجهيز) & 10s Undo (R2)
+- **Decision:** Insert state `ready` ("تم التجهيز") between `preparing` ("قيد التجهيز") and `shipped` ("تم الشحن").
+- **Canonical Flow:**
+  `pending` / `awaiting_confirmation` -> `confirmed` -> `preparing` -> `ready` -> `shipped` -> `completed` (+ `cancelled`).
+- **Quick Action Primary Button:** Admin orders list rows and details drawer present a single context-sensitive next-action button with color-coded styling.
+- **10-Second Undo Toast:** Transitioning states triggers a fixed countdown toast allowing instant rollback in case of accidental click.
+- **Shipping Dispatch Modal (A3):** Transitioning to `shipped` prompts for courier selection (`بوسطة`, `أرامكس`, `مندوب خاص`, custom) and optional tracking number, generating a prefilled customer WhatsApp shipping notification link.
+
+### AD-28: Cross-Tab Admin Authentication with 12h Sliding Expiry & BroadcastChannel (R11)
+- **Decision:** Migrate active admin session from `sessionStorage` to `localStorage` (`stickify21_admin_session`) with a 12-hour sliding expiry window.
+- **Cross-Tab Synchronization:**
+  - Logging out in any tab broadcasts a `logout` event via `BroadcastChannel('stickify21_auth_channel')` and `window.onstorage`, immediately locking all open admin and packing slip tabs.
+  - Active admin tabs automatically refresh the session sliding expiry on user interaction.
+- **Passcode Management:** Settings tab provides an in-place "Change Passcode" form requiring current PIN verification and setting new PBKDF2 hash & salt.
+
+### AD-29: Single-Page First Packing Slip & Auto-Compaction Rules (R13)
+- **Decision:** Guarantee that packing slips strictly fit on ONE A4 page (`@page { size: A4 portrait; margin: 8mm }`) to prevent paper wastage in warehouse packing.
+- **Dynamic Compaction Thresholds:**
+  - Standard mode: <= 6 items (normal typography 11-12px, comfortable padding).
+  - Compact mode: 7 to 14 items (reduced padding, 10px typography, tighter grid).
+  - Ultra-compact mode: > 14 items (2-column dense grid, 8.5px typography, max-height 140mm container).
+- **View Modes:** Interactive selector toggles between `A4 صفحة واحدة`, `A5 نصف صفحة`, and `🏷️ بوليصة شحن` (shipping label sticker format).
+
+### AD-30: Order Confirmation Dialog & Tracking Number Storage (A2, A3)
+- **Decision:** After checkout submission, storefront presents a persistent confirmation screen featuring:
+  - Big prominent order number (`#S21-YYMMDD-XXXX`) with a 1-click clipboard copy button.
+  - Order financial and items summary.
+  - Direct deep-link button to live self-service tracking (`#/track/:id`).
+  - Reopen WhatsApp button in case the browser popup was initially blocked.
+

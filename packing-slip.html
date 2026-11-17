@@ -21,6 +21,7 @@
       color: #0E0E10;
       -webkit-font-smoothing: antialiased;
     }
+    
     .item-card.checked {
       border-color: #10B981 !important;
       background-color: #F0FDF4 !important;
@@ -29,116 +30,104 @@
       background-color: #10B981 !important;
       color: white !important;
     }
+
+    /* Print First CSS (R13) */
+    @page {
+      size: A4 portrait;
+      margin: 8mm;
+    }
     @media print {
       .no-print {
         display: none !important;
       }
       body {
         background-color: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
       }
-      .page-break {
+      .page-slip {
+        page-break-inside: avoid;
+        break-inside: avoid;
         page-break-after: always;
+        break-after: page;
+        max-height: 275mm;
+        overflow: hidden;
+      }
+      .page-slip-a5 {
+        max-height: 195mm;
+      }
+      .shipping-label-card {
+        max-width: 100mm;
+        max-height: 150mm;
       }
     }
+
+    /* Compaction Rules (Strictly 1-page A4) */
+    .compact-mode .slip-header { padding-bottom: 8px; margin-bottom: 8px; }
+    .compact-mode .slip-customer-grid { padding: 8px 0; }
+    .compact-mode .slip-thumb { width: 32px; height: 32px; }
+    .compact-mode .slip-text-main { font-size: 11px; }
+
+    .ultra-compact-mode .slip-header { padding-bottom: 4px; margin-bottom: 6px; }
+    .ultra-compact-mode .slip-customer-grid { padding: 6px 0; font-size: 10px; }
+    .ultra-compact-mode .slip-thumb { width: 22px; height: 22px; }
+    .ultra-compact-mode .slip-text-main { font-size: 9.5px; }
+    .ultra-compact-mode .slip-items-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
   </style>
 </head>
-<body class="p-4 sm:p-8 min-h-screen">
+<body class="p-4 sm:p-6 min-h-screen">
 
-  <div class="max-w-4xl mx-auto space-y-6">
+  <!-- Admin Auth Lock Screen (R11: Shared localStorage Session) -->
+  <div id="admin-lock-screen" class="fixed inset-0 z-50 bg-[#0E0E10]/95 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-4 shadow-2xl">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center text-2xl">
+        🔒
+      </div>
+      <div>
+        <h3 class="font-extrabold text-base text-zinc-900">إذن تجهيز الطلبيات محمي</h3>
+        <p class="text-xs text-zinc-500 mt-1">يجب تسجيل الدخول كمسؤول متجر لعرض هذا الإذن</p>
+      </div>
+      <a href="admin.html" class="block w-full py-3 rounded-2xl bg-[#FF5000] hover:bg-[#E04600] text-white font-bold text-xs transition shadow-sm">
+        تسجيل الدخول في لوحة الإدارة ←
+      </a>
+    </div>
+  </div>
+
+  <div class="max-w-4xl mx-auto space-y-4">
     
     <!-- Top Bar / Action Buttons -->
-    <div class="no-print flex items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm flex-wrap">
+    <div class="no-print flex items-center justify-between gap-4 bg-white p-3.5 rounded-2xl border border-zinc-200 shadow-sm flex-wrap">
       <div class="flex items-center gap-2">
         <a href="admin.html" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-          <span>← لوحة الإدارة (Admin)</span>
+          <span>← لوحة الإدارة</span>
         </a>
         <a href="index.html" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition">
           المتجر
         </a>
         <span class="text-xs text-zinc-300 hidden sm:inline">|</span>
-        <span class="text-xs font-bold text-zinc-500 hidden sm:inline">إذن تجهيز الطلبية بالصور (خاص بالإدارة)</span>
+        <span class="text-xs font-bold text-zinc-500 hidden sm:inline">إذن تجهيز الطلبية وفحص الجودة</span>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button onclick="window.print()" class="px-4 py-2 rounded-xl bg-[#FF5000] hover:bg-[#E04600] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-          <span>🖨️ طباعة إذن التجهيز</span>
+      <!-- View Modes & Print (R13) -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="setSlipViewMode('a4')" data-mode="a4" class="mode-btn px-3 py-1.5 rounded-xl bg-zinc-900 text-white text-xs font-bold transition">
+          A4 صفحة واحدة
+        </button>
+        <button onclick="setSlipViewMode('a5')" data-mode="a5" class="mode-btn px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition">
+          A5 نصف صفحة
+        </button>
+        <button onclick="setSlipViewMode('label')" data-mode="label" class="mode-btn px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition">
+          🏷️ بوليصة شحن
+        </button>
+        <button onclick="window.print()" class="px-4 py-1.5 rounded-xl bg-[#FF5000] hover:bg-[#E04600] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+          <span>🖨️ طباعة / حفظ PDF</span>
         </button>
       </div>
     </div>
 
-    <!-- Packing Slip Container -->
-    <div id="slips-container" class="space-y-8">
-      <div id="packing-slip-card" class="bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
-        
-        <!-- Header with Logo and Slip ID -->
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-zinc-200">
-          <div class="flex items-center gap-3">
-            <img src="logo.jpg" alt="STICKIFY21" class="h-12 w-auto object-contain">
-            <div>
-              <h1 class="font-extrabold text-xl text-zinc-900">إذن تجهيز طلبية #<span id="order-id" class="font-mono text-[#FF5000]">S21-XXXX</span></h1>
-              <p class="text-xs text-zinc-500 mt-0.5">براند STICKIFY 21 — استيكرات وفواصل كتب</p>
-            </div>
-          </div>
-
-          <div class="text-left font-mono text-xs text-zinc-500">
-            <div id="order-date">التاريخ: --/--/----</div>
-            <div class="text-[#FF5000] font-bold mt-0.5 font-sans">جاهز للتجميع والتغليف 📦</div>
-          </div>
-        </div>
-
-        <!-- Customer Details Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 py-6 border-b border-zinc-200 text-xs">
-          <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
-            <span class="text-zinc-400 block text-[10px] font-bold mb-1">اسم العميل:</span>
-            <span id="customer-name" class="font-bold text-zinc-900 text-sm">--</span>
-          </div>
-
-          <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
-            <span class="text-zinc-400 block text-[10px] font-bold mb-1">رقم الهاتف (واتساب):</span>
-            <a id="customer-phone-link" href="#" target="_blank" class="font-mono font-bold text-[#FF5000] text-sm hover:underline">--</a>
-          </div>
-
-          <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
-            <span class="text-zinc-400 block text-[10px] font-bold mb-1">المحافظة والعنوان:</span>
-            <span id="customer-address" class="font-bold text-zinc-900 block truncate">--</span>
-          </div>
-
-          <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100">
-            <span class="text-zinc-400 block text-[10px] font-bold mb-1">طريقة الدفع والإجمالي:</span>
-            <span id="payment-and-total" class="font-bold text-zinc-900 font-mono">--</span>
-          </div>
-        </div>
-
-        <!-- Preparation Progress Bar -->
-        <div class="no-print my-6 bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
-          <div class="flex items-center justify-between text-xs font-bold mb-2">
-            <span class="text-zinc-700">مؤشر تجهيز الاستيكرات من الأدراج:</span>
-            <span id="progress-text" class="text-[#FF5000] font-mono">0 / 0 تم تجهيزه</span>
-          </div>
-          <div class="w-full bg-zinc-200 h-2.5 rounded-full overflow-hidden">
-            <div id="progress-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-300 w-0"></div>
-          </div>
-        </div>
-
-        <!-- Items Visual Checklist Grid -->
-        <div>
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="font-bold text-base text-zinc-900">الاستيكرات المطلوبة (اضغط على الكارت لتحديده كتم التجهيز):</h2>
-            <span class="text-[11px] text-zinc-400">انقر فوق أي استيكر بعد وضعه في الشحنة</span>
-          </div>
-
-          <div id="items-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <!-- Injected via JavaScript -->
-          </div>
-        </div>
-
-        <!-- Notes if any -->
-        <div id="notes-container" class="mt-6 p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 text-xs hidden">
-          <span class="font-bold text-amber-900 block mb-1">📝 ملاحظات العميل:</span>
-          <p id="customer-notes" class="text-amber-800 leading-relaxed"></p>
-        </div>
-
-      </div>
+    <!-- Slips Container -->
+    <div id="slips-container" class="space-y-6">
+      <!-- Injected via JavaScript -->
     </div>
 
   </div>
@@ -146,11 +135,43 @@
   <script type="module">
     import { escapeHtml, sanitizeSvg, sanitizeUrl } from './src/utils/escape.js';
     import { CONFIG } from './src/config/config.js';
+    import { isAdminAuthenticated, setupAuthSync } from './src/domain/auth.js';
+    import { normalizeOrderLines } from './src/domain/orders.js';
 
+    let currentViewMode = 'a4'; // 'a4' | 'a5' | 'label'
     let checkedItems = new Set();
     let totalItemsCount = 0;
 
+    function checkAuth() {
+      const isAuth = isAdminAuthenticated();
+      const lockOverlay = document.getElementById('admin-lock-screen');
+      if (!isAuth) {
+        if (lockOverlay) lockOverlay.classList.remove('hidden');
+      } else {
+        if (lockOverlay) lockOverlay.classList.add('hidden');
+      }
+      return isAuth;
+    }
+
+    setupAuthSync(() => {
+      checkAuth();
+    });
+
+    export function setSlipViewMode(mode) {
+      currentViewMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        const isTarget = btn.dataset.mode === mode;
+        btn.classList.toggle('bg-zinc-900', isTarget);
+        btn.classList.toggle('text-white', isTarget);
+        btn.classList.toggle('bg-zinc-100', !isTarget);
+        btn.classList.toggle('text-zinc-700', !isTarget);
+      });
+      initSlip();
+    }
+
     function initSlip() {
+      checkAuth();
+
       const urlParams = new URLSearchParams(window.location.search);
       const dataParam = urlParams.get('o') || urlParams.get('data');
       const idParam = urlParams.get('id');
@@ -172,11 +193,8 @@
       if (idsParam) {
         const idList = idsParam.split(',').map(s => s.trim()).filter(Boolean);
         const matchedOrders = idList.map(id => storedOrders.find(o => o.id === id)).filter(Boolean);
-        if (matchedOrders.length > 1) {
-          renderBatchSlips(matchedOrders, prodMap);
-          return;
-        } else if (matchedOrders.length === 1) {
-          renderSingleSlip(matchedOrders[0], prodMap);
+        if (matchedOrders.length > 0) {
+          renderOrdersSlips(matchedOrders, prodMap);
           return;
         }
       }
@@ -213,200 +231,236 @@
               address: 'مدينة نصر - شارع عباس العقاد',
               notes: 'طلب تجريبي لمعاينة شاشة التجهيز'
             },
-            payment: 'عند الاستلام',
+            payment: 'عند الاستلام (COD)',
             total: 125,
-            items: [
-              { sku: 'DEV-01', nameAr: 'جيت بوش بالقوة 🚀', size: '8 سم', qty: 2, price: 35 },
-              { sku: 'BM-01', nameAr: 'فاصل كتب: خير جليس 📖', size: 'بوك مارك', qty: 1, price: 25 },
-              { sku: 'S21-01', nameAr: 'شعار STICKIFY 21 الرسمي 🍊', size: '8 سم', qty: 1, price: 30 }
+            lines: [
+              { sku: 'DEV-01', name: 'جيت بوش بالقوة', size: '8 سم', quantity: 2, unitPrice: 35, total: 70 },
+              { sku: 'BM-01', name: 'فاصل كتب: خير جليس', size: 'بوك مارك', quantity: 1, unitPrice: 25, total: 25 },
+              { sku: 'S21-01', name: 'شعار STICKIFY 21 الرسمي', size: '8 سم', quantity: 1, unitPrice: 30, total: 30 }
             ]
           };
         }
       }
 
-      renderSingleSlip(order, prodMap);
+      renderOrdersSlips([order], prodMap);
     }
 
-    function renderSingleSlip(order, prodMap) {
-      // Populate Meta (XSS Safe)
-      document.getElementById('order-id').innerText = order.id || 'S21-XXXX';
-      document.getElementById('order-date').innerText = 'التاريخ: ' + (order.date || new Date().toLocaleDateString('ar-EG'));
-      document.getElementById('customer-name').innerText = order.customer?.name || '';
-      
-      const phoneElem = document.getElementById('customer-phone-link');
-      const rawPhone = (order.customer?.phone || '').replace(/[^0-9]/g, '');
-      phoneElem.innerText = order.customer?.phone || '';
-      phoneElem.href = 'https://wa.me/2' + rawPhone;
-
-      document.getElementById('customer-address').innerText = (order.customer?.city || order.customer?.governorate || '') + ' - ' + (order.customer?.address || '');
-      document.getElementById('payment-and-total').innerText = (order.payment || 'عند الاستلام') + ' | ' + (order.total || 0) + ' ' + CONFIG.CURRENCY;
-
-      if (order.customer?.notes) {
-        document.getElementById('customer-notes').innerText = order.customer.notes;
-        document.getElementById('notes-container').classList.remove('hidden');
-      }
-
-      // Populate Items Grid (XSS Safe)
-      const container = document.getElementById('items-grid');
-      const items = order.items || [];
-      totalItemsCount = items.length;
-
-      container.innerHTML = items.map((item, index) => {
-        const prod = prodMap[item.sku] || {};
-        const isBookmark = item.size === 'بوك مارك' || (item.sku && item.sku.startsWith('BM-'));
-        const safeImg = sanitizeUrl(prod.image || (item.sku === 'S21-01' ? 'logo.jpg' : null));
-        const safeSvg = prod.svg ? sanitizeSvg(prod.svg) : `<div class="font-mono font-bold text-lg text-zinc-500">#${escapeHtml(item.sku)}</div>`;
-
-        return `
-          <div id="item-card-${index}" onclick="toggleItemCheck(${index})" class="item-card group bg-zinc-50 hover:bg-white rounded-2xl border-2 border-zinc-200 p-4 transition-all duration-200 cursor-pointer flex flex-col justify-between select-none shadow-sm">
-            
-            <div class="flex items-center justify-between mb-3">
-              <span class="px-2.5 py-1 rounded-lg bg-zinc-900 text-white font-mono font-black text-xs">
-                #${escapeHtml(item.sku)}
-              </span>
-
-              <div class="check-indicator w-6 h-6 rounded-lg border-2 border-zinc-300 flex items-center justify-center text-xs font-black transition">
-                ✓
-              </div>
-            </div>
-
-            <div class="w-full aspect-square bg-white rounded-xl border border-zinc-200/80 p-3 mb-3 flex items-center justify-center overflow-hidden">
-              <div class="${isBookmark ? 'w-20 h-32' : 'w-24 h-24'} flex items-center justify-center">
-                ${safeImg ? `<img src="${safeImg}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
-              </div>
-            </div>
-
-            <div>
-              <h3 class="font-bold text-xs text-zinc-900 mb-1">${escapeHtml(item.nameAr)}</h3>
-              <div class="flex items-center justify-between font-mono text-xs text-zinc-600 border-t border-zinc-200 pt-2">
-                <span>المقاس: ${escapeHtml(item.size)}</span>
-                <span class="px-2 py-0.5 rounded bg-zinc-200 font-extrabold text-zinc-900">الكمية: ${parseInt(item.qty || item.quantity, 10) || 1} قطعة</span>
-              </div>
-            </div>
-
-          </div>
-        `;
-      }).join('');
-
-      updateProgress();
-    }
-
-    function renderBatchSlips(orders, prodMap) {
+    function renderOrdersSlips(orders, prodMap) {
       const container = document.getElementById('slips-container');
       if (!container) return;
 
+      if (currentViewMode === 'label') {
+        renderShippingLabels(orders, container);
+        return;
+      }
+
       container.innerHTML = orders.map((order, orderIdx) => {
-        const items = order.items || [];
+        const lines = normalizeOrderLines(order);
+        
+        // Count total item units for auto-compaction
+        let totalCount = 0;
+        lines.forEach(l => {
+          if (l.type === 'pack') totalCount += (l.items?.length || 5);
+          else totalCount += (l.quantity || 1);
+        });
+
+        // Determine compaction mode (R13: strict single page)
+        let compactionClass = '';
+        if (totalCount > 14) {
+          compactionClass = 'ultra-compact-mode';
+        } else if (totalCount > 6) {
+          compactionClass = 'compact-mode';
+        }
+
+        const isA5 = currentViewMode === 'a5';
         const rawPhone = (order.customer?.phone || '').replace(/[^0-9]/g, '');
 
-        const itemsHtml = items.map((item, itemIdx) => {
-          const prod = prodMap[item.sku] || {};
-          const isBookmark = item.size === 'بوك مارك' || (item.sku && item.sku.startsWith('BM-'));
-          const safeImg = sanitizeUrl(prod.image || (item.sku === 'S21-01' ? 'logo.jpg' : null));
-          const safeSvg = prod.svg ? sanitizeSvg(prod.svg) : `<div class="font-mono font-bold text-lg text-zinc-500">#${escapeHtml(item.sku)}</div>`;
+        // Render lines (packs grouped with sub-items per R1)
+        const linesHtml = lines.map((line, lineIdx) => {
+          if (line.type === 'pack') {
+            const subItemsHtml = (line.items || []).map((sub, sIdx) => {
+              const prod = prodMap[sub.sku] || {};
+              const safeImg = sanitizeUrl(sub.image || prod.image || (sub.sku === 'S21-01' ? 'logo.jpg' : null));
+              const safeSvg = prod.svg ? sanitizeSvg(prod.svg) : `<div class="font-mono font-bold text-[10px] text-zinc-500">#${escapeHtml(sub.sku)}</div>`;
 
-          return `
-            <div class="item-card group bg-zinc-50 rounded-2xl border border-zinc-200 p-4 flex flex-col justify-between shadow-sm">
-              <div class="flex items-center justify-between mb-2">
-                <span class="px-2.5 py-0.5 rounded bg-zinc-900 text-white font-mono font-black text-xs">#${escapeHtml(item.sku)}</span>
-                <span class="text-[11px] font-bold text-zinc-600">الكمية: ${parseInt(item.qty || item.quantity, 10) || 1}</span>
-              </div>
-              <div class="w-full aspect-square bg-white rounded-xl border border-zinc-100 p-2 mb-2 flex items-center justify-center overflow-hidden">
-                <div class="${isBookmark ? 'w-16 h-28' : 'w-20 h-20'} flex items-center justify-center">
-                  ${safeImg ? `<img src="${safeImg}" class="w-full h-full object-contain">` : safeSvg}
+              return `
+                <div class="flex items-center justify-between p-1.5 rounded-lg bg-white border border-zinc-200 text-xs gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="slip-thumb w-8 h-8 rounded bg-zinc-50 border border-zinc-100 flex items-center justify-center p-0.5 flex-shrink-0 overflow-hidden">
+                      ${safeImg ? `<img src="${safeImg}" class="w-full h-full object-contain">` : safeSvg}
+                    </div>
+                    <div class="min-w-0">
+                      <span class="font-mono font-bold text-[10px] text-zinc-900 block truncate">#${escapeHtml(sub.sku || 'S21')} - ${escapeHtml(sub.name || '')}</span>
+                      <span class="text-[9.5px] text-zinc-400 font-mono">${escapeHtml(sub.sizeKey || '8 سم')} (${escapeHtml(sub.finish || 'مطفي')})</span>
+                    </div>
+                  </div>
+                  <span class="text-[10px] font-bold text-emerald-600 flex-shrink-0">ضمن الباقة</span>
+                </div>
+              `;
+            }).join('');
+
+            return `
+              <div class="slip-pack-group col-span-full p-2.5 rounded-2xl bg-orange-50/50 border border-[#FF5000]/30 space-y-2" data-pack-group>
+                <div class="flex items-center justify-between border-b border-orange-200/60 pb-1.5 font-bold text-xs">
+                  <span class="text-[#FF5000] flex items-center gap-1.5">
+                    <span>🎁</span>
+                    <span>باقة ${line.size} استيكرات (${Math.round((line.discountRate || 0.2) * 100)}% خصم)</span>
+                  </span>
+                  <span class="font-mono text-zinc-900">${line.packPrice} ${CONFIG.CURRENCY}</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  ${subItemsHtml}
                 </div>
               </div>
-              <div>
-                <h4 class="font-bold text-xs text-zinc-900 mb-1">${escapeHtml(item.nameAr)}</h4>
-                <div class="text-[11px] text-zinc-500 font-mono">المقاس: ${escapeHtml(item.size)}</div>
+            `;
+          }
+
+          // Single item
+          const prod = prodMap[line.sku] || {};
+          const isBookmark = line.type === 'bookmark' || (line.sku && line.sku.startsWith('BM-'));
+          const safeImg = sanitizeUrl(line.image || prod.image || (line.sku === 'S21-01' ? 'logo.jpg' : null));
+          const safeSvg = prod.svg ? sanitizeSvg(prod.svg) : `<div class="font-mono font-bold text-xs text-zinc-500">#${escapeHtml(line.sku || 'S21')}</div>`;
+
+          return `
+            <div class="item-card p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-3 text-xs">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="slip-thumb w-10 h-10 rounded-lg bg-white border border-zinc-200 p-1 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  ${safeImg ? `<img src="${safeImg}" class="w-full h-full object-contain">` : safeSvg}
+                </div>
+                <div class="min-w-0">
+                  <h4 class="font-bold text-zinc-900 truncate slip-text-main">${escapeHtml(line.name || 'منتج')}</h4>
+                  <div class="text-[10px] text-zinc-500 font-mono flex items-center gap-2">
+                    <span class="font-bold text-zinc-800">#${escapeHtml(line.sku || 'S21')}</span>
+                    <span>•</span>
+                    <span>${escapeHtml(isBookmark ? 'بوك مارك' : (line.size || '8 سم'))}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-left font-mono text-xs flex-shrink-0">
+                <span class="font-bold text-zinc-900">${line.total || ((line.unitPrice || 35) * (line.quantity || 1))} ${CONFIG.CURRENCY}</span>
+                <span class="block text-[10px] text-zinc-400">(${line.quantity || 1} × ${line.unitPrice || 35})</span>
               </div>
             </div>
           `;
         }).join('');
 
         return `
-          <div class="packing-slip-sheet page-break bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 shadow-sm">
-            <div class="flex items-center justify-between pb-4 border-b border-zinc-200">
+          <div id="packing-slip-card" class="page-slip packing-slip-sheet ${isA5 ? 'page-slip-a5' : ''} ${compactionClass} bg-white rounded-3xl border border-zinc-200 p-5 sm:p-7 shadow-sm text-xs">
+            
+            <!-- Slip Header -->
+            <div class="slip-header flex items-center justify-between border-b border-zinc-200 pb-4 mb-4">
               <div class="flex items-center gap-3">
-                <img src="logo.jpg" alt="STICKIFY21" class="h-10 w-auto object-contain">
+                <img src="logo.jpg" alt="STICKIFY21" class="h-9 w-auto object-contain">
                 <div>
-                  <h2 class="font-extrabold text-lg text-zinc-900">إذن تجهيز طلبية #${escapeHtml(order.id)}</h2>
-                  <p class="text-[11px] text-zinc-500">STICKIFY 21 PACKING SLIP (${orderIdx + 1} من ${orders.length})</p>
+                  <h2 class="font-extrabold text-base text-zinc-900">إذن تجهيز طلبية <span id="order-id">#${escapeHtml(order.id)}</span></h2>
+                  <p class="text-[10px] text-zinc-400 font-mono">STICKIFY 21 PACKING & QC SLIP</p>
                 </div>
               </div>
               <div class="text-left font-mono text-xs text-zinc-500">
-                <div>${escapeHtml(order.date || new Date().toLocaleDateString('ar-EG'))}</div>
-                <div class="text-[#FF5000] font-bold font-sans">تجهيز دفعة مجمعة 📦</div>
+                <div>${escapeHtml(new Date(order.date || Date.now()).toLocaleDateString('ar-EG'))}</div>
+                <div class="text-[#FF5000] font-bold font-sans mt-0.5">جاهز للتجميع والتغليف 📦</div>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4 border-b border-zinc-200 text-xs">
-              <div class="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100">
-                <span class="text-zinc-400 block text-[10px] font-bold">العميل:</span>
-                <span class="font-bold text-zinc-900">${escapeHtml(order.customer?.name || '')}</span>
+            <!-- Customer & Delivery 2-Column Block -->
+            <div class="slip-customer-grid grid grid-cols-2 sm:grid-cols-4 gap-2.5 py-3 border-b border-zinc-200 mb-4 bg-zinc-50/70 p-3 rounded-2xl">
+              <div>
+                <span class="text-zinc-400 block text-[9.5px] font-bold">اسم العميل:</span>
+                <strong id="customer-name" class="text-zinc-900 text-xs">${escapeHtml(order.customer?.name || '')}</strong>
               </div>
-              <div class="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100">
-                <span class="text-zinc-400 block text-[10px] font-bold">الهاتف:</span>
-                <span class="font-mono font-bold text-[#FF5000]">${escapeHtml(order.customer?.phone || '')}</span>
+              <div>
+                <span class="text-zinc-400 block text-[9.5px] font-bold">رقم الهاتف:</span>
+                <a id="customer-phone-link" href="https://wa.me/2${rawPhone}" target="_blank" class="font-mono font-bold text-[#FF5000] text-xs hover:underline" dir="ltr">${escapeHtml(order.customer?.phone || '')}</a>
               </div>
-              <div class="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100">
-                <span class="text-zinc-400 block text-[10px] font-bold">المحافظة:</span>
-                <span class="font-bold text-zinc-900">${escapeHtml(order.customer?.governorate || order.customer?.city || '')}</span>
+              <div>
+                <span class="text-zinc-400 block text-[9.5px] font-bold">المحافظة والعنوان:</span>
+                <span id="customer-address" class="text-zinc-800 truncate block text-xs">${escapeHtml(order.customer?.governorate || order.customer?.city || '')} - ${escapeHtml(order.customer?.address || '')}</span>
               </div>
-              <div class="bg-zinc-50 p-2.5 rounded-xl border border-zinc-100">
-                <span class="text-zinc-400 block text-[10px] font-bold">الدفع والإجمالي:</span>
-                <span class="font-bold text-zinc-900 font-mono">${escapeHtml(order.payment || 'عند الاستلام')} | ${order.total} ${CONFIG.CURRENCY}</span>
+              <div>
+                <span class="text-zinc-400 block text-[9.5px] font-bold">طريقة الدفع والإجمالي:</span>
+                <span id="payment-and-total" class="font-mono font-bold text-zinc-900 text-xs">${escapeHtml(order.payment || 'عند الاستلام')} | ${order.total} ${CONFIG.CURRENCY}</span>
               </div>
             </div>
 
-            <div class="pt-4">
-              <h3 class="font-bold text-xs text-zinc-900 mb-3">العناصر المطلوبة (${items.length}):</h3>
-              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                ${itemsHtml}
+            <!-- Warning for large orders -->
+            ${totalCount > 35 ? `<div class="p-2 bg-amber-50 text-amber-800 text-[10px] rounded-lg border border-amber-200 font-bold mb-2">⚠️ تنبيه: الطلب كبير جداً (${totalCount} قطع) - تم تفعيل الضغط الأقصى للورقة الواحدة.</div>` : ''}
+
+            <!-- Items Section -->
+            <div class="space-y-2 mb-4">
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-xs text-zinc-900">محتويات الشحنة (${lines.length} بنود):</h3>
+                <span class="text-[10px] text-zinc-400 font-mono">فحص البنود ومطابقتها</span>
               </div>
+              <div id="items-grid" class="slip-items-grid grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[140mm] overflow-hidden">
+                ${linesHtml}
+              </div>
+            </div>
+
+            <!-- Notes if any -->
+            ${order.customer?.notes ? `
+              <div id="customer-notes" class="p-2 rounded-xl bg-amber-50/50 border border-amber-200 text-[10px] text-amber-900 mb-3">
+                <strong>ملاحظات العميل:</strong> ${escapeHtml(order.customer.notes)}
+              </div>
+            ` : ''}
+
+            <!-- Totals & Quality Check Line -->
+            <div class="pt-3 border-t border-zinc-200 flex items-center justify-between text-xs font-mono flex-wrap gap-2">
+              <div class="text-zinc-500 font-sans text-[11px]">
+                توقيع مسؤول التغليف والجودة: _______________________
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="font-sans text-zinc-600">المطلوب تحصيله (COD):</span>
+                <span class="text-base font-extrabold text-[#FF5000]">${order.total} ${CONFIG.CURRENCY}</span>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderShippingLabels(orders, container) {
+      container.innerHTML = orders.map(order => {
+        const rawPhone = (order.customer?.phone || '').replace(/[^0-9]/g, '');
+
+        return `
+          <div class="shipping-label-card max-w-sm mx-auto bg-white border-2 border-black rounded-2xl p-5 text-xs space-y-3 font-mono shadow-sm" data-view="label">
+            <div class="flex items-center justify-between border-b-2 border-black pb-3">
+              <div>
+                <h2 class="font-black text-lg tracking-wider text-black">STICKIFY 21</h2>
+                <p class="text-[10px] text-zinc-600 font-sans">بوليصة شحن وتوصيل سريعة</p>
+              </div>
+              <div class="text-left">
+                <span class="font-bold text-sm block">#${escapeHtml(order.id)}</span>
+                <span class="text-[10px] text-zinc-500">${escapeHtml(new Date(order.date || Date.now()).toLocaleDateString('ar-EG'))}</span>
+              </div>
+            </div>
+
+            <div class="space-y-1 text-black font-sans">
+              <div class="text-sm font-extrabold">المستلم: ${escapeHtml(order.customer?.name || '')}</div>
+              <div class="font-mono font-bold text-[#FF5000]" dir="ltr">هاتف: ${escapeHtml(order.customer?.phone || '')}</div>
+              <div class="font-bold">المحافظة: ${escapeHtml(order.customer?.governorate || order.customer?.city || '')}</div>
+              <div class="text-xs text-zinc-800">العنوان: ${escapeHtml(order.customer?.address || '')}</div>
+            </div>
+
+            <div class="p-3 bg-zinc-100 rounded-xl border border-zinc-300 flex items-center justify-between font-sans">
+              <span class="font-bold text-xs">قيمة التحصيل عند الاستلام:</span>
+              <span class="font-mono text-base font-black text-black">${order.total} ${CONFIG.CURRENCY}</span>
+            </div>
+
+            <!-- Simulated Barcode / QR Block -->
+            <div class="pt-2 border-t border-zinc-200 text-center">
+              <div class="h-8 bg-zinc-900 mx-auto rounded flex items-center justify-center text-white text-[9px] font-mono tracking-widest">
+                ||| | |||| || ||| |||| | ||| || |||
+              </div>
+              <span class="text-[9px] text-zinc-400 font-mono mt-1 block">${escapeHtml(order.id)}</span>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    export function toggleItemCheck(index) {
-      const card = document.getElementById(`item-card-${index}`);
-      if (!card) return;
-
-      if (checkedItems.has(index)) {
-        checkedItems.delete(index);
-        card.classList.remove('checked');
-      } else {
-        checkedItems.add(index);
-        card.classList.add('checked');
-      }
-      updateProgress();
-    }
-
-    function updateProgress() {
-      const count = checkedItems.size;
-      const progressText = document.getElementById('progress-text');
-      const progressBar = document.getElementById('progress-bar');
-      
-      if (progressText) {
-        progressText.innerText = `${count} من ${totalItemsCount} تم تجهيزه`;
-      }
-      if (progressBar && totalItemsCount > 0) {
-        const pct = Math.round((count / totalItemsCount) * 100);
-        progressBar.style.width = pct + '%';
-        if (pct === 100) {
-          progressText.innerText = `اكتمل تجهيز الطلبية بالكامل! (100% جاهز للشحن 🚀)`;
-          progressText.classList.remove('text-[#FF5000]');
-          progressText.classList.add('text-emerald-600');
-        } else {
-          progressText.classList.remove('text-emerald-600');
-          progressText.classList.add('text-[#FF5000]');
-        }
-      }
-    }
-
-    window.toggleItemCheck = toggleItemCheck;
+    window.setSlipViewMode = setSlipViewMode;
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', initSlip);
     } else {

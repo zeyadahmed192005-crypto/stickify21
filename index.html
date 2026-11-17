@@ -801,6 +801,11 @@
           <p id="order-notes-error" class="text-red-500 text-[11px] font-semibold mt-1 hidden"></p>
         </div>
 
+        <!-- Checkout Items Summary (R1: Pack contents & singles) -->
+        <div id="checkout-items-summary" class="p-3 bg-zinc-50 rounded-xl border border-zinc-200/80 text-xs space-y-2 max-h-48 overflow-y-auto">
+          <!-- Injected via JS -->
+        </div>
+
         <!-- Checkout Pricing Summary in Modal -->
         <div id="checkout-pricing-preview" class="p-3 bg-zinc-50 rounded-xl border border-zinc-200/80 text-xs font-mono space-y-1">
           <!-- Injected via JS -->
@@ -832,14 +837,24 @@
           الحالة: بانتظار التأكيد (Awaiting Confirmation)
         </span>
         <h3 class="font-extrabold text-xl text-zinc-900">تم تسجيل طلبك بنجاح!</h3>
-        <p class="text-xs text-zinc-500 mt-1">كود الطلب غير القابل للتكرار:</p>
-        <p id="confirmed-order-id" class="text-lg font-mono font-black text-[#FF5000] tracking-wider mt-1 select-all">S21-XXXXXX-XXXX</p>
+        <p class="text-xs text-zinc-500 mt-1">رقم الطلب الخاص بك:</p>
+        <div class="flex items-center justify-center gap-2 mt-1">
+          <p id="confirmed-order-id" class="text-xl font-mono font-black text-[#FF5000] tracking-wider select-all">S21-XXXXXX-XXXX</p>
+          <button id="copy-order-id-btn" type="button" class="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition flex items-center gap-1" title="نسخ رقم الطلب">
+            <span>📋 نسخ</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Order Summary Card (A2) -->
+      <div id="confirmed-order-summary" class="p-3.5 bg-zinc-50 rounded-2xl border border-zinc-200 text-xs text-zinc-700 text-right space-y-1.5 font-mono">
+        <!-- Injected via JS -->
       </div>
 
       <div class="p-4 bg-zinc-50 rounded-2xl border border-zinc-200 text-xs text-zinc-600 text-right space-y-2 leading-relaxed">
         <p class="font-semibold text-zinc-900">ما هي الخطوة القادمة؟</p>
-        <p>1. فتح رابط واتساب ليس دليلاً على تأكيد الطلب، بل خطوة لإيصال تفاصيل طلبك لإدارة المتجر.</p>
-        <p>2. إذا لم يفتح واتساب تلقائياً بسبب حظر النوافذ المنبثقة، استخدم الأزرار أدناه لإعادة الفتح أو نسخ الرسالة.</p>
+        <p>1. فتح رابط واتساب يرسل تفاصيل طلبك لإدارة المتجر لبدء المراجعة والتجهيز.</p>
+        <p>2. إذا لم يفتح واتساب تلقائياً، اضغط على زر إعادة الفتح أدناه أو انسخ الرسالة.</p>
       </div>
 
       <div class="space-y-2">
@@ -848,7 +863,11 @@
           <span>💬</span>
         </button>
 
-        <button id="copy-order-msg-btn" class="w-full py-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs flex items-center justify-center gap-2 transition">
+        <a id="track-confirmed-order-btn" href="#/track" class="w-full py-2.5 rounded-2xl bg-zinc-900 hover:bg-black text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm">
+          <span>تتبع مسار طلبك الآن 📍</span>
+        </a>
+
+        <button id="copy-order-msg-btn" class="w-full py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs flex items-center justify-center gap-2 transition">
           <span id="copy-btn-text">نسخ نص رسالة الطلب يدوياً</span>
           <span>📋</span>
         </button>

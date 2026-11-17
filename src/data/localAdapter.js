@@ -160,9 +160,11 @@ export const LocalAdapter = {
    * Initialize and seed storage on first run
    */
   async init() {
-    const existingVersion = localStorage.getItem(STORAGE_KEYS.SCHEMA);
-    if (!existingVersion) {
-      // First run: Seed demo data
+    let existingVersion = localStorage.getItem(STORAGE_KEYS.SCHEMA);
+    const hasExistingData = localStorage.getItem(STORAGE_KEYS.PRODUCTS) !== null || localStorage.getItem(STORAGE_KEYS.ORDERS) !== null;
+
+    if (!existingVersion && !hasExistingData) {
+      // True First run on empty client: Seed demo data
       safeSave(STORAGE_KEYS.SCHEMA, CURRENT_SCHEMA_VERSION);
       safeSave(STORAGE_KEYS.PRODUCTS, SEED_PRODUCTS);
       safeSave(STORAGE_KEYS.CATEGORIES, SEED_CATEGORIES);
@@ -174,6 +176,11 @@ export const LocalAdapter = {
         freeShippingThreshold: CONFIG.FREE_SHIPPING_THRESHOLD
       });
       return;
+    }
+
+    // If existing data was unversioned, treat as 0.0.0 (F-01 fix: never overwrite existing data with seeds)
+    if (!existingVersion && hasExistingData) {
+      existingVersion = '0.0.0';
     }
 
     // Run migrations if version outdated
@@ -236,6 +243,9 @@ export const LocalAdapter = {
     }
     safeSave(STORAGE_KEYS.ORDERS, orders);
     return order;
+  },
+  async updateOrder(order) {
+    return this.createOrder(order);
   },
   async updateOrderStatus(orderId, newStatus, note = '') {
     const orders = await this.getOrders();

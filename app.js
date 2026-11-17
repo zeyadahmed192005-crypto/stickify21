@@ -1232,6 +1232,44 @@ export function handleCheckoutCityChange(city) {
 
 export function updateCheckoutPricingPreview() {
   const container = document.getElementById('checkout-pricing-preview');
+  const itemsContainer = document.getElementById('checkout-items-summary');
+
+  if (itemsContainer) {
+    itemsContainer.innerHTML = state.cart.map((item, idx) => {
+      if (item.type === 'pack') {
+        const subListHtml = (item.items || []).map(sub => `
+          <div class="flex items-center gap-2 p-1.5 bg-white rounded-lg border border-zinc-100 text-[11px]">
+            <span class="font-mono font-bold text-zinc-900">#${escapeHtml(sub.sku || 'S21')}</span>
+            <span class="text-zinc-700 truncate font-semibold">${escapeHtml(sub.nameAr || sub.name || '')}</span>
+            <span class="text-zinc-400 font-mono text-[10px] mr-auto">(${escapeHtml(sub.sizeKey || '8 سم')} - ${escapeHtml(sub.finish || 'مطفي')})</span>
+          </div>
+        `).join('');
+
+        return `
+          <div class="p-2.5 rounded-xl bg-orange-50/60 border border-orange-200/80 space-y-1.5">
+            <div class="flex items-center justify-between font-bold text-xs">
+              <span class="text-[#FF5000]">🎁 ${escapeHtml(item.nameAr || 'باقة استيكرات')} (الكمية: ${item.quantity || 1})</span>
+              <span class="font-mono">${item.price * (item.quantity || 1)} ${CONFIG.CURRENCY}</span>
+            </div>
+            <div class="space-y-1 pr-2 border-r-2 border-[#FF5000]/40">
+              ${subListHtml}
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-zinc-200/80 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="font-mono font-bold bg-zinc-100 px-1.5 py-0.5 rounded text-[10px]">#${escapeHtml(item.sku || 'S21')}</span>
+            <span class="font-bold text-zinc-900">${escapeHtml(item.nameAr || item.name)}</span>
+            <span class="text-zinc-400 font-mono text-[10px]">(${escapeHtml(item.type === 'bookmark' ? 'بوك مارك' : (item.size || '8 سم'))})</span>
+          </div>
+          <span class="font-mono font-bold">${item.price * (item.quantity || 1)} ${CONFIG.CURRENCY}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
   if (!container) return;
 
   const calc = calculateCart({
@@ -1343,6 +1381,40 @@ export async function submitOrder(e) {
       ? 'فودافون كاش (01043546503)' 
       : (paymentRadio === 'instapay' ? 'InstaPay (stickify21@instapay)' : 'عند الاستلام (COD)');
 
+    const structuredLines = state.cart.map(item => {
+      if (item.type === 'pack') {
+        const pSize = item.packSize || (item.items ? item.items.length : 5);
+        const dRate = item.discountRate || (pSize === 10 ? 0.3 : 0.2);
+        return {
+          type: 'pack',
+          size: pSize,
+          discountRate: dRate,
+          packPrice: item.price * (item.quantity || 1),
+          quantity: item.quantity || 1,
+          items: (item.items || []).map(p => ({
+            sku: p.sku || 'S21',
+            name: p.nameAr || p.name || 'استيكر',
+            sizeKey: p.sizeKey || 'medium',
+            finish: p.finish || 'matte',
+            unitPrice: p.price || 35,
+            image: p.image || ''
+          }))
+        };
+      }
+      return {
+        type: item.type === 'bookmark' ? 'bookmark' : 'single',
+        sku: item.sku || 'S21',
+        name: item.nameAr || item.name || '',
+        sizeKey: item.sizeKey || 'medium',
+        size: item.size || '8 سم',
+        finish: item.finish || 'matte',
+        unitPrice: item.price,
+        quantity: item.quantity || 1,
+        total: item.price * (item.quantity || 1),
+        image: item.image || ''
+      };
+    });
+
     const order = {
       id: orderId,
       idempotencyKey,
@@ -1363,6 +1435,10 @@ export async function submitOrder(e) {
       shippingCost: calc.shipping,
       total: calc.total,
       couponCode: state.coupon.code || null,
+      courier: null,
+      trackingNumber: null,
+      paymentVerified: false,
+      lines: structuredLines,
       items: state.cart.map(item => ({
         id: item.id,
         productId: item.productId,
@@ -1433,8 +1509,52 @@ export function openConfirmationModal(order, whatsappUrl, whatsappMsg) {
   const reopenBtn = document.getElementById('reopen-whatsapp-btn');
   const copyBtn = document.getElementById('copy-order-msg-btn');
   const copyBtnText = document.getElementById('copy-btn-text');
+  const copyIdBtn = document.getElementById('copy-order-id-btn');
+  const summaryEl = document.getElementById('confirmed-order-summary');
+  const trackBtn = document.getElementById('track-confirmed-order-btn');
 
   if (idEl) idEl.textContent = order.id;
+
+  if (copyIdBtn) {
+    copyIdBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(order.id);
+        showToast(`تم نسخ رقم الطلب #${order.id} بنجاح!`);
+      } catch (e) {
+        showToast('تعذر النسخ التلقائي لرقم الطلب', 'warning');
+      }
+    };
+  }
+
+  if (summaryEl) {
+    const linesCount = (order.lines || order.items || []).length;
+    summaryEl.innerHTML = `
+      <div class="flex justify-between text-zinc-900 font-bold border-b border-zinc-200 pb-1.5 mb-1.5">
+        <span>الإجمالي المستحق:</span>
+        <span class="text-[#FF5000] text-sm">${order.total} ${CONFIG.CURRENCY}</span>
+      </div>
+      <div class="flex justify-between text-zinc-600">
+        <span>عدد البنود:</span>
+        <span class="text-zinc-900 font-bold">${linesCount} بنود</span>
+      </div>
+      <div class="flex justify-between text-zinc-600">
+        <span>طريقة الدفع:</span>
+        <span class="text-zinc-900">${escapeHtml(order.payment)}</span>
+      </div>
+      <div class="flex justify-between text-zinc-600">
+        <span>عنوان التوصيل:</span>
+        <span class="text-zinc-900 truncate max-w-[200px]">${escapeHtml(order.customer?.city || order.customer?.governorate || '')} - ${escapeHtml(order.customer?.address || '')}</span>
+      </div>
+    `;
+  }
+
+  if (trackBtn) {
+    trackBtn.href = `#/track/${encodeURIComponent(order.id)}`;
+    trackBtn.onclick = () => {
+      closeConfirmationModal();
+      window.location.hash = `#/track/${encodeURIComponent(order.id)}`;
+    };
+  }
 
   if (reopenBtn) {
     reopenBtn.onclick = () => {

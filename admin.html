@@ -122,7 +122,7 @@
             <span>المتجر</span>
             <span>↗</span>
           </a>
-          <button onclick="lockAdmin()" class="p-2 rounded-xl hover:bg-zinc-100 text-zinc-400 hover:text-red-500 transition" title="قفل اللوحة">
+          <button onclick="lockAdmin()" id="admin-logout-btn" class="p-2 rounded-xl hover:bg-zinc-100 text-zinc-400 hover:text-red-500 transition" title="قفل اللوحة">
             🔒
           </button>
         </div>
@@ -562,6 +562,28 @@
               </div>
             </div>
 
+            <!-- Change Passcode (R11) -->
+            <div class="pt-6 border-t border-zinc-100 space-y-3">
+              <div>
+                <h4 class="text-sm font-extrabold text-zinc-900">أمان لوحة التحكم (رمز الدخول PIN)</h4>
+                <p class="text-[11px] text-zinc-500 mt-0.5">تغيير رمز الدخول لحماية لوحة الإدارة عبر جلسات المتصفح</p>
+              </div>
+
+              <form onsubmit="handleChangePasscode(event)" class="space-y-3 text-xs">
+                <div>
+                  <label class="block font-bold text-zinc-700 mb-1">رمز الدخول الحالي *</label>
+                  <input type="password" id="change-old-passcode" required placeholder="رمز الدخول الحالي" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 font-mono text-zinc-900 focus:outline-none focus:border-zinc-900">
+                </div>
+                <div>
+                  <label class="block font-bold text-zinc-700 mb-1">رمز الدخول الجديد *</label>
+                  <input type="password" id="change-new-passcode" required minlength="4" placeholder="الرمز الجديد (4 أرقام أو حروف على الأقل)" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 font-mono text-zinc-900 focus:outline-none focus:border-zinc-900">
+                </div>
+                <button type="submit" id="change-passcode-btn" class="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-black text-white font-bold text-xs transition shadow-sm">
+                  تحديث رمز الدخول
+                </button>
+              </form>
+            </div>
+
           </div>
 
           <!-- Governorates Shipping Rates Editor -->
@@ -850,6 +872,7 @@
           <select id="modal-status-select" onchange="handleModalStatusChange(this.value)" class="bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 font-bold text-xs text-zinc-900 focus:outline-none focus:border-[#FF5000]">
             <!-- Valid options only -->
           </select>
+          <div id="modal-quick-step-container"></div>
         </div>
 
         <div class="flex items-center gap-2">
@@ -863,6 +886,71 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: SHIPPING DISPATCH & TRACKING (R2, A3)-->
+  <!-- ========================================== -->
+  <div id="shipping-dispatch-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div onclick="closeShippingDispatchModal()" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+    <div class="relative bg-white rounded-3xl border border-zinc-200 p-6 sm:p-8 max-w-md w-full shadow-2xl z-10 space-y-4 text-xs">
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🚚</span>
+          <div>
+            <h3 class="font-extrabold text-base text-zinc-900">تأكيد شحن الطلب</h3>
+            <p id="ship-modal-order-subtitle" class="text-zinc-400 font-mono text-[11px]">#S21-ORD</p>
+          </div>
+        </div>
+        <button onclick="closeShippingDispatchModal()" class="text-zinc-400 hover:text-black font-bold">✕</button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block font-bold text-zinc-700 mb-1">شركة الشحن أو المندوب *</label>
+          <select id="ship-courier-select" onchange="toggleCustomCourierInput(this.value)" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 font-bold text-zinc-900 focus:outline-none focus:border-zinc-900">
+            <option value="بوسطة (Bosta)">بوسطة (Bosta)</option>
+            <option value="أرامكس (Aramex)">أرامكس (Aramex)</option>
+            <option value="مندوب خاص (Private Courier)">مندوب خاص (Private Courier)</option>
+            <option value="other">شركة أخرى / اسم مخصص...</option>
+          </select>
+          <input type="text" id="ship-courier-custom" placeholder="اكتب اسم شركة الشحن أو المندوب..." class="w-full mt-2 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 hidden text-zinc-900 focus:outline-none focus:border-zinc-900">
+        </div>
+
+        <div>
+          <label class="block font-bold text-zinc-700 mb-1">رقم البوليصة أو التتبع (اختياري)</label>
+          <input type="text" id="ship-tracking-input" placeholder="مثال: BOSTA-12345678" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 py-2 font-mono text-zinc-900 focus:outline-none focus:border-zinc-900">
+          <span class="text-[10px] text-zinc-400 mt-1 block">سيظهر هذا الرقم للعميل في رسالة الواتساب وصفحة التتبع.</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-2 pt-2">
+        <button id="confirm-ship-btn" onclick="confirmShippingDispatch()" class="w-full py-3 rounded-2xl bg-zinc-900 hover:bg-black text-white font-bold text-xs transition shadow-sm">
+          تأكيد الشحن وتحديث الحالة إلى "تم الشحن"
+        </button>
+
+        <a id="ship-whatsapp-link" href="#" target="_blank" class="w-full py-3 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm hidden">
+          <span>فتح واتساب برسالة للعميل</span>
+          <span>💬</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Undo Toast (10-second countdown) -->
+  <div id="status-undo-toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden bg-zinc-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-zinc-700 flex items-center gap-4 text-xs font-bold">
+    <div class="flex items-center gap-2">
+      <span class="text-[#FF5000]">●</span>
+      <span id="status-undo-text">تم تحديث الحالة بنجاح.</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="handleUndoStatusChange()" class="px-3 py-1 bg-white text-zinc-900 rounded-xl hover:bg-zinc-100 transition shadow-sm">
+        تراجع (<span id="status-undo-timer">10</span> ث)
+      </button>
+      <button onclick="dismissStatusUndoToast()" class="text-zinc-400 hover:text-white text-sm">✕</button>
     </div>
   </div>
 

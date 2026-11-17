@@ -55,19 +55,69 @@ export function applyStatusTransition(order, targetStatus, note = '') {
 }
 
 /**
+ * Normalize an order object to ensure a canonical composite lines[] structure (R1)
+ * @param {Object} order
+ * @returns {Array<Object>} Canonical lines
+ */
+export function normalizeOrderLines(order) {
+  if (!order) return [];
+  if (Array.isArray(order.lines) && order.lines.length > 0) {
+    return order.lines;
+  }
+  if (Array.isArray(order.items)) {
+    return order.items.map(it => {
+      if (it.type === 'pack') {
+        return {
+          type: 'pack',
+          size: it.packSize || it.size || (it.items ? it.items.length : 5),
+          discountRate: it.discountRate || (it.packSize === 10 ? 0.3 : 0.2),
+          packPrice: it.price || it.packPrice || 0,
+          items: (it.items || []).map(p => ({
+            sku: p.sku || 'S21',
+            name: p.name || p.nameAr || '',
+            sizeKey: p.sizeKey || 'medium',
+            finish: p.finish || 'matte',
+            unitPrice: p.unitPrice || p.price || 35,
+            image: p.image || ''
+          }))
+        };
+      }
+      return {
+        type: it.type === 'bookmark' ? 'bookmark' : 'single',
+        sku: it.sku || 'S21',
+        name: it.name || it.nameAr || '',
+        sizeKey: it.sizeKey || 'medium',
+        finish: it.finish || 'matte',
+        unitPrice: it.price || 35,
+        quantity: it.quantity || it.qty || 1,
+        total: (it.price || 35) * (it.quantity || it.qty || 1),
+        image: it.image || ''
+      };
+    });
+  }
+  return [];
+}
+
+/**
  * Format order details into Egyptian WhatsApp message with appended Order Code
  * @param {Object} order
  * @param {string} orderCode - Base64url order code
  * @returns {string} Text ready for WhatsApp URL encoding
  */
 export function formatOrderWhatsAppMessage(order, orderCode) {
-  const c = order.customer;
-  const itemsText = (order.items || []).map((it, idx) => {
-    if (it.type === 'pack') {
-      const subItemsNames = (it.items || []).map(p => `#${p.sku || p.id}`).join(', ');
-      return `${idx + 1}. *${it.nameAr || 'باقة استيكرات'}* (الكمية: ${it.quantity}) - ${it.price * it.quantity} ج.م\n   المحتويات: [${subItemsNames}]`;
+  const c = order.customer || {};
+  const lines = normalizeOrderLines(order);
+
+  const itemsText = lines.map((line, idx) => {
+    if (line.type === 'pack') {
+      const discountPct = Math.round((line.discountRate || 0.2) * 100);
+      const subList = (line.items || []).map((sub, sIdx) => 
+        `   ${sIdx + 1}. [${sub.sku || 'S21'}] ${sub.name || 'استيكر'} (${sub.sizeKey || '8 سم'}, ${sub.finish || 'مطفي'})`
+      ).join('\n');
+      return `${idx + 1}. *باقة ${line.size} استيكرات (-${discountPct}%)* - ${line.packPrice} ج.م\n   محتويات الباقة:\n${subList}`;
     }
-    return `${idx + 1}. *${it.nameAr || it.name}* (مقاس: ${it.size || '8 سم'}, الكمية: ${it.quantity}) - ${it.price * it.quantity} ج.م`;
+    const sizeStr = line.type === 'bookmark' ? 'بوك مارك' : (line.size || line.sizeKey || '8 سم');
+    return `${idx + 1}. *${line.name || 'منتج'}* [${line.sku || 'S21'}] (مقاس: ${sizeStr}, الكمية: ${line.quantity || 1}) - ${line.total || (line.unitPrice * (line.quantity || 1))} ج.م`;
   }).join('\n');
 
   let couponLine = '';

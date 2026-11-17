@@ -6,12 +6,14 @@
 import { CONFIG } from './src/config/config.js';
 import { escapeHtml, sanitizeUrl, sanitizeSvg } from './src/utils/escape.js';
 import { parseOrderCode } from './src/utils/ids.js';
-import { ORDER_STATUSES, isValidStatusTransition } from './src/domain/orders.js';
+import { ORDER_STATUSES, isValidStatusTransition, normalizeOrderLines } from './src/domain/orders.js';
 import { 
   verifyAdminPasscode, 
   isAdminAuthenticated, 
   adminLogout, 
-  getRateLimitStatus 
+  getRateLimitStatus,
+  changeAdminPasscode,
+  setupAuthSync
 } from './src/domain/auth.js';
 import { storage } from './src/data/storage.js';
 
@@ -153,6 +155,14 @@ function setupInactivityMonitor() {
 }
 
 function setupCrossTabSync() {
+  setupAuthSync(() => {
+    if (adminState.authenticated) {
+      adminState.authenticated = false;
+      showLockScreen();
+      showAdminToast('تم تسجيل الخروج من جلسة الإدارة في علامة تبويب أخرى', 'warning');
+    }
+  });
+
   window.addEventListener('storage', async (e) => {
     if (e.key && e.key.startsWith('stickify21_')) {
       if (adminState.authenticated) {
@@ -316,12 +326,13 @@ export function renderOrders() {
     return;
   }
 
-  // Canonical status keys and display mapping
+  // Canonical status keys and display mapping (R2: includes ready)
   const statuses = [
     { key: 'pending', label: 'جديد' },
     { key: 'awaiting_confirmation', label: 'بانتظار التأكيد' },
     { key: 'confirmed', label: 'مؤكد' },
     { key: 'preparing', label: 'قيد التجهيز' },
+    { key: 'ready', label: 'تم التجهيز' },
     { key: 'shipped', label: 'تم الشحن' },
     { key: 'completed', label: 'مكتمل' },
     { key: 'cancelled', label: 'ملغي' }
@@ -333,6 +344,48 @@ export function renderOrders() {
     const statusObj = ORDER_STATUSES[currentKey] || ORDER_STATUSES.pending;
     const badgeClass = statusObj.badgeClass || 'bg-zinc-100 text-zinc-800 border-zinc-200';
     const isChecked = adminState.selectedOrderIds.has(order.id);
+
+    // Primary Next Step Button (R2)
+    const nextStep = getNextLogicalStep(currentKey);
+    const quickBtnHtml = nextStep ? `
+      <button onclick="handleQuickNextStep('${escapeHtml(order.id)}', '${nextStep.target}')" class="quick-next-step-btn px-3 py-1.5 rounded-xl ${nextStep.btnClass} text-xs font-bold transition flex items-center gap-1 shadow-sm">
+        <span>${nextStep.label}</span>
+      </button>
+    ` : '';
+
+    // Pack Contents Expandable Row (R1)
+    const lines = normalizeOrderLines(order);
+    const packLines = lines.filter(l => l.type === 'pack');
+    let packsExpandHtml = '';
+    if (packLines.length > 0) {
+      packsExpandHtml = `
+        <div class="mt-2.5 pt-2 border-t border-zinc-200/60">
+          <button onclick="toggleOrderPacksExpand('${escapeHtml(order.id)}')" class="text-[11px] font-bold text-[#FF5000] hover:underline flex items-center gap-1">
+            <span>📦 محتويات باقات الطلب (${packLines.length} باقة)</span>
+            <span id="pack-arrow-${escapeHtml(order.id)}">▼</span>
+          </button>
+          <div id="order-packs-expand-${escapeHtml(order.id)}" class="mt-2 space-y-2 hidden">
+            ${packLines.map(pack => `
+              <div class="bg-white p-2.5 rounded-xl border border-orange-200/80 text-[11px] space-y-1.5">
+                <div class="flex items-center justify-between font-bold text-zinc-900">
+                  <span class="text-[#FF5000]">باقة ${pack.size} استيكرات (${Math.round((pack.discountRate || 0.2) * 100)}% خصم)</span>
+                  <span class="font-mono text-zinc-900">${pack.packPrice} ${CONFIG.CURRENCY}</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5">
+                  ${(pack.items || []).map(sub => `
+                    <div class="flex items-center gap-2 p-1.5 bg-zinc-50 rounded-lg border border-zinc-100 text-[10.5px]">
+                      <span class="font-mono font-bold text-zinc-800">#${escapeHtml(sub.sku || 'S21')}</span>
+                      <span class="text-zinc-900 truncate font-semibold">${escapeHtml(sub.name || '')}</span>
+                      <span class="text-zinc-400 font-mono text-[9.5px] mr-auto">(${escapeHtml(sub.sizeKey || '8 سم')})</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
 
     return `
       <div class="bg-zinc-50 hover:bg-white rounded-2xl border border-zinc-200 p-4 transition-all duration-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${isChecked ? 'ring-2 ring-[#FF5000] bg-orange-50/20' : ''}">
@@ -347,9 +400,10 @@ export function renderOrders() {
             <div class="flex items-center gap-2.5 flex-wrap">
               <span class="font-mono font-black text-sm text-[#FF5000]">#${escapeHtml(order.id || 'S21-ORD')}</span>
               <span class="text-xs text-zinc-400 font-mono">${escapeHtml(new Date(order.date || Date.now()).toLocaleDateString('ar-EG'))}</span>
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}">
+              <span class="order-status-badge px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}">
                 ${escapeHtml(statusObj.labelAr)}
               </span>
+              ${order.courier ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">🚚 ${escapeHtml(order.courier)} ${order.trackingNumber ? `(${escapeHtml(order.trackingNumber)})` : ''}</span>` : ''}
               ${order.source === 'whatsapp_import' ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">WHATSAPP CODE</span>' : ''}
             </div>
 
@@ -364,24 +418,28 @@ export function renderOrders() {
             </div>
 
             <div class="text-xs text-zinc-500 flex items-center gap-2 flex-wrap">
-              <span>عدد العناصر: <strong class="text-zinc-900 font-mono">${order.items?.length || 0}</strong></span>
+              <span>عدد البنود: <strong class="text-zinc-900 font-mono">${lines.length}</strong></span>
               <span>•</span>
               <span>طريقة الدفع: <strong class="text-zinc-900">${escapeHtml(order.payment || 'عند الاستلام')}</strong></span>
               <span>•</span>
               <span>الإجمالي: <strong class="text-[#FF5000] font-mono text-sm">${order.total} ${CONFIG.CURRENCY}</strong></span>
               ${order.couponCode ? `<span>•</span><span class="text-emerald-600 font-mono font-bold">كوبون: ${escapeHtml(order.couponCode)}</span>` : ''}
             </div>
+
+            ${packsExpandHtml}
           </div>
         </div>
 
         <!-- Action Controls -->
         <div class="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap pt-2 md:pt-0 border-t md:border-t-0 border-zinc-200 flex-shrink-0">
+          ${quickBtnHtml}
+
           <button onclick="openOrderDetailModal('${escapeHtml(order.id)}')" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition flex items-center gap-1">
             <span>👁️ عرض التفاصيل</span>
           </button>
 
           <a href="${packingSlipUrl}" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition flex items-center gap-1 shadow-sm">
-            <span>🖼️ تجهيز بالصور</span>
+            <span>🖼️ إذن التجهيز</span>
             <span>↗</span>
           </a>
 
@@ -416,6 +474,7 @@ function normalizeStatusKey(st) {
   if (k === 'بانتظار التأكيد') return 'awaiting_confirmation';
   if (k === 'مؤكد') return 'confirmed';
   if (k === 'قيد التجهيز') return 'preparing';
+  if (k === 'تم التجهيز') return 'ready';
   if (k === 'تم الشحن') return 'shipped';
   if (k === 'مكتمل') return 'completed';
   if (k === 'ملغي') return 'cancelled';
@@ -677,6 +736,273 @@ export async function clearAllOrders() {
 }
 
 // ==========================================
+// QUICK STATUS LOGIC & 10s UNDO (R2)
+// ==========================================
+let undoState = {
+  active: false,
+  orderId: null,
+  previousStatus: null,
+  countdownInterval: null,
+  secondsLeft: 10
+};
+
+let currentShippingOrderId = null;
+
+export function getNextLogicalStep(currentKey) {
+  const normKey = normalizeStatusKey(currentKey);
+  switch (normKey) {
+    case 'pending':
+    case 'awaiting_confirmation':
+      return {
+        target: 'confirmed',
+        label: 'تأكيد الطلب ✓',
+        btnClass: 'bg-blue-600 hover:bg-blue-700 text-white'
+      };
+    case 'confirmed':
+      return {
+        target: 'preparing',
+        label: 'بدء التجهيز ⚙️',
+        btnClass: 'bg-purple-600 hover:bg-purple-700 text-white'
+      };
+    case 'preparing':
+      return {
+        target: 'ready',
+        label: 'تم التجهيز 📦',
+        btnClass: 'bg-teal-600 hover:bg-teal-700 text-white'
+      };
+    case 'ready':
+      return {
+        target: 'shipped',
+        label: 'تم الشحن 🚚',
+        btnClass: 'bg-indigo-600 hover:bg-indigo-700 text-white'
+      };
+    case 'shipped':
+      return {
+        target: 'completed',
+        label: 'تم التسليم ✓',
+        btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white'
+      };
+    default:
+      return null;
+  }
+}
+
+export function startStatusUndoToast(orderId, previousStatus, newStatusLabel) {
+  dismissStatusUndoToast();
+  undoState.active = true;
+  undoState.orderId = orderId;
+  undoState.previousStatus = previousStatus;
+  undoState.secondsLeft = 10;
+
+  const toast = document.getElementById('status-undo-toast');
+  const textEl = document.getElementById('status-undo-text');
+  const timerEl = document.getElementById('status-undo-timer');
+  if (toast && textEl && timerEl) {
+    textEl.textContent = `تم تحديث الحالة إلى "${newStatusLabel}"`;
+    timerEl.textContent = '10';
+    toast.classList.remove('hidden');
+
+    undoState.countdownInterval = setInterval(() => {
+      undoState.secondsLeft--;
+      if (timerEl) timerEl.textContent = String(undoState.secondsLeft);
+      if (undoState.secondsLeft <= 0) {
+        dismissStatusUndoToast();
+      }
+    }, 1000);
+  }
+}
+
+export function dismissStatusUndoToast() {
+  if (undoState.countdownInterval) {
+    clearInterval(undoState.countdownInterval);
+    undoState.countdownInterval = null;
+  }
+  undoState.active = false;
+  undoState.orderId = null;
+  undoState.previousStatus = null;
+  const toast = document.getElementById('status-undo-toast');
+  if (toast) toast.classList.add('hidden');
+}
+
+export async function handleUndoStatusChange() {
+  if (!undoState.active || !undoState.orderId || !undoState.previousStatus) return;
+  const { orderId, previousStatus } = undoState;
+  dismissStatusUndoToast();
+
+  const order = adminState.orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  await storage.updateOrderStatus(orderId, previousStatus, 'تراجع المشرف عن تغيير الحالة');
+  await loadData();
+  const stObj = ORDER_STATUSES[previousStatus];
+  showAdminToast(`تم التراجع عن التغيير، عادت الحالة إلى "${stObj?.labelAr || previousStatus}"`);
+}
+
+export async function handleQuickNextStep(orderId, targetStatus) {
+  if (targetStatus === 'shipped') {
+    openShippingDispatchModal(orderId);
+    return;
+  }
+
+  const order = adminState.orders.find(o => o.id === orderId);
+  if (!order) return;
+  const prevStatus = normalizeStatusKey(order.status);
+
+  // Validate transition
+  if (!isValidStatusTransition(prevStatus, targetStatus)) {
+    showAdminToast(`لا يمكن الانتقال من "${prevStatus}" إلى "${targetStatus}" مباشرة`, 'error');
+    return;
+  }
+
+  // Warn if unpaid instapay/vodafone cash (R2/R12)
+  const isOnlinePayment = order.paymentMethod === 'instapay' || order.paymentMethod === 'vodafone_cash' || (typeof order.payment === 'string' && (order.payment.includes('InstaPay') || order.payment.includes('فودافون')));
+  if (isOnlinePayment && !order.paymentVerified) {
+    showAdminToast('تنبيه: لم يتم تأكيد استلام التحويل (إنستاباي/فودافون كاش) لهذا الطلب بعد!', 'warning');
+  }
+
+  await storage.updateOrderStatus(orderId, targetStatus, `تحديث سريع للحالة إلى ${targetStatus}`);
+  await loadData();
+
+  const statusObj = ORDER_STATUSES[targetStatus];
+  const label = statusObj ? statusObj.labelAr : targetStatus;
+  startStatusUndoToast(orderId, prevStatus, label);
+}
+
+// ==========================================
+// SHIPPING DISPATCH MODAL (R2, A3)
+// ==========================================
+export function openShippingDispatchModal(orderId) {
+  currentShippingOrderId = orderId;
+  const modal = document.getElementById('shipping-dispatch-modal');
+  const subtitle = document.getElementById('ship-modal-order-subtitle');
+  const trackingInput = document.getElementById('ship-tracking-input');
+  const courierSelect = document.getElementById('ship-courier-select');
+  const customInput = document.getElementById('ship-courier-custom');
+  const waLink = document.getElementById('ship-whatsapp-link');
+
+  const order = adminState.orders.find(o => o.id === orderId);
+  if (subtitle && order) {
+    subtitle.textContent = `${order.id} - ${order.customer?.name || ''}`;
+  }
+  if (trackingInput) {
+    trackingInput.value = order?.trackingNumber || '';
+  }
+  if (courierSelect) {
+    courierSelect.value = order?.courier || 'بوسطة (Bosta)';
+  }
+  if (customInput) {
+    customInput.value = '';
+    customInput.classList.add('hidden');
+  }
+  if (waLink) {
+    waLink.classList.add('hidden');
+  }
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+export function closeShippingDispatchModal() {
+  currentShippingOrderId = null;
+  const modal = document.getElementById('shipping-dispatch-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+export function toggleCustomCourierInput(val) {
+  const customInput = document.getElementById('ship-courier-custom');
+  if (!customInput) return;
+  if (val === 'other') {
+    customInput.classList.remove('hidden');
+    customInput.focus();
+  } else {
+    customInput.classList.add('hidden');
+  }
+}
+
+export async function confirmShippingDispatch() {
+  if (!currentShippingOrderId) return;
+  const order = adminState.orders.find(o => o.id === currentShippingOrderId);
+  if (!order) return;
+
+  const courierSelect = document.getElementById('ship-courier-select');
+  const customInput = document.getElementById('ship-courier-custom');
+  const trackingInput = document.getElementById('ship-tracking-input');
+
+  let courier = courierSelect ? courierSelect.value : 'مندوب خاص';
+  if (courier === 'other' && customInput && customInput.value.trim()) {
+    courier = customInput.value.trim();
+  }
+  const trackingNumber = trackingInput ? trackingInput.value.trim() : '';
+
+  const prevStatus = normalizeStatusKey(order.status);
+  
+  order.courier = courier;
+  order.trackingNumber = trackingNumber;
+  await storage.updateOrder(order);
+  await storage.updateOrderStatus(order.id, 'shipped', `تم الشحن عبر ${courier}${trackingNumber ? ' برقم تتبع ' + trackingNumber : ''}`);
+  await loadData();
+
+  // Prepare customer WhatsApp message
+  const customerPhone = (order.customer?.phone || '').replace(/\D/g, '');
+  const waPhone = customerPhone.startsWith('0') ? '2' + customerPhone : (customerPhone.startsWith('2') ? customerPhone : '20' + customerPhone);
+  
+  const waMsg = `مرحباً ${order.customer?.name || 'عميلنا العزيز'} 👋\nتم شحن طلبك من STICKIFY 21 بنجاح! 🚚\n\nرقم الطلب: ${order.id}\nشركة الشحن: ${courier}\n${trackingNumber ? `رقم التتبع / البوليصة: ${trackingNumber}\n` : ''}المبلغ المطلوب: ${order.total} ${CONFIG.CURRENCY}\n\nيمكنك متابعة حالة الطلب من الرابط التالي:\n${window.location.origin}/track.html?id=${encodeURIComponent(order.id)}\n\nشكراً لتسوقك معنا! ❤️`;
+  
+  const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
+  const waLink = document.getElementById('ship-whatsapp-link');
+  if (waLink) {
+    waLink.href = waUrl;
+    waLink.classList.remove('hidden');
+  }
+
+  showAdminToast(`تم تحديث الطلب إلى "تم الشحن" بنجاح! 🚚`);
+  startStatusUndoToast(order.id, prevStatus, 'تم الشحن');
+}
+
+// ==========================================
+// PACK CONTENTS EXPAND & PASSCODE (R1, R11)
+// ==========================================
+export function toggleOrderPacksExpand(orderId) {
+  const expandEl = document.getElementById(`order-packs-expand-${orderId}`);
+  const arrowEl = document.getElementById(`pack-arrow-${orderId}`);
+  if (!expandEl) return;
+  if (expandEl.classList.contains('hidden')) {
+    expandEl.classList.remove('hidden');
+    if (arrowEl) arrowEl.textContent = '▲';
+  } else {
+    expandEl.classList.add('hidden');
+    if (arrowEl) arrowEl.textContent = '▼';
+  }
+}
+
+export async function handleChangePasscode(e) {
+  if (e) e.preventDefault();
+  const oldInput = document.getElementById('change-old-passcode');
+  const newInput = document.getElementById('change-new-passcode');
+  if (!oldInput || !newInput) return;
+
+  const oldPass = oldInput.value.trim();
+  const newPass = newInput.value.trim();
+
+  if (!oldPass || !newPass) {
+    showAdminToast('يرجى ملء جميع الحقول المطلوبة', 'error');
+    return;
+  }
+  if (newPass.length < 4) {
+    showAdminToast('رمز الدخول الجديد يجب ألا يقل عن 4 أحرف/أرقام', 'error');
+    return;
+  }
+
+  const res = await changeAdminPasscode(oldPass, newPass);
+  if (res.success) {
+    showAdminToast('تم تغيير رمز الدخول بنجاح! احفظ الرمز الجديد 🔒');
+    oldInput.value = '';
+    newInput.value = '';
+  } else {
+    showAdminToast(res.error || 'فشل تغيير رمز الدخول', 'error');
+  }
+}
+
+// ==========================================
 // ORDER DETAILS MODAL / DRAWER
 // ==========================================
 export function openOrderDetailModal(orderId) {
@@ -715,28 +1041,58 @@ export function openOrderDetailModal(orderId) {
     notesBox.classList.add('hidden');
   }
 
-  // Items
+  // Items (R1: Pack contents rendered with .pack-sub-item and [data-pack-item])
   const itemsContainer = document.getElementById('modal-items-container');
-  const items = order.items || [];
-  document.getElementById('modal-items-count').innerText = items.length;
+  const lines = normalizeOrderLines(order);
+  document.getElementById('modal-items-count').innerText = lines.length;
 
-  itemsContainer.innerHTML = items.map(item => {
-    const safeImg = sanitizeUrl(item.image);
-    const safeSvg = item.svg ? sanitizeSvg(item.svg) : `<div class="font-mono font-bold text-xs text-zinc-400">#${escapeHtml(item.sku || '')}</div>`;
-    const qty = parseInt(item.qty || item.quantity, 10) || 1;
-    const price = parseInt(item.price, 10) || 0;
+  itemsContainer.innerHTML = lines.map(line => {
+    if (line.type === 'pack') {
+      const subItemsHtml = (line.items || []).map(sub => {
+        const safeImg = sanitizeUrl(sub.image);
+        return `
+          <div class="pack-sub-item flex items-center justify-between p-2 rounded-xl bg-white border border-orange-200 text-xs gap-2" data-pack-item>
+            <div class="flex items-center gap-2 truncate">
+              ${safeImg ? `<img src="${safeImg}" class="w-8 h-8 rounded object-contain flex-shrink-0">` : ''}
+              <div class="truncate">
+                <span class="font-mono font-bold text-zinc-900 text-[10px]">#${escapeHtml(sub.sku || 'S21')}</span>
+                <span class="font-semibold text-zinc-800 text-[11px] truncate block">${escapeHtml(sub.name || '')}</span>
+                <span class="text-zinc-400 font-mono text-[10px]">(${escapeHtml(sub.sizeKey || '8 سم')} - ${escapeHtml(sub.finish || 'مطفي')})</span>
+              </div>
+            </div>
+            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex-shrink-0">ضمن الباقة</span>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="bg-orange-50/60 p-3 rounded-2xl border border-orange-200 space-y-2">
+          <div class="flex items-center justify-between font-bold text-xs">
+            <span class="text-[#FF5000]">🎁 باقة ${line.size} استيكرات (${Math.round((line.discountRate || 0.2) * 100)}% خصم)</span>
+            <span class="font-mono text-zinc-900 font-black">${line.packPrice} ${CONFIG.CURRENCY}</span>
+          </div>
+          <div class="space-y-1.5 pr-2 border-r-2 border-[#FF5000]/40">
+            ${subItemsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    const safeImg = sanitizeUrl(line.image);
+    const qty = parseInt(line.quantity || 1, 10);
+    const price = parseInt(line.unitPrice || 35, 10);
 
     return `
       <div class="bg-white p-3 rounded-xl border border-zinc-200 flex items-center justify-between gap-3 shadow-xs">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-12 h-12 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center overflow-hidden flex-shrink-0 p-1">
-            ${safeImg ? `<img src="${safeImg}" class="w-full h-full object-contain">` : safeSvg}
+            ${safeImg ? `<img src="${safeImg}" class="w-full h-full object-contain">` : `<div class="font-mono font-bold text-xs text-zinc-400">#${escapeHtml(line.sku || '')}</div>`}
           </div>
           <div class="min-w-0">
-            <h5 class="font-bold text-xs text-zinc-900 truncate">${escapeHtml(item.nameAr || item.name || 'منتج')}</h5>
+            <h5 class="font-bold text-xs text-zinc-900 truncate">${escapeHtml(line.name || 'منتج')}</h5>
             <div class="text-[11px] text-zinc-500 font-mono flex items-center gap-2">
-              <span class="bg-zinc-100 px-1.5 py-0.2 rounded font-bold text-zinc-700">#${escapeHtml(item.sku || '')}</span>
-              <span>${escapeHtml(item.size || '')}</span>
+              <span class="bg-zinc-100 px-1.5 py-0.2 rounded font-bold text-zinc-700">#${escapeHtml(line.sku || '')}</span>
+              <span>${escapeHtml(line.size || line.sizeKey || '8 سم')}</span>
             </div>
           </div>
         </div>
@@ -749,7 +1105,10 @@ export function openOrderDetailModal(orderId) {
   }).join('');
 
   // Finance summary
-  const subtotal = items.reduce((sum, it) => sum + ((it.price || 0) * (it.qty || it.quantity || 1)), 0);
+  const subtotal = order.subtotal || lines.reduce((sum, l) => {
+    if (l.type === 'pack') return sum + (l.packPrice || 0);
+    return sum + ((l.unitPrice || l.price || 0) * (l.quantity || l.qty || 1));
+  }, 0);
   document.getElementById('modal-subtotal').innerText = `${subtotal} ${CONFIG.CURRENCY}`;
   const total = order.total || subtotal;
   const shipping = order.shipping !== undefined ? order.shipping : Math.max(0, total - subtotal);
@@ -772,7 +1131,7 @@ export function openOrderDetailModal(orderId) {
   ];
 
   timelineEl.innerHTML = history.map(h => {
-    const stObj = ORDER_STATUSES[h.status] || ORDER_STATUSES.pending;
+    const stObj = ORDER_STATUSES[h.status] || { labelAr: h.status };
     const timeStr = new Date(h.timestamp).toLocaleString('ar-EG');
     return `
       <div class="relative pr-4 pb-2 text-xs">
@@ -793,6 +1152,7 @@ export function openOrderDetailModal(orderId) {
     { key: 'awaiting_confirmation', label: 'بانتظار التأكيد' },
     { key: 'confirmed', label: 'مؤكد' },
     { key: 'preparing', label: 'قيد التجهيز' },
+    { key: 'ready', label: 'تم التجهيز' },
     { key: 'shipped', label: 'تم الشحن' },
     { key: 'completed', label: 'مكتمل' },
     { key: 'cancelled', label: 'ملغي' }
@@ -805,6 +1165,21 @@ export function openOrderDetailModal(orderId) {
       ${s.label} ${!isValid && !isCurrent ? '(غير متاح)' : ''}
     </option>`;
   }).join('');
+
+  // Quick next step in modal (R2)
+  const modalQuickStepContainer = document.getElementById('modal-quick-step-container');
+  if (modalQuickStepContainer) {
+    const nextStep = getNextLogicalStep(currentKey);
+    if (nextStep) {
+      modalQuickStepContainer.innerHTML = `
+        <button onclick="handleQuickNextStep('${escapeHtml(order.id)}', '${nextStep.target}'); closeOrderDetailModal();" class="px-3 py-1.5 rounded-xl ${nextStep.btnClass} text-xs font-bold transition flex items-center gap-1 shadow-sm">
+          <span>${nextStep.label}</span>
+        </button>
+      `;
+    } else {
+      modalQuickStepContainer.innerHTML = '';
+    }
+  }
 
   // Cancel & Packing slip link
   const slipLink = document.getElementById('modal-print-slip-link');
@@ -1724,5 +2099,15 @@ window.deleteCoupon = deleteCoupon;
 window.renderSettings = renderSettings;
 window.handleSaveStoreSettings = handleSaveStoreSettings;
 window.saveGovernoratesShippingRates = saveGovernoratesShippingRates;
+window.getNextLogicalStep = getNextLogicalStep;
+window.handleQuickNextStep = handleQuickNextStep;
+window.handleUndoStatusChange = handleUndoStatusChange;
+window.dismissStatusUndoToast = dismissStatusUndoToast;
+window.openShippingDispatchModal = openShippingDispatchModal;
+window.closeShippingDispatchModal = closeShippingDispatchModal;
+window.toggleCustomCourierInput = toggleCustomCourierInput;
+window.confirmShippingDispatch = confirmShippingDispatch;
+window.toggleOrderPacksExpand = toggleOrderPacksExpand;
+window.handleChangePasscode = handleChangePasscode;
 
 document.addEventListener('DOMContentLoaded', initAdmin);

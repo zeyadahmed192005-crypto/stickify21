@@ -85,8 +85,69 @@ export const ORDER_CODE_SECURITY_NOTE = 'Base64 is encoding, not security; this 
  * @returns {string} e.g. "S21CODE:eyJ2IjoxLCJpZCI6...}"
  */
 export function generateOrderCode(order) {
+  // Support both composite lines[] (R1) and legacy items[]
+  const lines = order.lines || (order.items ? order.items.map(it => {
+    if (it.type === 'pack') {
+      return {
+        type: 'pack',
+        size: it.size || (it.items ? it.items.length : 5),
+        discountRate: it.discountRate || (it.size === 10 ? 0.3 : 0.2),
+        packPrice: it.price || it.packPrice || 0,
+        items: (it.items || []).map(p => ({
+          sku: p.sku || 'S21',
+          name: p.name || p.nameAr || '',
+          sizeKey: p.sizeKey || 'medium',
+          finish: p.finish || 'matte',
+          unitPrice: p.unitPrice || p.price || 35,
+          image: p.image || ''
+        }))
+      };
+    }
+    return {
+      type: it.type === 'bookmark' ? 'bookmark' : 'single',
+      sku: it.sku || 'S21',
+      name: it.name || it.nameAr || '',
+      sizeKey: it.sizeKey || 'medium',
+      finish: it.finish || 'matte',
+      unitPrice: it.price || 35,
+      quantity: it.quantity || 1,
+      total: (it.price || 35) * (it.quantity || 1),
+      image: it.image || ''
+    };
+  }) : []);
+
+  const compactLines = lines.map(l => {
+    if (l.type === 'pack') {
+      return {
+        t: 'pack',
+        sz: l.size || 5,
+        dr: l.discountRate || 0.2,
+        pp: l.packPrice || 0,
+        it: (l.items || []).map(sub => ({
+          s: sub.sku || 'S21',
+          n: sub.name || '',
+          sk: sub.sizeKey || 'medium',
+          f: sub.finish || 'matte',
+          up: sub.unitPrice || 35,
+          im: sub.image || ''
+        }))
+      };
+    }
+    return {
+      t: l.type || 'single',
+      s: l.sku || 'S21',
+      n: l.name || '',
+      sk: l.sizeKey || 'medium',
+      f: l.finish || 'matte',
+      up: l.unitPrice || 35,
+      q: l.quantity || 1,
+      tot: l.total || (l.unitPrice * (l.quantity || 1)),
+      im: l.image || ''
+    };
+  });
+
   const compactPayload = {
-    v: 1, // schema version
+    v: 2, // schema version 2 (R1 lines composite structure)
     id: order.id,
     dt: order.date || new Date().toISOString(),
     c: {
@@ -96,6 +157,7 @@ export function generateOrderCode(order) {
       a: order.customer.address,
       nt: order.customer.notes || ''
     },
+    ln: compactLines,
     it: (order.items || []).map(item => ({
       i: item.id || item.productId,
       s: item.sku || 'S21',
@@ -104,13 +166,15 @@ export function generateOrderCode(order) {
       sz: item.size || '8 سم',
       q: item.quantity || item.qty || 1,
       p: item.price || 0,
-      pi: item.items ? item.items.map(sub => sub.id) : undefined // pack item ids
+      pi: item.items ? item.items.map(sub => sub.id) : undefined
     })),
     sub: order.subtotal || order.total,
     shp: order.shippingCost || 0,
     tot: order.total,
     cp: order.couponCode || null,
-    pm: order.payment || 'عند الاستلام'
+    pm: order.payment || 'عند الاستلام',
+    cr: order.courier || null,
+    tr: order.trackingNumber || null
   };
 
   const jsonStr = JSON.stringify(compactPayload);
@@ -133,13 +197,11 @@ export function parseOrderCode(text) {
   const prefixIdx = text.indexOf(ORDER_CODE_PREFIX);
   if (prefixIdx !== -1) {
     const afterPrefix = text.slice(prefixIdx + ORDER_CODE_PREFIX.length).trim();
-    // Match until end of word / whitespace
     const match = afterPrefix.match(/^([A-Za-z0-9_-]+)/);
     if (match) {
       codeStr = match[1];
     }
   } else {
-    // Check if entire text is a base64url string
     const cleaned = text.trim();
     if (/^[A-Za-z0-9_-]+$/.test(cleaned)) {
       codeStr = cleaned;
@@ -164,9 +226,77 @@ export function parseOrderCode(text) {
     throw new Error('محتوى كود الطلب ليس بتنسيق JSON سليم.');
   }
 
-  if (!data || !data.id || !data.c || !data.c.p || !Array.isArray(data.it)) {
+  if (!data || !data.id || !data.c || !data.c.p || (!Array.isArray(data.ln) && !Array.isArray(data.it))) {
     throw new Error('بيانات كود الطلب ناقصة أو لا تطابق هيكل الطلبات المعتمد.');
   }
+
+  // Reconstruct lines from ln or fallback to it
+  let reconstructedLines = [];
+  if (Array.isArray(data.ln)) {
+    reconstructedLines = data.ln.map(l => {
+      if (l.t === 'pack') {
+        return {
+          type: 'pack',
+          size: l.sz || 5,
+          discountRate: l.dr || 0.2,
+          packPrice: l.pp || 0,
+          items: (l.it || []).map(sub => ({
+            sku: sub.s || 'S21',
+            name: sub.n || '',
+            sizeKey: sub.sk || 'medium',
+            finish: sub.f || 'matte',
+            unitPrice: sub.up || 35,
+            image: sub.im || ''
+          }))
+        };
+      }
+      return {
+        type: l.t || 'single',
+        sku: l.s || 'S21',
+        name: l.n || '',
+        sizeKey: l.sk || 'medium',
+        finish: l.f || 'matte',
+        unitPrice: l.up || 35,
+        quantity: l.q || 1,
+        total: l.tot || (l.up * l.q),
+        image: l.im || ''
+      };
+    });
+  } else if (Array.isArray(data.it)) {
+    reconstructedLines = data.it.map(item => ({
+      type: item.t || 'single',
+      sku: item.s || 'S21',
+      name: item.n,
+      sizeKey: 'medium',
+      finish: 'matte',
+      unitPrice: item.p,
+      quantity: item.q || 1,
+      total: (item.p || 0) * (item.q || 1),
+      image: ''
+    }));
+  }
+
+  // Reconstruct flat items for backward compatibility
+  const flatItems = (data.it && data.it.length > 0) ? data.it.map(item => ({
+    id: item.i,
+    sku: item.s,
+    nameAr: item.n,
+    name: item.n,
+    type: item.t,
+    size: item.sz,
+    quantity: item.q,
+    price: item.p,
+    items: item.pi ? item.pi.map(id => ({ id })) : undefined
+  })) : reconstructedLines.map(l => ({
+    sku: l.sku || (l.type === 'pack' ? `PACK-${l.size}` : 'S21'),
+    nameAr: l.name || (l.type === 'pack' ? `باقة ${l.size} استيكرات` : 'استيكر'),
+    name: l.name,
+    type: l.type,
+    size: l.sizeKey || '8 سم',
+    quantity: l.quantity || 1,
+    price: l.packPrice || l.unitPrice,
+    items: l.items
+  }));
 
   // Reconstruct the full domain Order object
   return {
@@ -181,21 +311,15 @@ export function parseOrderCode(text) {
       address: data.c.a,
       notes: data.c.nt || ''
     },
-    items: data.it.map(item => ({
-      id: item.i,
-      sku: item.s,
-      nameAr: item.n,
-      type: item.t,
-      size: item.sz,
-      quantity: item.q,
-      price: item.p,
-      items: item.pi ? item.pi.map(id => ({ id })) : undefined
-    })),
+    lines: reconstructedLines,
+    items: flatItems,
     subtotal: data.sub || data.tot,
     shippingCost: data.shp || 0,
     total: data.tot,
     couponCode: data.cp,
     payment: data.pm || 'عند الاستلام',
+    courier: data.cr || null,
+    trackingNumber: data.tr || null,
     statusHistory: [
       {
         status: 'awaiting_confirmation',
