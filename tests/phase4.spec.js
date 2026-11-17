@@ -61,7 +61,9 @@ test.describe('Phase 4 Acceptance Tests - Admin Dashboard, Catalog CRUD, CSV & S
     await statusSelect.selectOption('preparing');
     await expect(statusSelect).toHaveValue('preparing');
 
-    // 3. preparing -> shipped
+    // 3. preparing -> ready -> shipped
+    await statusSelect.selectOption('ready');
+    await expect(statusSelect).toHaveValue('ready');
     await statusSelect.selectOption('shipped');
     await expect(statusSelect).toHaveValue('shipped');
 

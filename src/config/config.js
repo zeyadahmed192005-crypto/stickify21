@@ -143,7 +143,7 @@ export const CONFIG = {
     pending: ['awaiting_confirmation', 'confirmed', 'cancelled'],
     awaiting_confirmation: ['confirmed', 'cancelled'],
     confirmed: ['preparing', 'cancelled'],
-    preparing: ['ready', 'shipped', 'cancelled'],
+    preparing: ['ready', 'cancelled'],
     ready: ['shipped', 'cancelled'],
     shipped: ['completed', 'cancelled'],
     completed: [],

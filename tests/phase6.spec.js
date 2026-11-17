@@ -222,7 +222,11 @@ test.describe('Phase 6: Full End-to-End Integration & Migration-Ready Regression
     await page.waitForTimeout(300);
     await expect(statusSelect).toHaveValue('preparing');
 
-    // 3.5 Valid lifecycle transition: preparing -> shipped
+    // 3.5 Valid lifecycle transition: preparing -> ready -> shipped
+    await statusSelect.selectOption('ready');
+    await page.waitForTimeout(300);
+    await expect(statusSelect).toHaveValue('ready');
+
     await statusSelect.selectOption('shipped');
     await page.waitForTimeout(300);
     await expect(statusSelect).toHaveValue('shipped');
