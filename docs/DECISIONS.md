@@ -209,10 +209,11 @@ This document records all architectural decisions, ground-truth constraints, and
 
 ### AD-29: Single-Page First Packing Slip & Auto-Compaction Rules (R13)
 - **Decision:** Guarantee that packing slips strictly fit on ONE A4 page (`@page { size: A4 portrait; margin: 8mm }`) to prevent paper wastage in warehouse packing.
-- **Dynamic Compaction Thresholds:**
-  - Standard mode: <= 6 items (normal typography 11-12px, comfortable padding).
-  - Compact mode: 7 to 14 items (reduced padding, 10px typography, tighter grid).
-  - Ultra-compact mode: > 14 items (2-column dense grid, 8.5px typography, max-height 140mm container).
+- **Dynamic Compaction Thresholds (Updated P0-2):**
+  - Replaced `overflow: hidden` clipping with a live measure-and-compact loop (`applySmartCompaction`) in `packing-slip.html` with strict minimum print typography **`>= 8.5pt` (`11.4px`)**.
+  - Compaction progression: `level-1` (smaller thumbnails) -> `level-2` (hide thumbnails) -> `level-3` (dense 2-col + compact pack rows) -> `level-4` (3-col ultra-dense grid on A4).
+  - **Physical Targets:** A4 fits up to **60 lines on exactly 1 page** at `>= 8.5pt`; A5 fits up to **25 lines on 1 page**; above that, displays `"الطلب كبير جدًا، استخدم A4"` and allows clean multi-page flow without truncating any item or total.
+  - **Unified Payment Formatting:** `formatPayment(order, lang)` in `src/domain/orders.js` handles both object `{ method, status }` and legacy string payment values across slip, label, admin, WhatsApp, and CSV.
 - **View Modes:** Interactive selector toggles between `A4 صفحة واحدة`, `A5 نصف صفحة`, and `🏷️ بوليصة شحن` (shipping label sticker format).
 
 ### AD-30: Order Confirmation Dialog & Tracking Number Storage (A2, A3)

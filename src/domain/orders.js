@@ -99,6 +99,62 @@ export function normalizeOrderLines(order) {
 }
 
 /**
+ * Normalize and format payment method cleanly for UI, WhatsApp, Packing Slip, and CSV.
+ * Handles both structured payment objects ({ method, accountId, proofAttached, status })
+ * and legacy string values. Never returns "[object Object]".
+ * @param {Object|string} orderOrPayment
+ * @param {'ar'|'en'} [lang='ar']
+ * @returns {string}
+ */
+export function getPaymentMethod(orderOrPayment) {
+  if (!orderOrPayment) return 'cod';
+  if (typeof orderOrPayment === 'string') {
+    const low = orderOrPayment.toLowerCase();
+    if (low.includes('instapay') || low.includes('إنستا') || low.includes('انستا')) return 'instapay';
+    if (low.includes('vodafone') || low.includes('فودافون')) return 'vodafone_cash';
+    if (low.includes('bank') || low.includes('بنك')) return 'bank';
+    return 'cod';
+  }
+  const p = orderOrPayment.payment;
+  if (p && typeof p === 'object' && p.method) return String(p.method).toLowerCase();
+  if (typeof orderOrPayment.paymentMethod === 'string' && orderOrPayment.paymentMethod) {
+    return orderOrPayment.paymentMethod.toLowerCase();
+  }
+  if (typeof p === 'string' && p) return getPaymentMethod(p);
+  if (orderOrPayment.method) return String(orderOrPayment.method).toLowerCase();
+  return 'cod';
+}
+
+export function formatPayment(orderOrPayment, lang = 'ar') {
+  const method = getPaymentMethod(orderOrPayment);
+  const pObj = (orderOrPayment && typeof orderOrPayment === 'object' && orderOrPayment.payment && typeof orderOrPayment.payment === 'object')
+    ? orderOrPayment.payment
+    : (orderOrPayment && typeof orderOrPayment === 'object' && orderOrPayment.method ? orderOrPayment : null);
+  const status = pObj?.status || (orderOrPayment && typeof orderOrPayment === 'object' ? orderOrPayment.paymentStatus : null);
+
+  const labelsAr = {
+    cod: 'الدفع عند الاستلام (COD)',
+    instapay: 'إنستاباي (InstaPay)',
+    vodafone_cash: 'فودافون كاش (Vodafone Cash)',
+    bank: 'تحويل بنكي'
+  };
+  const labelsEn = {
+    cod: 'Cash on Delivery (COD)',
+    instapay: 'InstaPay Transfer',
+    vodafone_cash: 'Vodafone Cash',
+    bank: 'Bank Transfer'
+  };
+  const base = (lang === 'en' ? labelsEn : labelsAr)[method] || (lang === 'en' ? labelsEn.cod : labelsAr.cod);
+  if (method !== 'cod' && status === 'verified') {
+    return lang === 'en' ? `${base} (Verified)` : `${base} (تم التأكيد)`;
+  }
+  if (method !== 'cod' && status === 'rejected') {
+    return lang === 'en' ? `${base} (Rejected)` : `${base} (مرفوض)`;
+  }
+  return base;
+}
+
+/**
  * Format order details into Egyptian WhatsApp message with appended Order Code
  * @param {Object} order
  * @param {string} orderCode - Base64url order code
@@ -127,15 +183,7 @@ export function formatOrderWhatsAppMessage(order, orderCode) {
 
   const govName = c.governorate || c.city || 'القاهرة';
   const shippingLine = order.shippingCost === 0 ? 'مجاني' : `${order.shippingCost} ج.م`;
-
-  let paymentText = 'الدفع عند الاستلام (COD)';
-  if (order.paymentMethod === 'instapay' || order.payment === 'instapay') {
-    paymentText = 'انستاباي (InstaPay - stickify21@instapay)';
-  } else if (order.paymentMethod === 'vodafone_cash' || order.payment === 'vodafone_cash') {
-    paymentText = 'فودافون كاش (Vodafone Cash - 01043546503)';
-  } else if (order.payment) {
-    paymentText = order.payment;
-  }
+  const paymentText = formatPayment(order, 'ar');
 
   const langTag = (order.lang || order.customerLanguage || 'ar').toUpperCase();
 

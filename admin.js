@@ -8,7 +8,7 @@ import { stripEmoji } from './src/utils/emoji.js';
 import { CONFIG } from './src/config/config.js';
 import { escapeHtml, sanitizeUrl, sanitizeSvg } from './src/utils/escape.js';
 import { parseOrderCode } from './src/utils/ids.js';
-import { ORDER_STATUSES, isValidStatusTransition, normalizeOrderLines } from './src/domain/orders.js';
+import { ORDER_STATUSES, isValidStatusTransition, normalizeOrderLines, formatPayment, getPaymentMethod } from './src/domain/orders.js';
 import { 
   verifyAdminPasscode, 
   isAdminAuthenticated, 
@@ -474,7 +474,7 @@ export function renderOrders() {
             <div class="text-xs text-zinc-500 flex items-center gap-2 flex-wrap">
               <span>عدد البنود: <strong class="text-zinc-900 font-mono">${lines.length}</strong></span>
               <span>•</span>
-              <span>طريقة الدفع: <strong class="text-zinc-900">${escapeHtml(order.payment || 'عند الاستلام')}</strong></span>
+              <span>طريقة الدفع: <strong class="text-zinc-900">${escapeHtml(formatPayment(order, 'ar'))}</strong></span>
               <span>•</span>
               <span>الإجمالي: <strong class="text-[#FF5000] font-mono text-sm">${order.total} ${CONFIG.CURRENCY}</strong></span>
               ${order.couponCode ? `<span>•</span><span class="text-emerald-600 font-mono font-bold">كوبون: ${escapeHtml(order.couponCode)}</span>` : ''}
@@ -662,7 +662,7 @@ export function exportOrdersCsv(ordersToExport = null) {
       formatCsvCell(o.customer?.governorate || o.customer?.city || ''),
       formatCsvCell(o.customer?.address || ''),
       formatCsvCell(statusObj.labelAr || o.status),
-      formatCsvCell(o.payment || 'عند الاستلام'),
+      formatCsvCell(formatPayment(o, 'ar')),
       formatCsvCell(o.total || 0),
       formatCsvCell(o.couponCode || ''),
       formatCsvCell(o.items?.length || 0),
@@ -1110,10 +1110,10 @@ export function openOrderDetailModal(orderId) {
   }
 
   // Payment Details & Verification (R12)
-  const isCod = order.paymentMethod === 'cod' || (typeof order.payment === 'string' && order.payment.includes('COD'));
+  const isCod = getPaymentMethod(order) === 'cod';
   const payMethodBadge = document.getElementById('modal-payment-method-badge');
   if (payMethodBadge) {
-    payMethodBadge.textContent = order.paymentMethod ? (order.paymentMethod === 'instapay' ? 'InstaPay' : (order.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'عند الاستلام (COD)')) : (order.payment || 'عند الاستلام');
+    payMethodBadge.textContent = formatPayment(order, 'ar');
   }
 
   const proofImgContainer = document.getElementById('modal-payment-proof-container');

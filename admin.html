@@ -1463,7 +1463,7 @@
           <p class="text-xs text-zinc-500">حصر إجمالي الاستيكرات المطلوبة ومقاساتها عبر الطلبات الجارية</p>
         </div>
         <div class="flex items-center gap-2">
-          <button onclick="window.print()" class="no-print px-3.5 py-1.5 rounded-xl bg-[#FF5000] text-white font-bold text-xs hover:bg-[#E04600] transition">طباعة أمر الإنتاج</button>
+          <button onclick="document.body.classList.add('printing-production-summary'); window.print(); setTimeout(() => document.body.classList.remove('printing-production-summary'), 500);" class="no-print px-3.5 py-1.5 rounded-xl bg-[#FF5000] text-white font-bold text-xs hover:bg-[#E04600] transition">طباعة أمر الإنتاج</button>
           <button onclick="closeProductionSummaryModal()" class="modal-close-btn p-2 rounded-xl hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition" title="إغلاق"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
       </div>

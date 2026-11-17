@@ -292,15 +292,16 @@ html.dark .border-zinc-200, html.dark .border-zinc-100 {
   border-color: #27272A !important;
 }
 
-/* Production Summary Print Sheet (A15) */
+/* Production Summary Print Sheet (A15) — scoped so packing-slip.html print is never hidden */
 @media print {
-  body * {
+  body.printing-production-summary * {
     visibility: hidden;
   }
-  #production-summary-modal, #production-summary-modal * {
+  body.printing-production-summary #production-summary-modal,
+  body.printing-production-summary #production-summary-modal * {
     visibility: visible;
   }
-  #production-summary-modal {
+  body.printing-production-summary #production-summary-modal {
     position: absolute;
     left: 0;
     top: 0;
