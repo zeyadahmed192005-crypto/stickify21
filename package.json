@@ -7,8 +7,10 @@
   "scripts": {
     "build:css": "tailwindcss -i ./styles.css -o ./dist/styles.css --minify",
     "watch:css": "tailwindcss -i ./styles.css -o ./dist/styles.css --watch",
+    "pretest": "npm run build:css",
     "test": "playwright test",
-    "serve": "serve -p 3000 ."
+    "serve": "npm run build:css && python scripts/server.py 3000",
+    "share": "npm run build:css && npx cloudflared tunnel --url http://127.0.0.1:3000"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.1",

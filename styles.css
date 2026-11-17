@@ -92,7 +92,7 @@ body {
   background-size: 20px 20px;
 }
 
-/* Realistic MacBook Pro Lid */
+/* Realistic Neutral Laptop Lid */
 .mockup-laptop-realistic {
   background: linear-gradient(145deg, #3A3D42 0%, #26282B 45%, #18191B 100%);
   border: 2px solid #52555A;
@@ -103,7 +103,7 @@ body {
   border-radius: 1.5rem;
 }
 
-/* Realistic iPhone Titanium */
+/* Realistic Neutral Smartphone Back */
 .mockup-phone-realistic {
   background: linear-gradient(150deg, #2D2F33 0%, #1A1B1D 50%, #0F1011 100%);
   border: 4px solid #484B52;
@@ -114,7 +114,7 @@ body {
   border-radius: 3rem;
 }
 
-/* Realistic Tumbler / Hydroflask */
+/* Realistic Powder-Coat Cylindrical Tumbler */
 .mockup-bottle-realistic {
   background: linear-gradient(to right, #111214 0%, #2C2E33 22%, #5A5D66 48%, #3A3C42 70%, #161719 100%);
   border: 2px solid #45474E;
@@ -268,7 +268,8 @@ html.dark, body.dark {
   background-color: #0E0E10 !important;
   color: #F4F4F5 !important;
 }
-html.dark .bg-white {
+html.dark .bg-white,
+html.dark header {
   background-color: #18181B !important;
   color: #F4F4F5 !important;
 }
