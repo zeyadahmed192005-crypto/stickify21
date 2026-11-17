@@ -61,7 +61,7 @@ Custom Print Orders: Due to personalized production, custom orders cannot be ret
 3. كوبونات الخصم: تطبق الشروط المحددة لكل كوبون. لا يجوز دمج أكثر من كوبون في الطلب الواحد.`,
     contentEn: `These terms apply to all transactions and orders on STICKIFY 21.
 
-1. Currency & Pricing: All prices are denominated in Egyptian Pounds (EGP / ج.م).
+1. Currency & Pricing: All prices are denominated in Egyptian Pounds (EGP).
 2. Payment Methods: We accept Cash on Delivery (COD), InstaPay bank transfers, and Vodafone Cash mobile wallets. Non-COD orders require a transfer receipt screenshot for verification.
 3. Discount Coupons: Coupons apply per stated requirements (minimum order, validity). One coupon per order.`
   },

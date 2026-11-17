@@ -4,7 +4,7 @@
  */
 
 import { AR } from './ar.js';
-import { EN } from './en.js';
+import { EN, TAG_EN_MAP, GOV_EN_MAP } from './en.js';
 
 const DICTIONARIES = { ar: AR, en: EN };
 let currentLang = 'ar';
@@ -110,6 +110,50 @@ export function formatCurrency(amount, lang = currentLang) {
   return lang === 'en' ? `${num} EGP` : `${num} ج.م`;
 }
 
+export function translateTag(tag, lang = currentLang) {
+  if (!tag) return '';
+  if (lang === 'en') {
+    const trimmed = String(tag).trim();
+    return TAG_EN_MAP[trimmed] || trimmed;
+  }
+  return String(tag).trim();
+}
+
+export function translateGovernorate(govAr, lang = currentLang) {
+  if (!govAr) return '';
+  if (lang === 'en') return GOV_EN_MAP[govAr] || govAr;
+  return govAr;
+}
+
+/**
+ * Applies all data-i18n, data-i18n-placeholder, data-i18n-title, and data-i18n-aria
+ * attributes across the DOM plus document.title.
+ * @param {string} [lang]
+ * @param {ParentNode} [root]
+ */
+export function applyI18nToDom(lang = currentLang, root = document) {
+  if (typeof document === 'undefined' || !root) return;
+  if (root === document) {
+    document.title = t('pageTitle');
+  }
+  root.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (key) el.textContent = t(key);
+  });
+  root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (key) el.setAttribute('placeholder', t(key));
+  });
+  root.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    if (key) el.setAttribute('title', t(key));
+  });
+  root.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    const key = el.getAttribute('data-i18n-aria');
+    if (key) el.setAttribute('aria-label', t(key));
+  });
+}
+
 // Global exposure for non-module handlers and console debugging
 if (typeof window !== 'undefined') {
   window.i18n = {
@@ -117,6 +161,9 @@ if (typeof window !== 'undefined') {
     setLanguage,
     t,
     formatCurrency,
+    translateTag,
+    translateGovernorate,
+    applyI18nToDom,
     initI18n
   };
   window.t = t;
