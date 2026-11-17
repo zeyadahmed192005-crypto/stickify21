@@ -11,6 +11,7 @@ import { parseOrderCode } from './src/utils/ids.js';
 import { ORDER_STATUSES, isValidStatusTransition, normalizeOrderLines, formatPayment, getPaymentMethod } from './src/domain/orders.js';
 import { 
   verifyAdminPasscode, 
+  verifyAdminSession,
   isAdminAuthenticated, 
   adminLogout, 
   getRateLimitStatus,
@@ -59,9 +60,9 @@ export async function initAdmin() {
   checkBackupReminder();
   await storage.init();
 
-  // Check if active session in sessionStorage
-  if (isAdminAuthenticated()) {
-    unlockDashboard();
+  // Cryptographically verify HMAC-signed session against non-extractable IndexedDB CryptoKey (P1-1)
+  if (await verifyAdminSession()) {
+    await unlockDashboard();
   } else {
     showLockScreen();
   }
@@ -149,22 +150,31 @@ export function lockAdmin() {
 }
 
 function setupInactivityMonitor() {
+  let lastCheckedAt = 0;
+  const checkSession = async () => {
+    if (!adminState.authenticated) return;
+    const now = Date.now();
+    if (now - lastCheckedAt < 5000) return;
+    lastCheckedAt = now;
+    const ok = await verifyAdminSession();
+    if (!ok) {
+      lockAdmin();
+      showAdminToast('تم إنهاء الجلسة تلقائياً أو انتهت صلاحية التوقيع', 'warning');
+    }
+  };
+
   const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
   events.forEach(evt => {
-    window.addEventListener(evt, () => {
-      if (adminState.authenticated) {
-        if (!isAdminAuthenticated()) {
-          lockAdmin();
-          showAdminToast('تم إنهاء الجلسة تلقائياً بسبب الخمول (30 دقيقة)', 'warning');
-        }
-      }
-    }, { passive: true });
+    window.addEventListener(evt, checkSession, { passive: true });
   });
 
-  setInterval(() => {
-    if (adminState.authenticated && !isAdminAuthenticated()) {
-      lockAdmin();
-      showAdminToast('تم إنهاء الجلسة تلقائياً بسبب الخمول (30 دقيقة)', 'warning');
+  setInterval(async () => {
+    if (adminState.authenticated) {
+      const ok = await verifyAdminSession();
+      if (!ok) {
+        lockAdmin();
+        showAdminToast('تم إنهاء الجلسة تلقائياً بسبب انتهاء الصلاحية', 'warning');
+      }
     }
   }, 60000);
 }

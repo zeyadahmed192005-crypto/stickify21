@@ -1,5 +1,5 @@
 /**
- * STICKIFY 21 - Admin Authentication & Passcode Security (PBKDF2 Web Crypto)
+ * STICKIFY 21 - Admin Authentication & Passcode Security (PBKDF2 + Non-Extractable HMAC-SHA256 Session Key)
  */
 import { CONFIG } from '../config/config.js';
 
@@ -10,6 +10,129 @@ const STORAGE_SESSION_KEY = 'stickify21_admin_session';
 const SESSION_AUTH_KEY = 'stickify21_admin_authenticated';
 const SESSION_LAST_ACTIVE_KEY = 'stickify21_admin_last_active';
 const RATE_LIMIT_KEY = 'stickify21_admin_rate_limit';
+
+const AUTH_KEYS_DB_NAME = 'stickify21_auth_keys_db';
+const AUTH_KEYS_DB_VERSION = 1;
+const AUTH_KEYS_STORE = 'signing_keys';
+const SESSION_HMAC_KEY_ID = 'session_hmac_key';
+
+function openAuthKeysDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      return reject(new Error('IndexedDB unavailable'));
+    }
+    const req = indexedDB.open(AUTH_KEYS_DB_NAME, AUTH_KEYS_DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(AUTH_KEYS_STORE)) {
+        db.createObjectStore(AUTH_KEYS_STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getStoredSigningKeyRecord() {
+  try {
+    const db = await openAuthKeysDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(AUTH_KEYS_STORE, 'readonly');
+      const req = tx.objectStore(AUTH_KEYS_STORE).get(SESSION_HMAC_KEY_ID);
+      req.onsuccess = () => {
+        const res = req.result || null;
+        db.close();
+        resolve(res);
+      };
+      req.onerror = () => {
+        db.close();
+        reject(req.error);
+      };
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function generateAndStoreSigningKeyRecord(nextVersion = 1) {
+  const key = await crypto.subtle.generateKey(
+    { name: 'HMAC', hash: 'SHA-256' },
+    false, // non-extractable CryptoKey!
+    ['sign', 'verify']
+  );
+  const record = {
+    id: SESSION_HMAC_KEY_ID,
+    key,
+    version: nextVersion,
+    rotatedAt: Date.now()
+  };
+  const db = await openAuthKeysDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(AUTH_KEYS_STORE, 'readwrite');
+    const req = tx.objectStore(AUTH_KEYS_STORE).put(record);
+    req.onsuccess = () => { db.close(); resolve(); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
+  return record;
+}
+
+async function getOrCreateSigningKeyRecord() {
+  const existing = await getStoredSigningKeyRecord();
+  if (existing && existing.key) return existing;
+  return generateAndStoreSigningKeyRecord(1);
+}
+
+export async function rotateSessionSigningKey() {
+  const existing = await getStoredSigningKeyRecord();
+  const nextVersion = existing && typeof existing.version === 'number' ? existing.version + 1 : 2;
+  return generateAndStoreSigningKeyRecord(nextVersion);
+}
+
+function bytesToHex(buf) {
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToBytes(hex) {
+  if (typeof hex !== 'string' || !/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) {
+    return null;
+  }
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+function canonicalSessionPayload(session) {
+  return `${session.token}|${session.createdAt}|${session.lastActive}|${session.expiresAt}|${session.keyVersion}`;
+}
+
+async function signSessionObject(session, key) {
+  const enc = new TextEncoder();
+  const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(canonicalSessionPayload(session)));
+  return bytesToHex(sigBuf);
+}
+
+async function issueSignedSession(keyRecord) {
+  const now = Date.now();
+  const tokenBytes = new Uint8Array(16);
+  crypto.getRandomValues(tokenBytes);
+  const sessionObj = {
+    token: bytesToHex(tokenBytes),
+    createdAt: now,
+    lastActive: now,
+    expiresAt: now + AUTH_CONFIG.SESSION_TIMEOUT_MS,
+    keyVersion: keyRecord.version
+  };
+  sessionObj.sig = await signSessionObject(sessionObj, keyRecord.key);
+  localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessionObj));
+  // Clear legacy unsigned sessionStorage flags
+  try {
+    sessionStorage.removeItem(SESSION_AUTH_KEY);
+    sessionStorage.removeItem(SESSION_LAST_ACTIVE_KEY);
+  } catch (e) {}
+  return sessionObj;
+}
 
 /**
  * Hash a plain passcode using PBKDF2 with SHA-256
@@ -38,8 +161,7 @@ export async function hashPasscode(passcode, salt = AUTH_CONFIG.SALT) {
     AUTH_CONFIG.KEY_LENGTH * 8
   );
 
-  const hashArray = Array.from(new Uint8Array(derivedBits));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return bytesToHex(derivedBits);
 }
 
 /**
@@ -63,7 +185,6 @@ export function getRateLimitStatus() {
       };
     }
 
-    // Lockout expired, reset attempts
     if (state.lockedUntil && state.lockedUntil <= now) {
       clearRateLimit();
       return { isLocked: false, remainingMs: 0, attemptsLeft: AUTH_CONFIG.MAX_ATTEMPTS };
@@ -120,7 +241,6 @@ export function clearRateLimit() {
 export async function ensureAdminPasscodeInitialized() {
   let existingHash = localStorage.getItem(STORAGE_HASH_KEY);
   if (!existingHash) {
-    // Default PIN: 2121
     const defaultHash = await hashPasscode('2121', AUTH_CONFIG.SALT);
     localStorage.setItem(STORAGE_HASH_KEY, defaultHash);
     localStorage.setItem(STORAGE_SALT_KEY, AUTH_CONFIG.SALT);
@@ -130,7 +250,7 @@ export async function ensureAdminPasscodeInitialized() {
 }
 
 /**
- * Verify entered passcode against stored PBKDF2 hash
+ * Verify entered passcode against stored PBKDF2 hash and issue HMAC-signed session
  * @param {string} enteredPasscode
  * @returns {Promise<{ success: boolean, error?: string }>}
  */
@@ -152,23 +272,14 @@ export async function verifyAdminPasscode(enteredPasscode) {
 
   if (enteredHash === storedHash) {
     clearRateLimit();
-    // Establish session in localStorage (R11: 12-hour sliding expiry across tabs)
-    const sessionObj = {
-      token: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'tok-' + Date.now() + '-' + Math.random().toString(36).slice(2),
-      createdAt: Date.now(),
-      lastActive: Date.now(),
-      expiresAt: Date.now() + AUTH_CONFIG.SESSION_TIMEOUT_MS
-    };
-    localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(sessionObj));
-    sessionStorage.setItem(SESSION_AUTH_KEY, 'true');
-    sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(Date.now()));
+    const keyRecord = await getOrCreateSigningKeyRecord();
+    const sessionObj = await issueSignedSession(keyRecord);
 
-    // Broadcast login
     try {
       const bc = new BroadcastChannel('stickify21_auth_channel');
       bc.postMessage({ type: 'login', token: sessionObj.token });
       bc.close();
-    } catch(e) {}
+    } catch (e) {}
 
     return { success: true };
   } else {
@@ -188,7 +299,8 @@ export async function verifyAdminPasscode(enteredPasscode) {
 }
 
 /**
- * Update the admin passcode
+ * Update the admin passcode AND rotate the non-extractable HMAC session signing key
+ * (immediately invalidating all previously issued session tokens).
  * @param {string} oldPasscode
  * @param {string} newPasscode
  * @returns {Promise<{ success: boolean, error?: string }>}
@@ -203,66 +315,121 @@ export async function changeAdminPasscode(oldPasscode, newPasscode) {
     return { success: false, error: 'رمز الدخول الجديد يجب ألا يقل عن 4 أرقام/حروف' };
   }
 
-  const newSalt = 'stickify21_' + Date.now();
+  const saltBytes = new Uint8Array(16);
+  crypto.getRandomValues(saltBytes);
+  const newSalt = 'stickify21_' + bytesToHex(saltBytes);
   const newHash = await hashPasscode(newPasscode.trim(), newSalt);
 
   localStorage.setItem(STORAGE_HASH_KEY, newHash);
   localStorage.setItem(STORAGE_SALT_KEY, newSalt);
 
+  // Rotate non-extractable HMAC CryptoKey in IndexedDB & re-issue signed session
+  const rotatedKeyRecord = await rotateSessionSigningKey();
+  await issueSignedSession(rotatedKeyRecord);
+
   return { success: true };
 }
 
 /**
- * Check if admin is currently authenticated and session is active
- * @returns {boolean}
+ * Cryptographically verify the stored admin session token against the non-extractable
+ * HMAC-SHA256 CryptoKey stored in IndexedDB.
+ * Rejects forged localStorage values, tampered timestamps, expired tokens, and rotated keys.
+ * @returns {Promise<boolean>}
  */
-export function isAdminAuthenticated() {
-  // Check localStorage session first (R11)
+export async function verifyAdminSession() {
   try {
     const raw = localStorage.getItem(STORAGE_SESSION_KEY);
-    if (raw) {
-      const session = JSON.parse(raw);
-      const now = Date.now();
-      if (!session || !session.expiresAt || now > session.expiresAt) {
-        adminLogout();
-        return false;
-      }
-      // Sliding expiry: refresh lastActive and expiresAt if active
-      session.lastActive = now;
-      session.expiresAt = now + AUTH_CONFIG.SESSION_TIMEOUT_MS;
-      localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session));
-      return true;
+    if (!raw) return false;
+
+    const session = JSON.parse(raw);
+    const now = Date.now();
+    if (
+      !session ||
+      typeof session.token !== 'string' ||
+      typeof session.createdAt !== 'number' ||
+      typeof session.lastActive !== 'number' ||
+      typeof session.expiresAt !== 'number' ||
+      typeof session.keyVersion !== 'number' ||
+      typeof session.sig !== 'string' ||
+      now > session.expiresAt
+    ) {
+      adminLogout();
+      return false;
     }
-  } catch (e) {}
 
-  // Fallback check on sessionStorage for legacy or single-tab sessions
-  const isAuth = sessionStorage.getItem(SESSION_AUTH_KEY) === 'true';
-  if (!isAuth) return false;
+    const keyRecord = await getStoredSigningKeyRecord();
+    if (!keyRecord || !keyRecord.key || keyRecord.version !== session.keyVersion) {
+      adminLogout();
+      return false;
+    }
 
-  const lastActiveStr = sessionStorage.getItem(SESSION_LAST_ACTIVE_KEY);
-  if (!lastActiveStr) return false;
+    const sigBytes = hexToBytes(session.sig);
+    if (!sigBytes || sigBytes.length !== 32) {
+      adminLogout();
+      return false;
+    }
 
-  const lastActive = Number(lastActiveStr);
-  const now = Date.now();
+    const enc = new TextEncoder();
+    const isValidSig = await crypto.subtle.verify(
+      'HMAC',
+      keyRecord.key,
+      sigBytes,
+      enc.encode(canonicalSessionPayload(session))
+    );
 
-  if (now - lastActive > AUTH_CONFIG.SESSION_TIMEOUT_MS) {
+    if (!isValidSig) {
+      adminLogout();
+      return false;
+    }
+
+    // Valid! Refresh sliding 12h expiry and re-sign with non-extractable CryptoKey
+    session.lastActive = now;
+    session.expiresAt = now + AUTH_CONFIG.SESSION_TIMEOUT_MS;
+    session.sig = await signSessionObject(session, keyRecord.key);
+    localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session));
+    return true;
+  } catch (e) {
     adminLogout();
     return false;
   }
+}
 
-  sessionStorage.setItem(SESSION_LAST_ACTIVE_KEY, String(now));
-  return true;
+/**
+ * Quick synchronous structural check (authoritative check is verifyAdminSession()).
+ * Does NOT accept unsigned sessionStorage flags.
+ * @returns {boolean}
+ */
+export function isAdminAuthenticated() {
+  try {
+    const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+    if (!raw) return false;
+    const session = JSON.parse(raw);
+    const now = Date.now();
+    if (
+      !session ||
+      typeof session.sig !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(session.sig) ||
+      typeof session.expiresAt !== 'number' ||
+      now > session.expiresAt
+    ) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
  * Terminate admin session across all tabs (R11)
  */
 export function adminLogout() {
-  localStorage.removeItem(STORAGE_SESSION_KEY);
-  sessionStorage.removeItem(SESSION_AUTH_KEY);
-  sessionStorage.removeItem(SESSION_LAST_ACTIVE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_SESSION_KEY);
+    sessionStorage.removeItem(SESSION_AUTH_KEY);
+    sessionStorage.removeItem(SESSION_LAST_ACTIVE_KEY);
+  } catch (e) {}
 
-  // Broadcast logout event across tabs
   try {
     const bc = new BroadcastChannel('stickify21_auth_channel');
     bc.postMessage({ type: 'logout' });
@@ -291,6 +458,6 @@ export function setupAuthSync(onLogout) {
           if (typeof onLogout === 'function') onLogout();
         }
       };
-    } catch(e) {}
+    } catch (e) {}
   }
 }
