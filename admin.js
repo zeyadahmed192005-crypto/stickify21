@@ -437,7 +437,7 @@ export function renderOrders() {
         <div class="mt-2.5 pt-2 border-t border-zinc-200/60">
           <button onclick="toggleOrderPacksExpand('${escapeHtml(order.id)}')" class="text-[11px] font-bold text-[#FF5000] hover:underline flex items-center gap-1">
             <span>محتويات باقات الطلب (${packLines.length} باقة)</span>
-            <span id="pack-arrow-${escapeHtml(order.id)}">▼</span>
+            <span id="pack-arrow-${escapeHtml(order.id)}" class="inline-flex items-center transition-transform"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg></span>
           </button>
           <div id="order-packs-expand-${escapeHtml(order.id)}" class="mt-2 space-y-2 hidden">
             ${packLines.map(pack => `
@@ -484,21 +484,21 @@ export function renderOrders() {
 
             <div class="flex items-center gap-2 text-xs font-bold text-zinc-900 flex-wrap">
               <span>${escapeHtml(order.customer?.name || 'عميل')}</span>
-              <span class="text-zinc-300">•</span>
+              <span class="text-zinc-300" aria-hidden="true">|</span>
               <span class="font-mono text-zinc-600" dir="ltr">${escapeHtml(order.customer?.phone || '')}</span>
-              <span class="text-zinc-300">•</span>
+              <span class="text-zinc-300" aria-hidden="true">|</span>
               <span class="text-zinc-500">${escapeHtml(order.customer?.governorate || order.customer?.city || '')}</span>
-              <span class="text-zinc-300">•</span>
+              <span class="text-zinc-300" aria-hidden="true">|</span>
               <span class="text-zinc-500 text-[11px] font-normal truncate max-w-xs">${escapeHtml(order.customer?.address || '')}</span>
             </div>
 
             <div class="text-xs text-zinc-500 flex items-center gap-2 flex-wrap">
               <span>عدد البنود: <strong class="text-zinc-900 font-mono">${lines.length}</strong></span>
-              <span>•</span>
+              <span class="text-zinc-300" aria-hidden="true">|</span>
               <span>طريقة الدفع: <strong class="text-zinc-900">${escapeHtml(formatPayment(order, 'ar'))}</strong></span>
-              <span>•</span>
+              <span class="text-zinc-300" aria-hidden="true">|</span>
               <span>الإجمالي: <strong class="text-[#FF5000] font-mono text-sm">${order.total} ${CONFIG.CURRENCY}</strong></span>
-              ${order.couponCode ? `<span>•</span><span class="text-emerald-600 font-mono font-bold">كوبون: ${escapeHtml(order.couponCode)}</span>` : ''}
+              ${order.couponCode ? `<span class="text-zinc-300" aria-hidden="true">|</span><span class="text-emerald-600 font-mono font-bold">كوبون: ${escapeHtml(order.couponCode)}</span>` : ''}
             </div>
 
             ${packsExpandHtml}
@@ -515,7 +515,7 @@ export function renderOrders() {
 
           <a href="${packingSlipUrl}" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition flex items-center gap-1 shadow-sm">
             <span>إذن التجهيز</span>
-            <span>↗</span>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
           </a>
 
           <!-- Order Status Dropdown with Valid-Only Transitions Enabled -->
@@ -1061,10 +1061,10 @@ export function toggleOrderPacksExpand(orderId) {
   if (!expandEl) return;
   if (expandEl.classList.contains('hidden')) {
     expandEl.classList.remove('hidden');
-    if (arrowEl) arrowEl.textContent = '▲';
+    if (arrowEl) arrowEl.classList.add('rotate-180');
   } else {
     expandEl.classList.add('hidden');
-    if (arrowEl) arrowEl.textContent = '▼';
+    if (arrowEl) arrowEl.classList.remove('rotate-180');
   }
 }
 
@@ -1541,7 +1541,7 @@ export function renderCategories() {
               <span class="text-[10px] text-zinc-400 font-mono font-bold">(${count} منتج)</span>
             </div>
             <div class="text-[11px] text-zinc-500 font-mono mt-0.5 truncate">
-              <span>${escapeHtml(cat.nameEn || '')}</span> • <span class="text-[#FF5000]">id: ${escapeHtml(cat.id)}</span>
+              <span>${escapeHtml(cat.nameEn || '')}</span> <span class="text-zinc-300" aria-hidden="true">|</span> <span class="text-[#FF5000]">id: ${escapeHtml(cat.id)}</span>
             </div>
           </div>
         </div>
@@ -1549,8 +1549,8 @@ export function renderCategories() {
         <div class="flex items-center gap-1 flex-shrink-0">
           <!-- Reorder buttons -->
           <div class="flex flex-col gap-0.5">
-            <button onclick="reorderCategory(${index}, -1)" ${index === 0 ? 'disabled class="opacity-30"' : ''} class="p-1 rounded hover:bg-zinc-200 text-[10px]" title="تحريك لأعلى">▲</button>
-            <button onclick="reorderCategory(${index}, 1)" ${index === adminState.categories.length - 1 ? 'disabled class="opacity-30"' : ''} class="p-1 rounded hover:bg-zinc-200 text-[10px]" title="تحريك لأسفل">▼</button>
+            <button onclick="reorderCategory(${index}, -1)" ${index === 0 ? 'disabled class="opacity-30"' : ''} class="p-1 rounded hover:bg-zinc-200 text-zinc-600" title="تحريك لأعلى" aria-label="تحريك لأعلى"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"/></svg></button>
+            <button onclick="reorderCategory(${index}, 1)" ${index === adminState.categories.length - 1 ? 'disabled class="opacity-30"' : ''} class="p-1 rounded hover:bg-zinc-200 text-zinc-600" title="تحريك لأسفل" aria-label="تحريك لأسفل"><svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg></button>
           </div>
 
           <button onclick="editCategory(${index})" class="px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs transition flex items-center gap-1" title="تعديل">
@@ -2799,7 +2799,7 @@ export function renderAdminShowcase() {
             </div>
             <div class="flex items-center gap-2 mt-1 text-[11px] text-zinc-400 font-mono">
               <span class="text-zinc-500">${escapeHtml(item.captionEn || '')}</span>
-              <span>•</span>
+              <span class="text-zinc-300" aria-hidden="true">|</span>
               <span class="bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold">${escapeHtml(tagName)}</span>
             </div>
           </div>
@@ -3425,7 +3425,7 @@ export function renderCustomRequests() {
           <div class="flex items-center gap-2 min-w-0">
             <span class="px-1.5 py-0.5 rounded bg-zinc-900 text-white font-mono text-[10px] uppercase">${escapeHtml(f.kind || 'FILE')}</span>
             <span class="font-bold text-zinc-900 truncate">${escapeHtml(f.name || 'file')}</span>
-            <span class="text-zinc-500 font-mono">${sizeKb} KB ${dims ? `• ${dims}` : ''}</span>
+            <span class="text-zinc-500 font-mono">${sizeKb} KB ${dims ? `| ${dims}` : ''}</span>
             ${dpiBadge}
           </div>
           ${f.assetId ? `<button type="button" onclick="downloadCustomRequestAsset('${escapeHtml(f.assetId)}', '${escapeHtml(f.name || 'file')}')" class="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-black text-white font-bold text-[10px] whitespace-nowrap">تحميل الأصلي</button>` : ''}

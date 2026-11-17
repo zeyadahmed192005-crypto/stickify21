@@ -510,7 +510,7 @@ export function renderProducts() {
           <!-- Preview Button -->
           <button onclick="event.stopPropagation(); addStickerToMockup('${escapeHtml(product.id)}')" title="${isAr ? 'جرب على جهازك' : 'Preview on item'}" class="touch-preview-visible absolute bottom-2.5 left-2.5 px-3 py-1.5 rounded-lg bg-white/95 text-zinc-900 border border-zinc-200 hover:border-black hover:bg-black hover:text-white transition shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1.5 text-xs font-semibold">
             <span>${isAr ? 'معاينة' : 'Preview'}</span>
-            <span>↗</span>
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
           </button>
         </div>
 
@@ -1009,7 +1009,7 @@ export function renderCart() {
           </div>
           <div class="text-[11px] text-zinc-500 flex items-center gap-2 mt-1 font-mono">
             <span>${escapeHtml(itemSize)}</span>
-            <span>•</span>
+            <span class="text-zinc-300" aria-hidden="true">|</span>
             <span class="text-zinc-900 font-bold">${item.price * item.quantity} ${curr}</span>
           </div>
         </div>
@@ -2495,7 +2495,7 @@ export function renderProductDetailModal(product) {
           <div class="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/80 text-xs text-amber-950 space-y-1">
             <p class="font-bold">${isAr ? 'مواصفات فاصل الكتب القياسي:' : 'Standard Bookmark Specs:'}</p>
             <p class="text-[11px] text-amber-900/90 leading-relaxed">
-              ${isAr ? `المقاس: ${CONFIG.BOOKMARK_SPECS.dimensions} • كرتون كوشيه مقوى فاخر 350gsm • طبقة حماية سلوفان مطفي ناعمة فاخرة ضد الرطوبة.` : 'Dimensions: 15 × 5 cm • 350gsm Premium Artboard • Soft-touch matte protective laminate.'}
+              ${isAr ? `المقاس: ${CONFIG.BOOKMARK_SPECS.dimensions} | كرتون كوشيه مقوى فاخر 350gsm | طبقة حماية سلوفان مطفي ناعمة فاخرة ضد الرطوبة.` : 'Dimensions: 15 × 5 cm | 350gsm Premium Artboard | Soft-touch matte protective laminate.'}
             </p>
           </div>
         `}
@@ -2701,7 +2701,7 @@ export async function searchTrackOrder(query) {
     <div class="flex items-center justify-between py-2 border-b border-zinc-100 text-xs">
       <div>
         <p class="font-bold text-zinc-900">${escapeHtml(isAr ? (it.nameAr || it.name) : (it.nameEn || it.name || it.nameAr))}</p>
-        <p class="text-[11px] text-zinc-400 font-mono">${escapeHtml(it.size || '')} • ${isAr ? 'الكمية' : 'Qty'}: ${it.quantity}</p>
+        <p class="text-[11px] text-zinc-400 font-mono">${escapeHtml(it.size || '')} | ${isAr ? 'الكمية' : 'Qty'}: ${it.quantity}</p>
       </div>
       <div class="font-mono font-bold text-zinc-900">
         ${it.price * it.quantity} ${curr}
@@ -2853,7 +2853,7 @@ function renderCustomFilesList() {
             </div>
             <div class="min-w-0">
               <p class="font-bold text-zinc-900 truncate">${escapeHtml(entry.cleanName)}</p>
-              <p class="text-[10px] text-zinc-500 font-mono">${escapeHtml(sizeStr)} • ${escapeHtml(dimsStr)}</p>
+              <p class="text-[10px] text-zinc-500 font-mono">${escapeHtml(sizeStr)} | ${escapeHtml(dimsStr)}</p>
             </div>
           </div>
           <button type="button" onclick="removeCustomFile(${idx})" class="text-[11px] text-red-500 hover:text-red-700 font-bold px-2 py-1 rounded-lg hover:bg-red-50 transition">
@@ -3053,7 +3053,7 @@ export function updateCustomPrintSummary() {
   const sizeLabels = isAr
     ? { '6cm': '6 سم', '8cm': '8 سم', '10cm': '10 سم', 'custom': 'مقاس مخصص' }
     : { '6cm': '6 cm', '8cm': '8 cm', '10cm': '10 cm', 'custom': 'Custom Size' };
-  if (specEl) specEl.textContent = `${sizeLabels[state.customPrint.size] || (isAr ? '8 سم' : '8 cm')} • ${finishLabels[state.customPrint.finish] || (isAr ? 'لامع' : 'Glossy')}`;
+  if (specEl) specEl.textContent = `${sizeLabels[state.customPrint.size] || (isAr ? '8 سم' : '8 cm')} / ${finishLabels[state.customPrint.finish] || (isAr ? 'لامع' : 'Glossy')}`;
   
   if (totalEl) totalEl.textContent = summary.total;
 
