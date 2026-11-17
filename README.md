@@ -1,25 +1,25 @@
-# STICKIFY 21 — STICK YOUR VIBE 🚀
+# STICKIFY 21 — STICK YOUR VIBE
 ### متجر استيكرات وفواصل كتب مصري عالي الجودة | High-Quality Egyptian Vinyl Stickers & Bookmarks
 
-> **Language Notice:** This document is presented bilingually in **English** and **العربية (Egyptian Arabic)**.
-> **ملاحظة:** هذا الدليل متوفر باللغتين الإنجليزية والعربية لتسهيل التطوير والنشر.
+> **Language Notice:** Bilingual storefront (**العربية / English**, RTL/LTR mirroring) + Arabic owner Admin portal. Local-first prototype with **no backend** (`localStorage` + `IndexedDB`); all server-dependent workflows are transparently marked `DEMO` in `docs/LAUNCH-CHECKLIST.md`.
 
 ---
 
-## 🌟 English Overview
+## English Overview
 
-**STICKIFY 21** is a specialized Egyptian e-commerce brand designed for university students, tech enthusiasts, and avid readers. It offers:
-- **Die-cut waterproof vinyl stickers:** 3 official sizes (Small 6 cm, Medium 8 cm, Large 10 cm) with 2 finishes (Glossy, Matte).
+**STICKIFY 21** is a specialized Egyptian e-commerce prototype designed for university students, tech enthusiasts, and avid readers. It offers:
+- **Die-cut waterproof vinyl stickers:** 3 official sizes (Small 6 cm, Medium 8 cm, Large 10 cm) with 2 finishes (**Glossy** and **Matte** — holographic fully purged & auto-migrated).
 - **Premium cardstock bookmarks:** 15 × 5 cm, 350gsm cardstock with double-sided matte lamination.
-- **Custom print studio:** Custom batch orders for universities, tech clubs, book clubs, and corporate branding starting from 10 pieces with tiered volume pricing.
+- **Smart Packs & Auto-Grouping (R1, R10):** 5-sticker pack (-20%) and 10-sticker pack (-30%) with full pack contents visible across Cart, Checkout, WhatsApp message, `S21CODE` Order Code, Admin expandable rows, and Packing Slip PDFs.
+- **True-to-Scale Interactive Mockup Studio (R5–R7):** Layered neutral SVG mockups (Laptop, Phone, Water Bottle with cylindrical squeeze, A5 Spiral Notebook, Novel Book with top bookmark slot), live `pxPerCm` metric ruler, and keyed GPU `transform` drag.
+- **Safe Magic-Byte Uploads & Custom Print Studio (R14):** Strict PNG-only product art with alpha transparency detection & lossless PNG storage, plus multi-format custom print uploads (original bytes preserved in IndexedDB, SVG XSS sanitization, 300 DPI warning, WhatsApp Document workflow).
+- **Admin Portal (`admin.html`, default PIN `2121`):** 8-state order lifecycle (`pending` -> `awaiting_confirmation` -> `confirmed` -> `preparing` -> `ready` -> `shipped` -> `completed`, plus `cancelled`), HMAC-SHA256 signed sessions backed by a non-extractable IndexedDB `CryptoKey`, 1-tap next-step buttons with 10s Undo, single-page A4/A5/Label PDF packing slips (`>= 8.5pt`), CSV export with formula-injection protection, Dark Mode, Showcase Manager, and 25/page pagination for 500+ orders.
 - **Identity & Colors:** Brand Orange `#FF5000` (hover `#E04600`), Deep Black `#0E0E10`, Clean White `#FAFAFA`, WhatsApp Green `#25D366`.
 - **Typography:** `Readex Pro` (Arabic UI) and `Space Grotesk` (Numbers & Latin accents).
 
-The project is built with **Vanilla JavaScript (ES Modules)** and precompiled **Tailwind CSS**, operating completely offline/locally without any paid cloud services or external database dependencies, while maintaining a **clean enterprise architectural boundary** ready for seamless backend migration.
-
 ---
 
-## ⚡ 3-Command Quick Start (التشغيل السريع)
+## 3-Command Quick Start (التشغيل السريع)
 
 To run the project locally on your computer:
 
@@ -27,84 +27,60 @@ To run the project locally on your computer:
 # 1. Install dev dependencies (Tailwind CLI & Playwright)
 npm install
 
-# 2. (Optional) Rebuild Tailwind CSS if modifying utility classes
+# 2. Rebuild compiled Tailwind CSS
 npm run build:css
 
-# 3. Start the local server
+# 3. Start the local server (or run tests via: npm test)
 python scripts/server.py 3000
-# or alternatively:
-# npx serve .
 ```
 
-Then open your browser at: **`http://localhost:3000`** (or `http://127.0.0.1:3000`).
+Then open:
+- Storefront (Arabic): **`http://127.0.0.1:3000`**
+- Storefront (English): **`http://127.0.0.1:3000/?lang=en`**
+- Admin Portal (PIN `2121`): **`http://127.0.0.1:3000/admin.html`**
+
+### Deploy to GitHub Pages (للمشاركة والتجربة أونلاين مجاناً 24/7)
+1. Push this repository (including committed `dist/styles.css`) to a GitHub repository.
+2. Go to **Repository Settings → Pages → Source: Deploy from a branch (`master` / `main`, folder `/ (root)`) → Save**.
+3. Wait ~1 minute and share your permanent HTTPS URL: `https://<username>.github.io/<repo-name>/` (storefront) and `https://<username>.github.io/<repo-name>/admin.html` (admin).
 
 > [!IMPORTANT]
-> **Why is a local HTTP server required?**
-> The application uses standard ECMAScript modules (`<script type="module">`). Browsers block module imports over the `file://` protocol due to strict Cross-Origin (CORS) security policies. Opening `index.html` by double-clicking will display an informative bilingual guidance screen instead of a broken page.
+> **Why is a local HTTP server (or GitHub Pages) required?**
+> The application uses standard ECMAScript modules (`<script type="module">`). Browsers block module imports over `file://`. Opening `index.html` directly displays a clear bilingual guidance banner.
 
 ---
 
-## 🏗 Architecture & Project Structure (الهيكلية البرمجية)
+## Architecture & Project Structure (الهيكلية البرمجية)
 
 ```
 stickify21/
-├── index.html                  # Main storefront entry point (RTL, Egyptian Arabic)
-├── admin.html                  # Admin management dashboard (Orders, Products, Coupons, Settings)
-├── packing-slip.html           # Print-optimized packing slip (Single & batch printing)
-├── app.js                      # Storefront orchestration & event delegation
-├── admin.js                    # Admin dashboard logic & data bindings
+├── index.html                  # Bilingual storefront (AR RTL / EN LTR, >=44px mobile targets)
+├── admin.html                  # Arabic Admin portal (Dashboard, Orders, Products, Categories, Coupons, Showcase, Settings)
+├── packing-slip.html           # Measure-and-compact single-page A4 / A5 / 100x150mm Label PDF generator
+├── app.js                      # Storefront controller, keyed mockup studio, custom print & checkout
+├── admin.js                    # Admin dashboard controller, paginated orders, CSV export & PNG upload
 ├── logo.jpg                    # Official brand logo
-├── robots.txt                  # Search engine crawler directives
-├── sitemap.xml                 # Canonical XML sitemap
-├── tailwind.config.js          # Tailwind CLI configuration
-│
-├── dist/
-│   └── styles.css              # Precompiled, committed Tailwind CSS (runs without Node.js)
+├── tailwind.config.js          # Tailwind CLI config (darkMode: 'class' + dynamic safelist)
+├── dist/styles.css             # Precompiled, committed Tailwind CSS (auto-built before npm test)
 │
 ├── src/
-│   ├── config/
-│   │   └── config.js           # Central configuration (shipping rates, contacts, thresholds)
-│   ├── data/
-│   │   ├── storage.js          # Unified async StorageService interface & RemoteAdapter stub
-│   │   ├── localAdapter.js     # LocalStorage + IndexedDB (WebP compression <= 1000px)
-│   │   ├── migrations.js       # Versioned database migration runner
-│   │   └── seed.js             # Initial catalog seed data
-│   ├── domain/
-│   │   ├── pricing.js          # Unified pricing, pack bundles, and 27-gov shipping engine
-│   │   ├── coupons.js          # Coupon validation, usage tracking, and discount calculator
-│   │   ├── orders.js           # 6-state order lifecycle with transition validation & history
-│   │   ├── products.js         # Product models and category relationships
-│   │   ├── inventory.js        # Prototype stock tracking and availability guards
-│   │   ├── auth.js             # Admin passcode security (PBKDF2 Web Crypto, lockout timer)
-│   │   └── validation.js       # Strict Egyptian phone, address, and input validator
-│   └── utils/
-│       ├── escape.js           # XSS defense (escapeHtml, sanitizeSvg, sanitizeUrl)
-│       ├── ids.js              # Cryptographic IDs (S21-YYMMDD-XXXX) & Base64url Order Codes
-│       └── analytics.js        # Privacy-preserving analytics dispatcher (GA4 & Meta Pixel hooks)
+│   ├── config/config.js        # Central configuration (8 order states, 27 governorates, pricing tiers)
+│   ├── i18n/                   # Complete 100% key-parity bilingual layer (ar.js, en.js, index.js)
+│   ├── data/                   # StorageService (storage.js), LocalAdapter + IndexedDB, migrations.js, seed.js, policies.js
+│   ├── domain/                 # pricing.js (O(n) auto-packs), orders.js (8-state machine + formatPayment), auth.js (PBKDF2 + IndexedDB HMAC CryptoKey), coupons.js, inventory.js, validation.js
+│   └── utils/                  # fileValidation.js (magic bytes, alpha, lossless PNG, SVG XSS, 300 DPI), ids.js (8-char unambiguous crypto IDs + S21CODE), escape.js, emoji.js, arabic.js, icons.js, analytics.js
 │
-├── docs/
-│   ├── AUDIT.md                # Exhaustive phase 1 audit log & resolutions
-│   ├── DECISIONS.md            # Comprehensive architectural decision records (AD-01 to AD-25)
-│   ├── LIMITATIONS.md          # Local prototype boundaries and multi-device explanation
-│   └── LAUNCH-CHECKLIST.md     # Production deployment checklist & server migration guide
-│
-├── tests/                      # 100% automated Playwright test suite (34 passing tests)
-│   ├── phase1.spec.js          # Bug fixes, sizing, pack integrity, XSS sanitization
-│   ├── phase2.spec.js          # Data layer, 6-state orders, PBKDF2 auth, Base64url Order Code
-│   ├── phase3.spec.js          # Custom print studio, deep link modals, multi-payment options
-│   ├── phase4.spec.js          # Admin KPIs, bulk actions, UTF-8 BOM CSV, 27-gov settings, batch slips
-│   ├── phase5.spec.js          # SEO meta, crawler directives, dynamic JSON-LD, legal policy modals
-│   └── phase6.spec.js          # Full end-to-end integration, WebP compression, corrupt data recovery
-│
-└── scripts/
-    └── server.py               # Lightweight local Python HTTP server with UTF-8 support
+├── docs/                       # DECISIONS.md (AD-01..AD-53), LIMITATIONS.md, LAUNCH-CHECKLIST.md, COPY-REVIEW.md
+├── audit/                      # Independent audit reports (REPORT-v3.md, REPORT-v4.md), logs & scripts
+├── tests/                      # 83+ automated Playwright E2E, PDF, security, i18n, performance & mutation-guard tests
+└── scripts/server.py           # Multithreaded local Python HTTP server
 ```
 
 ---
 
-## 🔄 Data Flow & Storage Architecture (تدفق البيانات ونظام التخزين)
+## Data Flow & Storage Architecture (تدفق البيانات ونظام التخزين)
 
-All data access throughout the entire storefront and admin dashboard goes through a **single asynchronous interface** (`StorageService`). No UI component or domain module touches `localStorage` or `IndexedDB` directly.
+All core catalog, order, showcase, custom-print, and binary asset operations flow through the unified asynchronous `StorageService` (`src/data/storage.js`) backed by `LocalAdapter` (`localStorage` + `IndexedDB`), with a documented `RemoteAdapter` REST stub ready for backend integration. Non-extractable HMAC session keys live in a dedicated IndexedDB store (`stickify21_auth_keys_db`).
 
 ```mermaid
 flowchart TD

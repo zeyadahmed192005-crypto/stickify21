@@ -360,4 +360,30 @@ This document records all architectural decisions, ground-truth constraints, and
 - **Normalization Utility (`src/utils/arabic.js`):** Exports `normalizeArabic(text)` stripping tashkeel (`\u064B-\u065F\u0670`) and unifying alef, teh marbuta, alef maqsura, and hamza carriers.
 - **Product Tags & Filter Chips (`#tag-filter-chips`):** Seed products carry curated Egyptian Arabic/English tags; catalog renders clickable top-tag chips above `#products-grid` and matches normalized search queries across product names, descriptions, SKUs, and tags.
 
+### AD-48: Automated Tailwind CSS Freshness & Non-Blocking Fonts (P0-1)
+- **Decision:** Run `npm run build:css` automatically via `package.json` `pretest` before Playwright tests, maintain an explicit safelist in `tailwind.config.js` (`darkMode: 'class'`), and verify committed `dist/styles.css` matches a fresh Tailwind CLI build with zero holographic rules.
+- **Font Loading:** Use `rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'"` (with `<noscript>` fallback) so slow external CDN networks never block first paint.
+
+### AD-49: Unified Payment Formatting & Measure-and-Compact PDF Packing Slips (P0-2)
+- **Decision:** Centralize all payment rendering through `formatPayment(orderOrPayment, lang)` in `src/domain/orders.js` (zero `[object Object]` leaks).
+- **Print Layout:** Eliminate blank page 2 via `break-after: page` only on `:not(:last-child)` and `height: auto`, replace `overflow: hidden` clipping with a live measure-and-compact loop (`compact-l1..l4`) keeping font sizes `>= 8.5pt`, and warn explicitly on A5 > 25 items without truncation.
+
+### AD-50: Declarative Bilingual Storefront i18n with Zero-Leak Guarantee (P0-3)
+- **Decision:** Maintain 100% key parity between `src/i18n/ar.js` and `src/i18n/en.js`, apply `data-i18n*` attributes via `applyI18nToDom(lang)`, translate all 27 Egyptian governorates (`GOV_EN_MAP`) and tags (`TAG_EN_MAP`), and mark intentional Arabic calligraphy SVGs with `data-allow-arabic="true"` so automated zero-leak tests catch every unintended UI text leak.
+
+### AD-51: Shared Magic-Byte File Validation & R14 Upload Policies (P0-4)
+- **Decision:** Validate every uploaded file's magic bytes in `src/utils/fileValidation.js` (rejecting disguised executables, double extensions, 0-byte, and oversized files).
+- **Product/Category Art:** Strict PNG-only magic-byte enforcement with alpha transparency check, lossless `image/png` (`<=1200px`) + `256px` PNG thumbnail in IndexedDB, and Admin `"صور غير PNG"` migration filter.
+- **Custom Print Matrix:** Multi-format allowlist (configurable in Admin Settings), byte-for-byte original preservation in IndexedDB (SHA-256 verified), SVG XSS sanitization rendered strictly via `<img>`, 300 DPI print warning, and WhatsApp Document transfer workflow.
+
+### AD-52: Non-Extractable IndexedDB HMAC Admin Session & Strict Lifecycle Guards (P1-1, P1-2, P1-3)
+- **Decision:** Store a non-extractable HMAC-SHA256 `CryptoKey` in IndexedDB (`stickify21_auth_keys_db`) to sign and verify `stickify21_admin_session`, rejecting forged/tampered tokens and rotating keys on passcode changes.
+- **Transitions:** Lock `ORDER_TRANSITIONS.preparing` to `['ready', 'cancelled']` (enforcing `preparing -> ready -> shipped`).
+- **Identifiers & CSV:** Generate 8-char unambiguous crypto Order IDs (`23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, 0 collisions in 100k test) and prefix `'` on CSV cells starting with `= + - @ \t \r`.
+
+### AD-53: Keyed Mockup Reconciliation, Mobile 44px Targets & Admin Pagination (P1-5, P2-1, P2-2)
+- **Decision:** Reconcile placed mockup stickers by key (`data-placed-id`) and drag via GPU `transform: translate3d(...)` inside `requestAnimationFrame` without destroying sibling DOM nodes.
+- **Accessibility & Scale:** Enforce `>= 44px` interactive tap targets on `<= 640px` mobile viewports, optimize cart grouping to $O(n)$ (`< 300ms` for 100 lines), and paginate Admin Orders at 25/page for 500+ order resilience.
+
+
 
