@@ -1080,7 +1080,8 @@ export async function confirmShippingDispatch() {
   const customerPhone = (order.customer?.phone || '').replace(/\D/g, '');
   const waPhone = customerPhone.startsWith('0') ? '2' + customerPhone : (customerPhone.startsWith('2') ? customerPhone : '20' + customerPhone);
   
-  const waMsg = `مرحباً ${order.customer?.name || 'عميلنا العزيز'}\nتم شحن طلبك من STICKIFY 21 بنجاح!\n\nرقم الطلب: ${order.id}\nشركة الشحن: ${courier}\n${trackingNumber ? `رقم التتبع / البوليصة: ${trackingNumber}\n` : ''}المبلغ المطلوب: ${order.total} ${CONFIG.CURRENCY}\n\nيمكنك متابعة حالة الطلب من الرابط التالي:\n${window.location.origin}/track.html?id=${encodeURIComponent(order.id)}\n\nشكراً لتسوقك معنا.`;
+  const trackUrl = new URL(`index.html#/track/${encodeURIComponent(order.id)}`, window.location.href).href;
+  const waMsg = `مرحباً ${order.customer?.name || 'عميلنا العزيز'}\nتم شحن طلبك من STICKIFY 21 بنجاح!\n\nرقم الطلب: ${order.id}\nشركة الشحن: ${courier}\n${trackingNumber ? `رقم التتبع / البوليصة: ${trackingNumber}\n` : ''}المبلغ المطلوب: ${order.total} ${CONFIG.CURRENCY}\n\nيمكنك متابعة حالة الطلب من الرابط التالي:\n${trackUrl}\n\nشكراً لتسوقك معنا.`;
   
   const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
   const waLink = document.getElementById('ship-whatsapp-link');

@@ -3266,10 +3266,10 @@ export function updateProductJsonLd(products) {
     document.head.appendChild(scriptEl);
   }
 
-  const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : CONFIG.SITE_URL;
+  const baseUrl = (typeof window !== 'undefined' && window.location.href) ? window.location.href : CONFIG.SITE_URL;
   const items = (products || []).map((p, index) => {
     const isBookmark = p.category === 'bookmarks' || p.type === 'bookmark';
-    const prodImg = p.image ? (p.image.startsWith('data:') ? p.image : new URL(p.image, origin).href) : `${origin}/logo.jpg`;
+    const prodImg = p.image ? (p.image.startsWith('data:') ? p.image : new URL(p.image, baseUrl).href) : new URL('logo.jpg', baseUrl).href;
     return {
       '@type': 'Product',
       'position': index + 1,
@@ -3282,7 +3282,7 @@ export function updateProductJsonLd(products) {
         'priceCurrency': 'EGP',
         'price': p.price || (isBookmark ? 25 : 35),
         'availability': p.inStock !== false ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-        'url': `${origin}/#/product/${p.id}`,
+        'url': new URL(`#/product/${p.id}`, baseUrl).href,
         'seller': {
           '@type': 'Organization',
           'name': 'STICKIFY 21'
