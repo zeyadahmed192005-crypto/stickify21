@@ -31,9 +31,9 @@ test.describe('P0-1: dist/styles.css Freshness, Safelist & Visual CSS Integrity'
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#products-grid .sticker-card');
 
-    // Flask mockup must be vertical (height >= 400px, width <= 260px)
+    // Flask mockup must be vertical (height >= 400px, width <= 280px after 300ms transition)
     await page.click('button[data-device="bottle"]');
-    await page.waitForTimeout(150);
+    await expect.poll(async () => (await page.locator('#device-wrapper').boundingBox())?.width || 999).toBeLessThanOrEqual(280);
     const bottleBox = await page.locator('#device-wrapper').boundingBox();
     expect(bottleBox).not.toBeNull();
     expect(bottleBox.height).toBeGreaterThanOrEqual(400);
@@ -42,7 +42,7 @@ test.describe('P0-1: dist/styles.css Freshness, Safelist & Visual CSS Integrity'
 
     // Notebook mockup must be vertical A5 (height >= 360px, width <= 330px)
     await page.click('button[data-device="notebook"]');
-    await page.waitForTimeout(150);
+    await expect.poll(async () => (await page.locator('#device-wrapper').boundingBox())?.width || 999).toBeLessThanOrEqual(330);
     const nbBox = await page.locator('#device-wrapper').boundingBox();
     expect(nbBox).not.toBeNull();
     expect(nbBox.height).toBeGreaterThanOrEqual(360);
