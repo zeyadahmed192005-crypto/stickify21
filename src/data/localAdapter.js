@@ -15,7 +15,8 @@ const STORAGE_KEYS = {
   COUPONS: 'stickify21_coupons',
   SETTINGS: 'stickify21_settings',
   CART: 'stickify21_cart',
-  SHOWCASE: 'stickify21_showcase'
+  SHOWCASE: 'stickify21_showcase',
+  CUSTOM_REQUESTS: 'stickify21_custom_requests'
 };
 
 const DB_NAME = 'stickify21_assets_db';
@@ -571,5 +572,32 @@ export const LocalAdapter = {
       totalMb,
       percent
     };
+  },
+
+  // Custom Print Requests (R14)
+  async getCustomPrintRequests() {
+    const list = safeLoad(STORAGE_KEYS.CUSTOM_REQUESTS, []);
+    return Array.isArray(list) ? list : [];
+  },
+
+  async saveCustomPrintRequest(request) {
+    const list = await this.getCustomPrintRequests();
+    const idx = list.findIndex(r => r.id === request.id);
+    if (idx > -1) {
+      list[idx] = { ...list[idx], ...request };
+    } else {
+      list.unshift(request);
+    }
+    safeSave(STORAGE_KEYS.CUSTOM_REQUESTS, list);
+    return request;
+  },
+
+  async updateCustomPrintRequest(requestId, updates) {
+    const list = await this.getCustomPrintRequests();
+    const idx = list.findIndex(r => r.id === requestId);
+    if (idx === -1) return null;
+    list[idx] = { ...list[idx], ...updates };
+    safeSave(STORAGE_KEYS.CUSTOM_REQUESTS, list);
+    return list[idx];
   }
 };

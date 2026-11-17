@@ -108,20 +108,95 @@ class StorageService {
     return this.adapter.saveSettings(settings);
   }
 
-  // Assets & Uploads (IndexedDB WebP)
+  // Assets & Uploads (IndexedDB)
   async uploadImage(file) {
     await this.init();
     const { compressImageToWebP, saveAssetToIndexedDb } = await import('./localAdapter.js');
     const compressed = await compressImageToWebP(file);
     const assetId = 'asset-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-    await saveAssetToIndexedDb(assetId, compressed, { name: file.name, type: file.type });
+    await saveAssetToIndexedDb(assetId, compressed, { name: file.name, type: 'image/webp' });
     return {
       id: assetId,
       name: file.name,
       size: file.size,
-      type: file.type,
+      type: 'image/webp',
       previewUrl: URL.createObjectURL(compressed)
     };
+  }
+
+  // R14: Lossless PNG-only Product Art upload preserving alpha channel (<=1200px PNG + 256px PNG thumb)
+  async uploadProductPng(file) {
+    await this.init();
+    const { saveAssetToIndexedDb } = await import('./localAdapter.js');
+    const { resizePngKeepingAlpha, sanitizeFilename } = await import('../utils/fileValidation.js');
+    const { main, thumb, origWidth, origHeight } = await resizePngKeepingAlpha(file, 1200, 256);
+    const baseId = 'png-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    const mainId = baseId;
+    const thumbId = baseId + '-thumb';
+    const safeName = sanitizeFilename(file.name);
+    await saveAssetToIndexedDb(mainId, main.blob, {
+      name: safeName,
+      mimeType: 'image/png',
+      width: main.width,
+      height: main.height,
+      origWidth,
+      origHeight
+    });
+    await saveAssetToIndexedDb(thumbId, thumb.blob, {
+      name: safeName,
+      mimeType: 'image/png',
+      width: thumb.width,
+      height: thumb.height,
+      isThumb: true
+    });
+    return {
+      id: mainId,
+      thumbId,
+      name: safeName,
+      mimeType: 'image/png',
+      thumbMimeType: 'image/png',
+      width: main.width,
+      height: main.height,
+      size: main.blob.size,
+      dataUrl: main.dataUrl,
+      thumbDataUrl: thumb.dataUrl
+    };
+  }
+
+  // R14: Store exact original bytes for customer custom print uploads (no re-encoding)
+  async storeOriginalAsset(fileOrBlob, metadata = {}) {
+    await this.init();
+    const { saveAssetToIndexedDb } = await import('./localAdapter.js');
+    const assetId = 'orig-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    await saveAssetToIndexedDb(assetId, fileOrBlob, {
+      ...metadata,
+      originalPreserved: true
+    });
+    return {
+      id: assetId,
+      size: fileOrBlob.size,
+      ...metadata
+    };
+  }
+
+  async getAssetBlob(assetId) {
+    await this.init();
+    const { getAssetFromIndexedDb } = await import('./localAdapter.js');
+    return getAssetFromIndexedDb(assetId);
+  }
+
+  // Custom Print Requests (R14)
+  async getCustomPrintRequests() {
+    await this.init();
+    return this.adapter.getCustomPrintRequests();
+  }
+  async saveCustomPrintRequest(req) {
+    await this.init();
+    return this.adapter.saveCustomPrintRequest(req);
+  }
+  async updateCustomPrintRequest(id, updates) {
+    await this.init();
+    return this.adapter.updateCustomPrintRequest(id, updates);
   }
 
   // Showcase

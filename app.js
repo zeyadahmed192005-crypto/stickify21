@@ -19,6 +19,12 @@ import { stripEmoji } from './src/utils/emoji.js';
 import { getIcon } from './src/utils/icons.js';
 import { DEFAULT_POLICIES } from './src/data/policies.js';
 import { normalizeArabic } from './src/utils/arabic.js';
+import {
+  validateFile,
+  UPLOAD_POLICIES,
+  DEFAULT_CUSTOM_UPLOAD_POLICY,
+  checkPrintDpi
+} from './src/utils/fileValidation.js';
 
 // Safe JSON parser with fallback and corrupted snapshot
 function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
@@ -83,9 +89,11 @@ const state = {
   },
   customPrint: {
     file: null,
+    files: [],
     fileName: '',
     fileSize: 0,
     fileUrl: '',
+    lastOrder: null,
     size: '8cm',
     finish: 'glossy',
     quantity: 10,
@@ -2185,14 +2193,17 @@ export function handlePaymentMethodChange(method) {
   }
 }
 
-export function handlePaymentProofSelected(event) {
+export async function handlePaymentProofSelected(event) {
   const file = event.target.files?.[0];
   const errEl = document.getElementById('payment-proof-error');
   const previewBox = document.getElementById('payment-proof-preview');
   const previewImg = document.getElementById('payment-proof-preview-img');
   const filenameEl = document.getElementById('payment-proof-filename');
 
-  if (errEl) errEl.classList.add('hidden');
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
 
   if (!file) {
     state.checkoutPaymentProof = null;
@@ -2200,10 +2211,10 @@ export function handlePaymentProofSelected(event) {
     return;
   }
 
-  // Check 5MB limit
-  if (file.size > 5 * 1024 * 1024) {
+  const check = await validateFile(file, UPLOAD_POLICIES.paymentProof, getLanguage());
+  if (!check.valid) {
     if (errEl) {
-      errEl.textContent = 'حجم الصورة يتجاوز الحد الأقصى (5 ميجابايت). يرجى اختيار صورة أصغر.';
+      errEl.textContent = check.reason;
       errEl.classList.remove('hidden');
     }
     event.target.value = '';
@@ -2216,7 +2227,7 @@ export function handlePaymentProofSelected(event) {
   reader.onload = (e) => {
     state.checkoutPaymentProof = e.target.result;
     if (previewImg) previewImg.src = e.target.result;
-    if (filenameEl) filenameEl.textContent = file.name;
+    if (filenameEl) filenameEl.textContent = check.cleanName;
     if (previewBox) previewBox.classList.remove('hidden');
   };
   reader.readAsDataURL(file);
@@ -2749,73 +2760,230 @@ export async function searchTrackOrder(query) {
 }
 
 // ==========================================
-// CUSTOM PRINT STUDIO (IndexedDB & Tiered Pricing)
+// CUSTOM PRINT STUDIO (R14 Multi-Format Safe Uploads, Original Bytes & 300 DPI)
 // ==========================================
-export function handleCustomFileSelect(files) {
-  const errorEl = document.getElementById('custom-file-error');
-  if (errorEl) errorEl.classList.add('hidden');
+function getCustomUploadPolicy() {
+  const cfg = state.settings?.customUpload || {};
+  return {
+    allowedExtensions: Array.isArray(cfg.allowedExtensions) && cfg.allowedExtensions.length > 0
+      ? cfg.allowedExtensions
+      : DEFAULT_CUSTOM_UPLOAD_POLICY.allowedExtensions,
+    maxFileSizeMb: Number(cfg.maxFileSizeMb) > 0 ? Number(cfg.maxFileSizeMb) : DEFAULT_CUSTOM_UPLOAD_POLICY.maxFileSizeMb,
+    maxFiles: Number(cfg.maxFiles) > 0 ? Number(cfg.maxFiles) : DEFAULT_CUSTOM_UPLOAD_POLICY.maxFiles,
+    maxTotalSizeMb: Number(cfg.maxTotalSizeMb) > 0 ? Number(cfg.maxTotalSizeMb) : DEFAULT_CUSTOM_UPLOAD_POLICY.maxTotalSizeMb
+  };
+}
 
-  if (!files || files.length === 0) return;
-  const file = files[0];
+function updateCustomDpiWarning() {
+  const warnEl = document.getElementById('custom-dpi-warning');
+  if (!warnEl) return;
+  const isAr = getLanguage() === 'ar';
+  const lowResItems = (state.customPrint.files || []).filter(f => {
+    if (!f.dimensions || !f.dimensions.width || !f.dimensions.height) return false;
+    const dpiInfo = checkPrintDpi(f.dimensions.width, f.dimensions.height, state.customPrint.size);
+    f.dpiInfo = dpiInfo;
+    return dpiInfo.isLowRes;
+  });
 
-  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
-  if (!allowedTypes.includes(file.type)) {
-    if (errorEl) {
-      errorEl.textContent = 'صيغة الملف غير مدعومة. يرجى رفع ملف بصيغة PNG أو JPG أو PDF.';
-      errorEl.classList.remove('hidden');
-    }
-    return;
+  if (lowResItems.length > 0) {
+    const first = lowResItems[0];
+    warnEl.textContent = isAr
+      ? `تنبيه دقة الطباعة (300 DPI): الملف "${first.cleanName}" أبعاده ${first.dimensions.width}×${first.dimensions.height}px (${first.dpiInfo.dpi} DPI) أقل من الدقة المثالية لمقاس ${first.dpiInfo.cm} سم (الموصى به ≥ ${first.dpiInfo.minRequiredPx}px).`
+      : `Print resolution warning (300 DPI): "${first.cleanName}" is ${first.dimensions.width}×${first.dimensions.height}px (${first.dpiInfo.dpi} DPI), below optimal 300 DPI for ${first.dpiInfo.cm} cm (recommended ≥ ${first.dpiInfo.minRequiredPx}px).`;
+    warnEl.classList.remove('hidden');
+  } else {
+    warnEl.textContent = '';
+    warnEl.classList.add('hidden');
   }
+}
 
-  const maxBytes = 10 * 1024 * 1024; // 10MB
-  if (file.size > maxBytes) {
-    if (errorEl) {
-      errorEl.textContent = 'حجم الملف يتجاوز الحد المسموح (10MB). يرجى تقليل حجم الملف.';
-      errorEl.classList.remove('hidden');
-    }
-    return;
-  }
-
-  state.customPrint.file = file;
-  state.customPrint.fileName = file.name;
-  state.customPrint.fileSize = file.size;
-
+function renderCustomFilesList() {
+  const listEl = document.getElementById('custom-files-list');
   const dropPrompt = document.getElementById('dropzone-prompt');
   const dropPreview = document.getElementById('dropzone-preview');
   const nameEl = document.getElementById('preview-file-name');
   const sizeEl = document.getElementById('preview-file-size');
   const mediaBox = document.getElementById('preview-media-box');
+  const isAr = getLanguage() === 'ar';
 
-  if (nameEl) nameEl.textContent = file.name;
-  if (sizeEl) sizeEl.textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+  const items = state.customPrint.files || [];
+  if (items.length === 0) {
+    if (dropPrompt) dropPrompt.classList.remove('hidden');
+    if (dropPreview) dropPreview.classList.add('hidden');
+    if (listEl) {
+      listEl.innerHTML = '';
+      listEl.classList.add('hidden');
+    }
+    updateCustomDpiWarning();
+    return;
+  }
+
+  const first = items[0];
+  state.customPrint.file = first.originalFile;
+  state.customPrint.fileName = items.map(i => i.cleanName).join(', ');
+  state.customPrint.fileSize = items.reduce((sum, i) => sum + (i.size || 0), 0);
+
+  if (nameEl) nameEl.textContent = items.length === 1 ? first.cleanName : (isAr ? `${items.length} ملفات جاهزة للطباعة` : `${items.length} files ready to print`);
+  if (sizeEl) sizeEl.textContent = `${(state.customPrint.fileSize / (1024 * 1024)).toFixed(2)} MB`;
 
   if (mediaBox) {
-    if (file.type === 'application/pdf') {
-      mediaBox.innerHTML = '<span class="text-xs text-zinc-400 font-mono font-bold">FILE</span>';
+    if (first.previewImgUrl) {
+      mediaBox.innerHTML = `<img src="${escapeHtml(first.previewImgUrl)}" alt="${escapeHtml(first.cleanName)}" class="w-full h-full object-contain">`;
     } else {
-      const url = URL.createObjectURL(file);
-      mediaBox.innerHTML = `<img src="${url}" class="w-full h-full object-contain">`;
+      mediaBox.innerHTML = `<span class="text-[11px] text-zinc-700 font-mono font-black uppercase">${escapeHtml(first.kind || 'FILE')}</span>`;
     }
   }
 
   if (dropPrompt) dropPrompt.classList.add('hidden');
   if (dropPreview) dropPreview.classList.remove('hidden');
-  showToast('تم تحميل ملف التصميم بنجاح');
+
+  if (listEl) {
+    listEl.innerHTML = items.map((entry, idx) => {
+      const sizeStr = entry.size < 1024 * 1024
+        ? `${Math.max(1, Math.round(entry.size / 1024))} KB`
+        : `${(entry.size / (1024 * 1024)).toFixed(2)} MB`;
+      const dimsStr = entry.dimensions ? `${entry.dimensions.width}×${entry.dimensions.height}px` : entry.kind.toUpperCase();
+      return `
+        <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-8 h-8 rounded-lg bg-white border border-zinc-200 flex items-center justify-center shrink-0 overflow-hidden">
+              ${entry.previewImgUrl
+                ? `<img src="${escapeHtml(entry.previewImgUrl)}" alt="" class="w-full h-full object-contain">`
+                : `<span class="text-[9px] font-mono font-black text-zinc-700 uppercase">${escapeHtml(entry.kind)}</span>`}
+            </div>
+            <div class="min-w-0">
+              <p class="font-bold text-zinc-900 truncate">${escapeHtml(entry.cleanName)}</p>
+              <p class="text-[10px] text-zinc-500 font-mono">${escapeHtml(sizeStr)} • ${escapeHtml(dimsStr)}</p>
+            </div>
+          </div>
+          <button type="button" onclick="removeCustomFile(${idx})" class="text-[11px] text-red-500 hover:text-red-700 font-bold px-2 py-1 rounded-lg hover:bg-red-50 transition">
+            ${isAr ? 'حذف' : 'Remove'}
+          </button>
+        </div>
+      `;
+    }).join('');
+    listEl.classList.remove('hidden');
+  }
+
+  updateCustomDpiWarning();
+}
+
+export function removeCustomFile(idx) {
+  const items = state.customPrint.files || [];
+  const removed = items.splice(idx, 1)[0];
+  if (removed && removed.previewImgUrl && removed.previewImgUrl.startsWith('blob:')) {
+    try { URL.revokeObjectURL(removed.previewImgUrl); } catch (e) {}
+  }
+  renderCustomFilesList();
+}
+
+export async function handleCustomFileSelect(fileList) {
+  const errorEl = document.getElementById('custom-file-error');
+  const isAr = getLanguage() === 'ar';
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+
+  if (!fileList || fileList.length === 0) return;
+  const files = Array.from(fileList);
+  const policyCfg = getCustomUploadPolicy();
+
+  if (files.length > policyCfg.maxFiles) {
+    if (errorEl) {
+      errorEl.textContent = isAr
+        ? `الحد الأقصى هو ${policyCfg.maxFiles} ملفات في الطلب الواحد.`
+        : `Maximum ${policyCfg.maxFiles} files allowed per request.`;
+      errorEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
+  if (totalBytes > policyCfg.maxTotalSizeMb * 1024 * 1024) {
+    if (errorEl) {
+      errorEl.textContent = isAr
+        ? `الحجم الإجمالي للملفات يتجاوز الحد المسموح (${policyCfg.maxTotalSizeMb} ميجابايت).`
+        : `Total files size exceeds the ${policyCfg.maxTotalSizeMb} MB limit.`;
+      errorEl.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const filePolicy = {
+    name: 'custom_print',
+    allowedExtensions: policyCfg.allowedExtensions,
+    maxBytes: policyCfg.maxFileSizeMb * 1024 * 1024,
+    requireImageDecode: false
+  };
+
+  const validated = [];
+  for (const file of files) {
+    const res = await validateFile(file, filePolicy, getLanguage());
+    if (!res.valid) {
+      if (errorEl) {
+        errorEl.textContent = res.reason;
+        errorEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    // Build safe preview URL:
+    // - SVG: ALWAYS sanitize first and render via <img src="blob:..."> (never inline DOM!)
+    // - Web raster (png/jpg/webp/gif/bmp): blob URL of original file
+    // - Vector/Print docs (pdf/ai/eps/psd/cdr/tiff/heic): icon + name + size only
+    let previewImgUrl = '';
+    let fileToStore = file;
+    if (res.kind === 'svg') {
+      const safeSvgBlob = new Blob([res.sanitizedSvgText], { type: 'image/svg+xml' });
+      fileToStore = new File([safeSvgBlob], res.cleanName, { type: 'image/svg+xml' });
+      previewImgUrl = URL.createObjectURL(safeSvgBlob);
+    } else if (['png', 'jpg', 'webp', 'gif', 'bmp'].includes(res.kind)) {
+      previewImgUrl = URL.createObjectURL(file);
+    }
+
+    validated.push({
+      originalFile: fileToStore,
+      cleanName: res.cleanName,
+      kind: res.kind,
+      ext: res.ext,
+      size: fileToStore.size,
+      sha256: res.sha256,
+      dimensions: res.dimensions,
+      previewImgUrl
+    });
+  }
+
+  // Revoke previous object URLs
+  (state.customPrint.files || []).forEach(old => {
+    if (old.previewImgUrl && old.previewImgUrl.startsWith('blob:')) {
+      try { URL.revokeObjectURL(old.previewImgUrl); } catch (e) {}
+    }
+  });
+
+  state.customPrint.files = validated;
+  renderCustomFilesList();
+  showToast(isAr
+    ? `تم تجهيز ${validated.length} ملف بنجاح (بالجودة الأصلية)`
+    : `${validated.length} file(s) validated and ready at original quality`);
 }
 
 export function clearCustomUpload(e) {
   if (e) e.stopPropagation();
+  (state.customPrint.files || []).forEach(old => {
+    if (old.previewImgUrl && old.previewImgUrl.startsWith('blob:')) {
+      try { URL.revokeObjectURL(old.previewImgUrl); } catch (err) {}
+    }
+  });
   state.customPrint.file = null;
+  state.customPrint.files = [];
   state.customPrint.fileName = '';
   state.customPrint.fileSize = 0;
 
   const fileInput = document.getElementById('custom-file-input');
   if (fileInput) fileInput.value = '';
 
-  const dropPrompt = document.getElementById('dropzone-prompt');
-  const dropPreview = document.getElementById('dropzone-preview');
-  if (dropPrompt) dropPrompt.classList.remove('hidden');
-  if (dropPreview) dropPreview.classList.add('hidden');
+  renderCustomFilesList();
 }
 
 export function selectCustomSize(sizeKey) {
@@ -2830,6 +2998,7 @@ export function selectCustomSize(sizeKey) {
     activeBtn.classList.add('border-zinc-900', 'bg-zinc-900', 'text-white', 'active-custom-size');
   }
   updateCustomPrintSummary();
+  updateCustomDpiWarning();
 }
 
 export function selectCustomFinish(finishKey) {
@@ -2898,7 +3067,31 @@ export function updateCustomPrintSummary() {
   if (badgeEl) badgeEl.textContent = isAr ? summary.tierLabel : (summary.tierLabelEn || summary.tierLabel);
 }
 
+export async function shareCustomOrderFiles() {
+  const last = state.customPrint.lastOrder;
+  const isAr = getLanguage() === 'ar';
+  if (!last) return;
+  const filesToShare = (state.customPrint.files || []).map(f => f.originalFile).filter(Boolean);
+  if (typeof navigator !== 'undefined' && navigator.share && filesToShare.length > 0 && (!navigator.canShare || navigator.canShare({ files: filesToShare }))) {
+    try {
+      await navigator.share({
+        title: `STICKIFY 21 Custom Print ${last.id}`,
+        text: last.waMsg,
+        files: filesToShare
+      });
+      return;
+    } catch (e) {
+      // Fall through to WhatsApp link if share cancelled/failed
+    }
+  }
+  window.open(last.waUrl, '_blank');
+  showToast(isAr
+    ? 'يرجى إرفاق الملف الأصلي كمستند (Document) في محادثة واتساب للحفاظ على الجودة.'
+    : 'Please attach your original file as a Document in WhatsApp to preserve full print quality.', 'warning');
+}
+
 export async function submitCustomPrintOrder() {
+  const isAr = getLanguage() === 'ar';
   const nameInput = document.getElementById('custom-customer-name');
   const phoneInput = document.getElementById('custom-customer-phone');
   const notesInput = document.getElementById('custom-order-notes');
@@ -2918,7 +3111,7 @@ export async function submitCustomPrintOrder() {
 
   if (name.length < 3) {
     if (nameError) {
-      nameError.textContent = 'يرجى كتابة الاسم بالكامل (3 أحرف على الأقل)';
+      nameError.textContent = isAr ? 'يرجى كتابة الاسم بالكامل (3 أحرف على الأقل)' : 'Please enter your full name (at least 3 characters)';
       nameError.classList.remove('hidden');
     }
     hasError = true;
@@ -2928,7 +3121,7 @@ export async function submitCustomPrintOrder() {
   const egRegex = /^(?:\+20|0020|0)?(1[0125]\d{8})$/;
   if (!egRegex.test(cleanPhone)) {
     if (phoneError) {
-      phoneError.textContent = 'يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678)';
+      phoneError.textContent = isAr ? 'يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678)' : 'Please enter a valid Egyptian phone number (e.g. 01012345678)';
       phoneError.classList.remove('hidden');
     }
     hasError = true;
@@ -2943,12 +3136,33 @@ export async function submitCustomPrintOrder() {
   }
 
   try {
-    if (state.customPrint.file) {
+    // Store exact original bytes in IndexedDB (NO re-encoding!)
+    const storedFiles = [];
+    for (const entry of (state.customPrint.files || [])) {
+      const dpiInfo = entry.dimensions ? checkPrintDpi(entry.dimensions.width, entry.dimensions.height, state.customPrint.size) : null;
+      let assetId = null;
       try {
-        await storage.uploadImage(state.customPrint.file);
+        const stored = await storage.storeOriginalAsset(entry.originalFile, {
+          name: entry.cleanName,
+          kind: entry.kind,
+          mimeType: entry.originalFile.type || 'application/octet-stream',
+          sha256: entry.sha256,
+          dimensions: entry.dimensions
+        });
+        assetId = stored.id;
       } catch (err) {
-        console.warn('Could not store image in IndexedDB:', err);
+        console.warn('Could not store original file in IndexedDB:', err);
       }
+      storedFiles.push({
+        assetId,
+        name: entry.cleanName,
+        kind: entry.kind,
+        size: entry.size,
+        sha256: entry.sha256,
+        dimensions: entry.dimensions || null,
+        dpi: dpiInfo ? dpiInfo.dpi : null,
+        isLowRes: dpiInfo ? dpiInfo.isLowRes : false
+      });
     }
 
     const qty = Math.max(10, state.customPrint.quantity || 10);
@@ -2969,18 +3183,44 @@ export async function submitCustomPrintOrder() {
       total: summary.total,
       savings: summary.savings,
       tierLabel: summary.tierLabel,
-      fileName: state.customPrint.fileName || '',
+      fileName: storedFiles.map(f => f.name).join(', ') || state.customPrint.fileName || '',
+      files: storedFiles,
+      receivedOnWhatsApp: false,
       date: new Date().toISOString()
     };
 
+    await storage.saveCustomPrintRequest(customOrder);
+
     const waMsg = formatCustomPrintWhatsAppMessage(customOrder);
     const waUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}`;
+    state.customPrint.lastOrder = { id: customOrderId, waMsg, waUrl };
 
-    showToast(`تم تجهيز طلب الطباعة المخصصة ${customOrderId}! `);
+    const confirmBox = document.getElementById('custom-order-confirmation');
+    if (confirmBox) {
+      confirmBox.innerHTML = `
+        <div class="font-bold text-emerald-900">${isAr ? `تم حفظ طلب الطباعة #${escapeHtml(customOrderId)} بالملفات الأصلية` : `Custom Print Request #${escapeHtml(customOrderId)} Saved`}</div>
+        <p class="text-[11px] text-emerald-800 leading-relaxed">
+          ${isAr
+            ? 'ملاحظة (DEMO محلي): تم حفظ ملفاتك الأصلية داخل متصفحك. لإرسالها لفريق الطباعة بأعلى جودة، استخدم زر المشاركة أدناه أو أرفقها كمستند (Document) في واتساب حتى لا يتم ضغطها.'
+            : 'Local Prototype Notice (DEMO): Your original files are saved locally in your browser. Use Share below or attach them as a Document in WhatsApp so they are not compressed.'}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" id="custom-share-file-btn" onclick="shareCustomOrderFiles()" class="flex-1 py-2 px-3 rounded-xl bg-zinc-900 hover:bg-black text-white font-bold text-[11px] transition">
+            ${isAr ? 'مشاركة الملفات عبر واتساب' : 'Share Files via WhatsApp'}
+          </button>
+          <a href="${waUrl}" target="_blank" class="py-2 px-3 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-[11px] transition">
+            ${isAr ? 'فتح واتساب' : 'Open WhatsApp'}
+          </a>
+        </div>
+      `;
+      confirmBox.classList.remove('hidden');
+    }
+
+    showToast(isAr ? `تم تجهيز طلب الطباعة المخصصة ${customOrderId}!` : `Custom print request ${customOrderId} ready!`);
     window.open(waUrl, '_blank');
   } catch (err) {
     console.error('Error submitting custom print order:', err);
-    showToast('حدث خطأ أثناء معالجة طلب الطباعة، يرجى المحاولة مرة أخرى.', 'error');
+    showToast(isAr ? 'حدث خطأ أثناء معالجة طلب الطباعة، يرجى المحاولة مرة أخرى.' : 'Failed to process custom print request. Please try again.', 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -3443,7 +3683,9 @@ window.closeOrderTrackingModal = closeOrderTrackingModal;
 window.handleTrackOrderSubmit = handleTrackOrderSubmit;
 window.searchTrackOrder = searchTrackOrder;
 window.handleCustomFileSelect = handleCustomFileSelect;
+window.removeCustomFile = removeCustomFile;
 window.clearCustomUpload = clearCustomUpload;
+window.shareCustomOrderFiles = shareCustomOrderFiles;
 window.selectCustomSize = selectCustomSize;
 window.selectCustomFinish = selectCustomFinish;
 window.adjustCustomQty = adjustCustomQty;

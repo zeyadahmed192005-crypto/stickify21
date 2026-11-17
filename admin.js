@@ -18,6 +18,14 @@ import {
   setupAuthSync
 } from './src/domain/auth.js';
 import { storage } from './src/data/storage.js';
+import {
+  validateFile,
+  UPLOAD_POLICIES,
+  DEFAULT_CUSTOM_UPLOAD_POLICY,
+  detectPngAlpha
+} from './src/utils/fileValidation.js';
+
+let pendingOpaquePngFile = null;
 
 // Admin State
 let adminState = {
@@ -28,6 +36,7 @@ let adminState = {
   categories: [],
   coupons: [],
   showcase: [],
+  customRequests: [],
   settings: {},
   productSearch: '',
   productCategoryFilter: 'all',
@@ -188,12 +197,14 @@ export async function loadData() {
   adminState.coupons = await storage.getCoupons();
   adminState.settings = await storage.getSettings();
   adminState.showcase = await storage.getShowcase();
+  adminState.customRequests = await storage.getCustomPrintRequests();
 
   renderAll();
 }
 
 function renderAll() {
   renderOrders();
+  renderCustomRequests();
   renderProducts();
   renderCategories();
   renderCoupons();
@@ -1555,18 +1566,35 @@ export async function reorderCategory(index, direction) {
   showAdminToast('تم تغيير ترتيب الأقسام بنجاح');
 }
 
-export function handleCategoryFileUpload(e) {
-  const file = e.target.files[0];
+export async function handleCategoryFileUpload(e) {
+  const file = e.target.files?.[0];
+  const errEl = document.getElementById('cat-file-error');
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(evt) {
+  const check = await validateFile(file, UPLOAD_POLICIES.productPng, 'ar');
+  if (!check.valid) {
+    if (errEl) {
+      errEl.textContent = check.reason;
+      errEl.classList.remove('hidden');
+    }
+    showAdminToast(check.reason, 'error');
+    e.target.value = '';
+    return;
+  }
+
+  try {
+    const asset = await storage.uploadProductPng(file);
     const input = document.getElementById('cat-image-url');
-    if (input) input.value = evt.target.result;
+    if (input) input.value = asset.dataUrl;
     updateCategoryPreview();
-    showAdminToast('تم تحميل صورة القسم بنجاح!');
-  };
-  reader.readAsDataURL(file);
+    showAdminToast('تم حفظ صورة القسم بصيغة PNG شفافة بنجاح!');
+  } catch (err) {
+    showAdminToast('تعذر معالجة صورة PNG، يرجى المحاولة بصورة أخرى.', 'error');
+  }
 }
 
 export function updateCategoryPreview() {
@@ -1680,16 +1708,23 @@ export function handleAdminProductCategoryFilter(catId) {
   renderProducts();
 }
 
+function isPngImageSource(src) {
+  if (!src || typeof src !== 'string') return false;
+  const trimmed = src.trim().toLowerCase();
+  return trimmed.startsWith('data:image/png') || /\.png(\?.*)?$/i.test(trimmed);
+}
+
 export function renderProducts() {
   const container = document.getElementById('admin-products-table');
   if (!container) return;
 
   // Populate Category Filter dropdown
   const catFilterSelect = document.getElementById('admin-product-category-filter');
-  if (catFilterSelect && catFilterSelect.children.length <= 1) {
+  if (catFilterSelect && catFilterSelect.querySelectorAll('option[data-cat-opt="1"]').length === 0) {
     adminState.categories.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
+      opt.dataset.catOpt = '1';
       opt.textContent = c.nameAr;
       catFilterSelect.appendChild(opt);
     });
@@ -1708,9 +1743,11 @@ export function renderProducts() {
     );
   }
 
-  // Category filter
+  // Category / Migration filter (including R14 non_png)
   if (adminState.productCategoryFilter === 'missing_en') {
     list = list.filter(p => !p.nameEn || p.nameEn.trim() === '' || p.nameEn === p.nameAr);
+  } else if (adminState.productCategoryFilter === 'non_png') {
+    list = list.filter(p => Boolean(p.image && p.image.trim() !== '' && !isPngImageSource(p.image)));
   } else if (adminState.productCategoryFilter && adminState.productCategoryFilter !== 'all') {
     list = list.filter(p => p.category === adminState.productCategoryFilter);
   }
@@ -2340,27 +2377,80 @@ export async function quickUpdatePrice(index, newPrice) {
   showAdminToast(`تم تحديث سعر [${prod.sku}] إلى ${priceNum} ${CONFIG.CURRENCY}`);
 }
 
+async function commitProductPngFile(file) {
+  showAdminToast('جارٍ حفظ الصورة بصيغة PNG بدون فقدان مع الحفاظ على الشفافية...', 'warning');
+  const asset = await storage.uploadProductPng(file);
+  const input = document.getElementById('prod-image');
+  if (input) input.value = asset.dataUrl;
+  updateProductPreview();
+  showAdminToast(`تم حفظ الصورة بصيغة PNG (${asset.width}×${asset.height}px) بنجاح!`);
+}
+
+export async function confirmOpaqueProductPng() {
+  const warnEl = document.getElementById('prod-alpha-warning');
+  if (warnEl) warnEl.classList.add('hidden');
+  if (!pendingOpaquePngFile) return;
+  const f = pendingOpaquePngFile;
+  pendingOpaquePngFile = null;
+  try {
+    await commitProductPngFile(f);
+  } catch (err) {
+    showAdminToast('تعذر حفظ الصورة بصيغة PNG.', 'error');
+  }
+}
+
+export function cancelOpaqueProductPng() {
+  pendingOpaquePngFile = null;
+  const warnEl = document.getElementById('prod-alpha-warning');
+  if (warnEl) warnEl.classList.add('hidden');
+  const fileInput = document.getElementById('prod-file-input');
+  if (fileInput) fileInput.value = '';
+}
+
 export async function handleProductFileUpload(e) {
-  const file = e.target.files[0];
+  const file = e.target.files?.[0];
+  const errEl = document.getElementById('prod-file-error');
+  const warnEl = document.getElementById('prod-alpha-warning');
+  pendingOpaquePngFile = null;
+
+  if (errEl) {
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
+  if (warnEl) warnEl.classList.add('hidden');
   if (!file) return;
 
+  // R14: Strict PNG-only validation via magic bytes
+  const check = await validateFile(file, UPLOAD_POLICIES.productPng, 'ar');
+  if (!check.valid) {
+    const msg = check.reason || 'ارفع الصورة بصيغة PNG بخلفية شفافة';
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+    showAdminToast(msg, 'error');
+    e.target.value = '';
+    return;
+  }
+
+  // R14: Alpha channel transparency check
   try {
-    showAdminToast('جارٍ ضغط الصورة بصيغة WebP وحفظها في IndexedDB...', 'warning');
-    const asset = await storage.uploadImage(file);
-    const input = document.getElementById('prod-image');
-    if (input) input.value = asset.previewUrl;
-    updateProductPreview();
-    showAdminToast('تم حفظ وضغط الصورة بنجاح!');
+    const alphaInfo = await detectPngAlpha(file);
+    if (!alphaInfo.hasAlpha) {
+      pendingOpaquePngFile = file;
+      if (warnEl) warnEl.classList.remove('hidden');
+      showAdminToast('تنبيه: الصورة لا تحتوي على خلفية شفافة (PNG مصمتة).', 'warning');
+      return;
+    }
+    await commitProductPngFile(file);
   } catch (err) {
-    console.warn('Fallback to DataURL:', err);
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      const input = document.getElementById('prod-image');
-      if (input) input.value = evt.target.result;
-      updateProductPreview();
-      showAdminToast('تم تحميل صورة المنتج بنجاح!');
-    };
-    reader.readAsDataURL(file);
+    const msg = 'ارفع الصورة بصيغة PNG بخلفية شفافة';
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+    showAdminToast(msg, 'error');
+    e.target.value = '';
   }
 }
 
@@ -2796,9 +2886,16 @@ function setupShowcaseFileInput() {
   if (!fileInput || fileInput.dataset.listenerAttached) return;
   fileInput.dataset.listenerAttached = 'true';
 
-  fileInput.addEventListener('change', (e) => {
+  fileInput.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const check = await validateFile(file, UPLOAD_POLICIES.showcasePhoto, 'ar');
+    if (!check.valid) {
+      showAdminToast(check.reason, 'error');
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (loadEvt) => {
@@ -2944,6 +3041,15 @@ export async function renderSettings() {
       `;
     }).join('');
   }
+
+  // Populate Custom Print Upload Settings (R14)
+  const cu = settings.customUpload || DEFAULT_CUSTOM_UPLOAD_POLICY;
+  const maxMbEl = document.getElementById('setting-custom-max-mb');
+  const maxFilesEl = document.getElementById('setting-custom-max-files');
+  const extsEl = document.getElementById('setting-custom-exts');
+  if (maxMbEl) maxMbEl.value = cu.maxFileSizeMb || DEFAULT_CUSTOM_UPLOAD_POLICY.maxFileSizeMb;
+  if (maxFilesEl) maxFilesEl.value = cu.maxFiles || DEFAULT_CUSTOM_UPLOAD_POLICY.maxFiles;
+  if (extsEl) extsEl.value = (cu.allowedExtensions || DEFAULT_CUSTOM_UPLOAD_POLICY.allowedExtensions).join(',');
 
   // Populate Payment Accounts (R12)
   const payAccounts = settings.paymentAccounts || CONFIG.PAYMENT_ACCOUNTS || [];
@@ -3279,6 +3385,108 @@ window.renderStockAlerts = renderStockAlerts;
 window.renderStorageUsageMeter = renderStorageUsageMeter;
 window.openProductionSummaryModal = openProductionSummaryModal;
 window.closeProductionSummaryModal = closeProductionSummaryModal;
+// ==========================================
+// R14: CUSTOM PRINT REQUESTS & UPLOAD POLICY SETTINGS
+// ==========================================
+export function renderCustomRequests() {
+  const listEl = document.getElementById('admin-custom-requests-list');
+  const badgeEl = document.getElementById('custom-requests-count-badge');
+  const reqs = adminState.customRequests || [];
+  if (badgeEl) badgeEl.textContent = String(reqs.length);
+  if (!listEl) return;
+
+  if (reqs.length === 0) {
+    listEl.innerHTML = `<div class="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-center text-xs text-zinc-400 font-semibold">لا توجد طلبات طباعة مخصصة مسجلة محلياً حتى الآن.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = reqs.map(req => {
+    const filesHtml = (req.files || []).map(f => {
+      const sizeKb = Math.max(1, Math.round((f.size || 0) / 1024));
+      const dims = f.dimensions ? `${f.dimensions.width}×${f.dimensions.height}px` : '';
+      const dpiBadge = f.dpi ? `<span class="px-1.5 py-0.5 rounded font-mono text-[10px] ${f.isLowRes ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">${f.dpi} DPI</span>` : '';
+      return `
+        <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-zinc-50 border border-zinc-200 text-[11px]">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="px-1.5 py-0.5 rounded bg-zinc-900 text-white font-mono text-[10px] uppercase">${escapeHtml(f.kind || 'FILE')}</span>
+            <span class="font-bold text-zinc-900 truncate">${escapeHtml(f.name || 'file')}</span>
+            <span class="text-zinc-500 font-mono">${sizeKb} KB ${dims ? `• ${dims}` : ''}</span>
+            ${dpiBadge}
+          </div>
+          ${f.assetId ? `<button type="button" onclick="downloadCustomRequestAsset('${escapeHtml(f.assetId)}', '${escapeHtml(f.name || 'file')}')" class="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-black text-white font-bold text-[10px] whitespace-nowrap">تحميل الأصلي</button>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="p-4 rounded-2xl bg-white border border-zinc-200 space-y-2.5 text-xs">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <span class="font-mono font-black text-[#FF5000]">#${escapeHtml(req.id)}</span>
+            <span class="font-bold text-zinc-900">${escapeHtml(req.name || '')}</span>
+            <span class="font-mono text-zinc-500">${escapeHtml(req.phone || '')}</span>
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer select-none px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold text-[11px]">
+            <input type="checkbox" ${req.receivedOnWhatsApp ? 'checked' : ''} onchange="toggleCustomRequestWhatsAppReceived('${escapeHtml(req.id)}', this.checked)" class="rounded text-emerald-600">
+            <span>تم الاستلام على واتساب</span>
+          </label>
+        </div>
+        <div class="text-[11px] text-zinc-600 flex flex-wrap gap-3 font-mono">
+          <span>الكمية: <strong>${req.quantity || 10}</strong></span>
+          <span>المقاس: <strong>${escapeHtml(req.sizeLabel || req.size || '8 سم')}</strong></span>
+          <span>الإجمالي التقديري: <strong class="text-[#FF5000]">${req.total || 0} ${CONFIG.CURRENCY}</strong></span>
+        </div>
+        ${filesHtml ? `<div class="space-y-1.5 pt-1">${filesHtml}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+export async function toggleCustomRequestWhatsAppReceived(reqId, checked) {
+  await storage.updateCustomPrintRequest(reqId, { receivedOnWhatsApp: Boolean(checked) });
+  adminState.customRequests = await storage.getCustomPrintRequests();
+  showAdminToast(checked ? 'تم تأكيد استلام ملف الطباعة على واتساب' : 'تم إلغاء علامة الاستلام');
+}
+
+export async function downloadCustomRequestAsset(assetId, filename) {
+  const blob = await storage.getAssetBlob(assetId);
+  if (!blob) {
+    showAdminToast('الملف غير موجود في التخزين المحلي لهذا المتصفح.', 'warning');
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'custom-design';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function saveCustomUploadSettings() {
+  const maxMb = Math.max(1, Math.min(50, parseInt(document.getElementById('setting-custom-max-mb')?.value || '15', 10) || 15));
+  const maxFiles = Math.max(1, Math.min(20, parseInt(document.getElementById('setting-custom-max-files')?.value || '5', 10) || 5));
+  const rawExts = (document.getElementById('setting-custom-exts')?.value || '').split(',').map(s => s.trim().toLowerCase().replace(/^\./, '')).filter(Boolean);
+  const allowedExtensions = rawExts.length > 0 ? rawExts : DEFAULT_CUSTOM_UPLOAD_POLICY.allowedExtensions;
+
+  const settings = adminState.settings || await storage.getSettings();
+  settings.customUpload = {
+    allowedExtensions,
+    maxFileSizeMb: maxMb,
+    maxFiles,
+    maxTotalSizeMb: Math.max(maxMb, maxMb * 3)
+  };
+  await storage.saveSettings(settings);
+  adminState.settings = settings;
+  showAdminToast('تم حفظ حدود وصيغ ملفات الطباعة المخصصة بنجاح!');
+}
+
+window.confirmOpaqueProductPng = confirmOpaqueProductPng;
+window.cancelOpaqueProductPng = cancelOpaqueProductPng;
+window.toggleCustomRequestWhatsAppReceived = toggleCustomRequestWhatsAppReceived;
+window.downloadCustomRequestAsset = downloadCustomRequestAsset;
+window.saveCustomUploadSettings = saveCustomUploadSettings;
 window.toggleAdminTheme = toggleAdminTheme;
 
 document.addEventListener('DOMContentLoaded', initAdmin);

@@ -11,6 +11,7 @@ This document outlines the operational boundaries and technical constraints of t
 > - Data saved in `localStorage` or `IndexedDB` exists solely within the browser and profile of the device accessing the site.
 > - **Catalog Edits:** When an administrator adds or edits a product or category in `admin.html`, those modifications reside only in that administrator's browser. Customers opening the store on other phones, tablets, or computers **cannot** see those updates unless they are synchronized via a real backend database or imported via JSON.
 > - **Order Submissions:** When a customer completes checkout on their phone, the order record is stored inside that customer's local browser. The store owner receives the order details **exclusively through the generated WhatsApp message and compact Order Code**. The order will not appear in the owner's admin dashboard unless imported via the "استيراد طلب من واتساب" (Import WhatsApp Order Code) tool or synced to a live server.
+> - **Custom Print Artwork Uploads (R14):** Customer custom print files are validated client-side via magic bytes and preserved byte-for-byte in the customer's local browser `IndexedDB`. Because there is no backend server, files cannot be uploaded directly to the store owner's device; customers share/attach their original files as a WhatsApp **Document** (to avoid compression), and the owner checks off `"تم الاستلام على واتساب"` once received.
 
 ---
 

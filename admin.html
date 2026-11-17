@@ -410,6 +410,20 @@
           </div>
         </div>
 
+        <!-- Custom Print Requests (R14) -->
+        <div id="admin-custom-requests-section" class="bg-white rounded-3xl border border-zinc-200 p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+            <div>
+              <h3 class="text-base font-extrabold text-zinc-900">طلبات الطباعة المخصصة والملفات المرفقة (R14)</h3>
+              <p class="text-xs text-zinc-500 mt-0.5">يتم حفظ الملفات الأصلية محلياً (DEMO) — يرجى مطابقتها مع الملف المرسل على واتساب كمستند (Document)</p>
+            </div>
+            <span id="custom-requests-count-badge" class="font-mono text-xs font-bold bg-zinc-100 text-zinc-700 px-2.5 py-1 rounded-full">0</span>
+          </div>
+          <div id="admin-custom-requests-list" class="space-y-3">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
       </section>
 
       <!-- ========================================== -->
@@ -426,6 +440,7 @@
             <select id="admin-product-category-filter" onchange="handleAdminProductCategoryFilter(this.value)" class="bg-zinc-50 border border-zinc-200 rounded-2xl px-3 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900 font-bold">
               <option value="all">كل الأقسام</option>
               <option value="missing_en">ناقص ترجمة إنجليزية (Missing EN)</option>
+              <option value="non_png">صور غير PNG (تحتاج تحويل لشفاف)</option>
             </select>
             <input type="text" id="admin-product-search" placeholder=" ابحث بالاسم أو كود SKU..." oninput="handleAdminProductSearch(this.value)" class="bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-2.5 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900 w-full sm:w-64">
             <button onclick="openProductModal()" class="px-5 py-2.5 rounded-2xl bg-[#FF5000] hover:bg-[#E04600] text-white font-bold text-xs transition shadow-sm flex items-center gap-2 whitespace-nowrap flex-shrink-0">
@@ -544,9 +559,10 @@
 
                   <div class="flex-grow space-y-2">
                     <label class="w-full cursor-pointer py-2 px-3 rounded-xl bg-white border border-dashed border-zinc-300 hover:border-zinc-900 hover:bg-zinc-50 text-zinc-700 font-bold flex items-center justify-center gap-2 transition text-xs shadow-sm">
-                      <span> رفع صورة من جهازك</span>
-                      <input type="file" id="cat-file-input" accept="image/*" class="hidden" onchange="handleCategoryFileUpload(event)">
+                      <span>رفع صورة PNG بخلفية شفافة</span>
+                      <input type="file" id="cat-file-input" accept="image/png,.png" class="hidden" onchange="handleCategoryFileUpload(event)">
                     </label>
+                    <p id="cat-file-error" class="text-red-600 text-[11px] font-bold hidden"></p>
 
                     <input type="text" id="cat-image-url" placeholder="أو اكتب رابط/اسم الصورة (مثل logo.jpg)" oninput="updateCategoryPreview()" class="w-full bg-white border border-zinc-200 rounded-xl px-3 py-1.5 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900">
                   </div>
@@ -794,6 +810,33 @@
             </div>
           </div>
 
+        </div>
+
+        <!-- Custom Print Upload Limits Settings (R14) -->
+        <div id="custom-upload-settings-card" class="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-zinc-100 flex-wrap gap-2">
+            <div>
+              <h3 class="text-base font-extrabold text-zinc-900">إعدادات ملفات الطباعة المخصصة (R14)</h3>
+              <p class="text-xs text-zinc-500 mt-0.5">التحكم في الصيغ المسموحة وحدود الحجم وعدد الملفات في نموذج الطباعة المخصصة</p>
+            </div>
+            <button type="button" onclick="saveCustomUploadSettings()" class="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition shadow-sm">
+              حفظ حدود الرفع
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div class="md:col-span-1">
+              <label class="block font-bold text-zinc-700 mb-1">الحد الأقصى لحجم الملف (MB)</label>
+              <input type="number" id="setting-custom-max-mb" min="1" max="50" value="15" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 font-mono text-zinc-900">
+            </div>
+            <div class="md:col-span-1">
+              <label class="block font-bold text-zinc-700 mb-1">الحد الأقصى لعدد الملفات</label>
+              <input type="number" id="setting-custom-max-files" min="1" max="20" value="5" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 font-mono text-zinc-900">
+            </div>
+            <div class="md:col-span-1">
+              <label class="block font-bold text-zinc-700 mb-1">الصيغ المسموحة (مفصولة بفاصلة)</label>
+              <input type="text" id="setting-custom-exts" value="png,jpg,jpeg,webp,gif,bmp,avif,tiff,tif,heic,svg,pdf,ai,eps,psd,cdr" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 font-mono text-zinc-900" dir="ltr">
+            </div>
+          </div>
         </div>
 
         <!-- Payment Accounts Manager (R12) -->
@@ -1084,11 +1127,11 @@
           </div>
         </div>
 
-        <!-- Product Image Upload & Live Preview -->
+        <!-- Product Image Upload & Live Preview (R14: PNG Only) -->
         <div class="bg-zinc-50 border border-zinc-200/90 rounded-2xl p-4 space-y-3">
           <div class="flex items-center justify-between">
-            <span class="font-bold text-zinc-800">صورة الاستيكر أو البوك مارك:</span>
-            <span class="text-[10px] text-zinc-400 font-mono">Image Upload (WebP) / URL / SVG</span>
+            <span class="font-bold text-zinc-800">صورة الاستيكر أو البوك مارك (PNG شفاف فقط):</span>
+            <span class="text-[10px] text-zinc-400 font-mono">Lossless PNG (Alpha) / URL / SVG</span>
           </div>
 
           <div class="flex items-center gap-4">
@@ -1098,11 +1141,25 @@
 
             <div class="flex-grow space-y-2">
               <label class="w-full cursor-pointer py-2 px-3 rounded-xl bg-white border border-dashed border-zinc-300 hover:border-zinc-900 hover:bg-zinc-50 text-zinc-700 font-bold flex items-center justify-center gap-2 transition text-xs shadow-sm">
-                <span> رفع صورة (يتم ضغطها إلى WebP في IndexedDB)</span>
-                <input type="file" id="prod-file-input" accept="image/*" class="hidden" onchange="handleProductFileUpload(event)">
+                <span>رفع صورة PNG بخلفية شفافة (حفظ PNG بدون فقدان)</span>
+                <input type="file" id="prod-file-input" accept="image/png,.png" class="hidden" onchange="handleProductFileUpload(event)">
               </label>
 
-              <input type="text" id="prod-image" placeholder="أو اكتب مسار أو رابط الصورة (مثال: logo.jpg)" oninput="updateProductPreview()" class="w-full bg-white border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900">
+              <p id="prod-file-error" class="text-red-600 text-[11px] font-bold hidden"></p>
+
+              <div id="prod-alpha-warning" class="hidden p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-[11px] text-amber-900 space-y-2">
+                <p class="font-bold">تنبيه: هذه الصورة بصيغة PNG لكنها لا تحتوي على خلفية شفافة (مصمتة). يفضل استخدام PNG مفرغ لقص Die-cut.</p>
+                <div class="flex items-center gap-2">
+                  <button type="button" id="prod-alpha-confirm-btn" onclick="confirmOpaqueProductPng()" class="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition">
+                    متابعة واستخدام الصورة رغم ذلك
+                  </button>
+                  <button type="button" onclick="cancelOpaqueProductPng()" class="px-3 py-1 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-[11px] transition">
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+
+              <input type="text" id="prod-image" placeholder="أو اكتب مسار أو رابط صورة PNG (مثال: sticker.png)" oninput="updateProductPreview()" class="w-full bg-white border border-zinc-200 rounded-xl px-3.5 py-2 text-xs text-zinc-900 focus:outline-none focus:border-zinc-900">
             </div>
           </div>
 
