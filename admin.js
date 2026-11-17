@@ -668,7 +668,12 @@ export function exportOrdersCsv(ordersToExport = null) {
 
   function formatCsvCell(str) {
     if (str === null || str === undefined) return '""';
-    const clean = String(str).replace(/"/g, '""');
+    let s = String(str);
+    // F-03: Neutralize CSV formula injection (DDE / spreadsheet formulas) across ALL columns
+    if (/^[=+\-@\t\r]/.test(s)) {
+      s = `'${s}`;
+    }
+    const clean = s.replace(/"/g, '""');
     return `"${clean}"`;
   }
 

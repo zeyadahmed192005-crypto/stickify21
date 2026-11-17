@@ -168,7 +168,7 @@ test.describe('Phase 3 Acceptance Tests', () => {
     await popup.close();
 
     const orderId = (await page.locator('#confirmed-order-id').innerText()).trim();
-    expect(orderId).toMatch(/^S21-\d{6}-[A-Z0-9]{4}$/);
+    expect(orderId).toMatch(/^S21-\d{6}-[23456789A-HJ-NP-Z]{6,8}$/);
 
     // Close confirmation modal
     await page.click('button:has-text("إغلاق ومتابعة التسوق")');

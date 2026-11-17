@@ -67,7 +67,7 @@ test.describe('Round 2 - Phase A: Orders & Admin Core', () => {
     const confModal = page.locator('#order-confirmation-modal');
     await expect(confModal).toBeVisible();
     const orderIdText = await page.locator('#confirmed-order-id').innerText();
-    expect(orderIdText).toMatch(/^S21-\d{6}-[A-F0-9]{4,6}$/);
+    expect(orderIdText).toMatch(/^S21-\d{6}-[23456789A-HJ-NP-Z]{6,8}$/);
 
     // Check order code and structured lines in localStorage
     const storedOrdersRaw = await page.evaluate(() => localStorage.getItem('stickify21_orders'));

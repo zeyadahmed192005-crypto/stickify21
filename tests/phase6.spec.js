@@ -156,7 +156,7 @@ test.describe('Phase 6: Full End-to-End Integration & Migration-Ready Regression
     await expect(confModal).toBeVisible();
 
     const orderId = await page.locator('#confirmed-order-id').innerText();
-    expect(orderId).toMatch(/^S21-\d{6}-[A-F0-9]{4}$/);
+    expect(orderId).toMatch(/^S21-\d{6}-[23456789A-HJ-NP-Z]{6,8}$/);
 
     // Verify WhatsApp was opened with Order Code S21CODE:
     const openedUrls = await page.evaluate(() => window.__openedUrls);

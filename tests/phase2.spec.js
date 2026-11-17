@@ -121,7 +121,7 @@ test.describe('Phase 2 Acceptance Tests', () => {
     const orderIdEl = page.locator('#confirmed-order-id');
     const orderIdText = await orderIdEl.innerText();
     // ID must match non-guessable format: S21-YYMMDD-XXXX
-    expect(orderIdText).toMatch(/^S21-\d{6}-[A-F0-9]{4}$/);
+    expect(orderIdText).toMatch(/^S21-\d{6}-[23456789A-HJ-NP-Z]{6,8}$/);
 
     // Verify WhatsApp URL was opened with Order Code (S21CODE:)
     const openedUrls = await page.evaluate(() => window.__openedUrls);

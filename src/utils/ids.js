@@ -2,10 +2,14 @@
  * STICKIFY 21 - Identification & Order Code Utilities
  */
 
+const ORDER_ID_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // 32 unambiguous chars (no 0/O/1/I)
+const ORDER_ID_RAND_LEN = 8; // 32^8 = ~1.1 trillion per day
+
 /**
- * Generate a unique, non-guessable order ID: S21-YYMMDD-XXXX
- * @param {Array<string>} existingIds - Optional array of existing IDs to prevent collisions
- * @returns {string} e.g. "S21-261116-A8F2"
+ * Generate a unique, non-guessable order ID: S21-YYMMDD-XXXXXXXX
+ * Uses crypto.getRandomValues with unambiguous 32-char alphabet (32^8 > 10^12/day) + collision retry.
+ * @param {Array<string>|Set<string>} existingIds - Optional list/set of existing IDs to prevent collisions
+ * @returns {string} e.g. "S21-261118-K7M9P2X4"
  */
 export function generateOrderId(existingIds = []) {
   const now = new Date();
@@ -14,22 +18,28 @@ export function generateOrderId(existingIds = []) {
   const dd = String(now.getDate()).padStart(2, '0');
   const datePart = `${yy}${mm}${dd}`;
 
+  const existingSet = existingIds instanceof Set ? existingIds : new Set(existingIds || []);
   let candidate = '';
   let attempts = 0;
   const maxAttempts = 100;
 
   do {
-    const bytes = new Uint8Array(2);
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(ORDER_ID_RAND_LEN);
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
       crypto.getRandomValues(bytes);
     } else {
-      bytes[0] = Math.floor(Math.random() * 256);
-      bytes[1] = Math.floor(Math.random() * 256);
+      for (let i = 0; i < ORDER_ID_RAND_LEN; i++) {
+        bytes[i] = Math.floor(Math.random() * 256);
+      }
     }
-    const randHex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
-    candidate = `S21-${datePart}-${randHex}`;
+    let randPart = '';
+    for (let i = 0; i < ORDER_ID_RAND_LEN; i++) {
+      // 256 is an exact multiple of 32 -> zero modulo bias!
+      randPart += ORDER_ID_ALPHABET[bytes[i] & 31];
+    }
+    candidate = `S21-${datePart}-${randPart}`;
     attempts++;
-  } while (existingIds.includes(candidate) && attempts < maxAttempts);
+  } while (existingSet.has(candidate) && attempts < maxAttempts);
 
   return candidate;
 }
