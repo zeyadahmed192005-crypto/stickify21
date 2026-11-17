@@ -1331,6 +1331,8 @@ export function changeMockupDevice(devId) {
   renderMockupDevice();
 }
 
+let placedStickerSeq = 0;
+
 export function addStickerToMockup(productId) {
   const product = state.products.find(p => p.id === productId);
   if (!product) return;
@@ -1346,7 +1348,7 @@ export function addStickerToMockup(productId) {
   const defaultRotation = isBookmark ? (isBookDevice ? -2 : 0) : 0;
 
   const newPlaced = {
-    id: 'placed-' + Date.now(),
+    id: `placed-${Date.now()}-${++placedStickerSeq}`,
     productId: product.id,
     sku: product.sku,
     nameAr: product.nameAr,
@@ -1374,117 +1376,128 @@ export function addStickerToMockup(productId) {
   }
 }
 
+function applyStickerTransformStyle(el, item, boardRect) {
+  const isBottle = state.activeDevice === 'bottle';
+  const xPx = (item.x / 100) * (boardRect.width || 500);
+  const yPx = (item.y / 100) * (boardRect.height || 380);
+  let scaleXTransform = '';
+  let filterVal = '';
+  if (isBottle) {
+    const normX = (item.x - 50) / 45;
+    const angle = Math.max(-1, Math.min(1, normX)) * (Math.PI / 2.6);
+    const cosTheta = Math.max(0.35, Math.cos(angle));
+    scaleXTransform = ` scaleX(${cosTheta.toFixed(3)})`;
+    if (Math.abs(normX) > 0.35) {
+      const brightness = (0.75 + 0.25 * cosTheta).toFixed(2);
+      filterVal = `brightness(${brightness})`;
+    }
+  }
+  el.style.transform = `translate3d(${xPx.toFixed(2)}px, ${yPx.toFixed(2)}px, 0) translate(-50%, -50%) rotate(${item.rotation}deg)${scaleXTransform}`;
+  el.style.filter = filterVal;
+}
+
+function attachSingleStickerDragListener(el, board) {
+  if (el.dataset.dragBound === '1') return;
+  el.dataset.dragBound = '1';
+
+  el.onpointerdown = (e) => {
+    e.preventDefault();
+    const id = el.dataset.placedId;
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch (err) {}
+    state.selectedPlacedId = id;
+    board.querySelectorAll('.mockup-placed-sticker').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+    updatePlacedControls();
+    updateMockupScaleCaption();
+
+    const item = state.placedStickers.find(s => s.id === id);
+    if (!item) return;
+
+    const boardRect = board.getBoundingClientRect();
+    let rafId = null;
+
+    const onPointerMove = (moveEvt) => {
+      const xPct = ((moveEvt.clientX - boardRect.left) / boardRect.width) * 100;
+      const yPct = ((moveEvt.clientY - boardRect.top) / boardRect.height) * 100;
+
+      item.x = Math.max(5, Math.min(95, xPct));
+      item.y = Math.max(5, Math.min(95, yPct));
+
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        // P1-5: Update ONLY GPU-composited transform on dragged element (no reflow / no innerHTML)
+        applyStickerTransformStyle(el, item, boardRect);
+      });
+    };
+
+    const onPointerUp = (upEvt) => {
+      if (rafId) cancelAnimationFrame(rafId);
+      applyStickerTransformStyle(el, item, boardRect);
+      try {
+        el.releasePointerCapture(upEvt.pointerId);
+      } catch (err) {}
+      el.onpointermove = null;
+      el.onpointerup = null;
+      el.onpointercancel = null;
+    };
+
+    el.onpointermove = onPointerMove;
+    el.onpointerup = onPointerUp;
+    el.onpointercancel = onPointerUp;
+  };
+}
+
 export function renderPlacedStickers() {
   const board = document.getElementById('mockup-stickers-layer');
   if (!board) return;
 
-  const isBottle = state.activeDevice === 'bottle';
+  const boardRect = board.getBoundingClientRect();
+  const activeIds = new Set(state.placedStickers.map(it => it.id));
 
-  board.innerHTML = state.placedStickers.map(item => {
-    const safeImg = sanitizeUrl(item.image);
-    const safeSvg = sanitizeSvg(item.svg);
+  // 1. Keyed reconciliation: remove ONLY stickers no longer in state
+  Array.from(board.children).forEach(child => {
+    const pid = child.dataset?.placedId;
+    if (!pid || !activeIds.has(pid)) {
+      child.remove();
+    }
+  });
+
+  // 2. Reuse existing DOM nodes by key (data-placed-id); create ONLY newly added stickers
+  state.placedStickers.forEach(item => {
     const { widthPx, heightPx } = getPlacedStickerDimensions(item);
+    let el = board.querySelector(`.mockup-placed-sticker[data-placed-id="${CSS.escape(item.id)}"]`);
 
-    // Cylindrical horizontal squeeze for bottle/tumbler (R6)
-    let scaleXTransform = '';
-    let curvatureStyle = '';
-    if (isBottle) {
-      const normX = (item.x - 50) / 45;
-      const angle = Math.max(-1, Math.min(1, normX)) * (Math.PI / 2.6);
-      const cosTheta = Math.max(0.35, Math.cos(angle));
-      scaleXTransform = ` scaleX(${cosTheta.toFixed(3)})`;
-      if (Math.abs(normX) > 0.35) {
-        const brightness = (0.75 + 0.25 * cosTheta).toFixed(2);
-        curvatureStyle = `filter: brightness(${brightness});`;
-      }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = item.id;
+      el.dataset.placedId = item.id;
+      el.dataset.allowArabic = 'true';
+      el.className = 'mockup-placed-sticker sticker-diecut-contour';
+      el.style.position = 'absolute';
+      el.style.left = '0px';
+      el.style.top = '0px';
+      el.style.willChange = 'transform';
+
+      const safeImg = sanitizeUrl(item.image);
+      const safeSvg = sanitizeSvg(item.svg);
+      const isGlossy = item.finish !== 'matte';
+      const finishSheen = isGlossy ? `<div class="sticker-glossy-sheen pointer-events-none"></div>` : '';
+      el.innerHTML = `${safeImg ? `<img src="${safeImg}" alt="" class="w-full h-full object-contain pointer-events-none">` : safeSvg}${finishSheen}`;
+
+      board.appendChild(el);
+      attachSingleStickerDragListener(el, board);
     }
 
-    const isGlossy = item.finish !== 'matte';
-    const finishSheen = isGlossy ? `<div class="sticker-glossy-sheen pointer-events-none"></div>` : '';
+    el.classList.toggle('selected', state.selectedPlacedId === item.id);
+    el.style.width = `${widthPx}px`;
+    el.style.height = `${heightPx}px`;
+    applyStickerTransformStyle(el, item, boardRect);
+  });
 
-    return `
-      <div id="${escapeHtml(item.id)}" 
-           data-allow-arabic="true"
-           class="mockup-placed-sticker sticker-diecut-contour relative ${state.selectedPlacedId === item.id ? 'selected' : ''}"
-           style="width: ${widthPx}px; height: ${heightPx}px; left: ${item.x}%; top: ${item.y}%; transform: translate(-50%, -50%) rotate(${item.rotation}deg)${scaleXTransform}; ${curvatureStyle}"
-           data-placed-id="${escapeHtml(item.id)}">
-        ${safeImg ? `<img src="${safeImg}" alt="" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
-        ${finishSheen}
-      </div>
-    `;
-  }).join('');
-
-  attachPointerDragListeners();
   updatePlacedControls();
   updateMockupScaleCaption();
-}
-
-function attachPointerDragListeners() {
-  const board = document.getElementById('mockup-stickers-layer');
-  if (!board) return;
-
-  board.querySelectorAll('.mockup-placed-sticker').forEach(el => {
-    const id = el.dataset.placedId;
-    el.onpointerdown = (e) => {
-      e.preventDefault();
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch (err) {}
-      state.selectedPlacedId = id;
-      board.querySelectorAll('.mockup-placed-sticker').forEach(s => s.classList.remove('selected'));
-      el.classList.add('selected');
-      updatePlacedControls();
-      updateMockupScaleCaption();
-
-      const item = state.placedStickers.find(s => s.id === id);
-      if (!item) return;
-
-      const boardRect = board.getBoundingClientRect();
-      let rafId = null;
-
-      const onPointerMove = (moveEvt) => {
-        const xPct = ((moveEvt.clientX - boardRect.left) / boardRect.width) * 100;
-        const yPct = ((moveEvt.clientY - boardRect.top) / boardRect.height) * 100;
-        
-        item.x = Math.max(5, Math.min(95, xPct));
-        item.y = Math.max(5, Math.min(95, yPct));
-
-        if (rafId) cancelAnimationFrame(rafId);
-        rafId = requestAnimationFrame(() => {
-          el.style.left = `${item.x}%`;
-          el.style.top = `${item.y}%`;
-          if (state.activeDevice === 'bottle') {
-            const normX = (item.x - 50) / 45;
-            const angle = Math.max(-1, Math.min(1, normX)) * (Math.PI / 2.6);
-            const cosTheta = Math.max(0.35, Math.cos(angle));
-            el.style.transform = `translate(-50%, -50%) rotate(${item.rotation}deg) scaleX(${cosTheta.toFixed(3)})`;
-            if (Math.abs(normX) > 0.35) {
-              const brightness = (0.75 + 0.25 * cosTheta).toFixed(2);
-              el.style.filter = `brightness(${brightness})`;
-            } else {
-              el.style.filter = '';
-            }
-          }
-        });
-      };
-
-      const onPointerUp = (upEvt) => {
-        if (rafId) cancelAnimationFrame(rafId);
-        el.style.left = `${item.x}%`;
-        el.style.top = `${item.y}%`;
-        try {
-          el.releasePointerCapture(upEvt.pointerId);
-        } catch(err) {}
-        el.onpointermove = null;
-        el.onpointerup = null;
-        el.onpointercancel = null;
-      };
-
-      el.onpointermove = onPointerMove;
-      el.onpointerup = onPointerUp;
-      el.onpointercancel = onPointerUp;
-    };
-  });
 }
 
 export function updateMockupScaleCaption() {
