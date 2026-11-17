@@ -135,7 +135,29 @@ export const EN = {
   devicePhone: 'Phone',
   deviceBottle: 'Water Bottle',
   deviceNotebook: 'Notebook',
-  deviceCar: 'Car Window',
+  deviceBook: 'Book',
+  scaleCaption: '{size} sticker on {device} ({deviceWidth})',
+  scaleCaptionBookmark: '{size} bookmark inside {device} ({deviceWidth})',
+  rulerToggle: 'Show Ruler',
+  rulerHide: 'Hide Ruler',
+  sizeGuideBtn: 'Size Guide',
+
+  // Size Guide Modal
+  sizeGuideTitle: 'Visual Size & Scale Guide',
+  sizeGuideSubtitle: 'Compare sticker and bookmark sizes against everyday objects',
+  sizeSmallDesc: 'Perfect for phone cases, earbuds cases, keychains, and power banks.',
+  sizeMediumDesc: 'Our most popular size! Ideal for laptops, water tumblers, and notebooks.',
+  sizeLargeDesc: 'Bold statement sticker for laptops, tablets, or skateboards.',
+  sizeBookmarkDesc: '350gsm premium cardstock with velvet matte lamination for novels and textbooks.',
+  refCard: 'Bank / ID Card (8.5 × 5.4 cm)',
+  refPhone: 'Smartphone (7.1 × 14.7 cm)',
+  refBook: 'Novel / Standard Book (13 × 20 cm)',
+
+  // Showcase Section
+  showcaseTitle: 'Stickers in the Real World',
+  showcaseSubtitle: 'Real customer snaps on laptops, tumblers, and notebooks',
+  showcaseEmpty: 'No photos in showcase currently',
+  stuckOn: 'Stuck on: ',
 
   // Order Tracking
   trackingTitle: 'Order & Shipping Tracking',

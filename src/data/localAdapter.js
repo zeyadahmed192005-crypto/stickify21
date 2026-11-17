@@ -3,7 +3,7 @@
  */
 import { CONFIG } from '../config/config.js';
 import { CURRENT_SCHEMA_VERSION, migrateStorageBundle } from './migrations.js';
-import { SEED_PRODUCTS, SEED_CATEGORIES, SEED_COUPONS } from './seed.js';
+import { SEED_PRODUCTS, SEED_CATEGORIES, SEED_COUPONS, SEED_SHOWCASE } from './seed.js';
 import { DEFAULT_POLICIES } from './policies.js';
 import { stripEmoji } from '../utils/emoji.js';
 
@@ -14,7 +14,8 @@ const STORAGE_KEYS = {
   CATEGORIES: 'stickify21_categories',
   COUPONS: 'stickify21_coupons',
   SETTINGS: 'stickify21_settings',
-  CART: 'stickify21_cart'
+  CART: 'stickify21_cart',
+  SHOWCASE: 'stickify21_showcase'
 };
 
 const DB_NAME = 'stickify21_assets_db';
@@ -171,6 +172,7 @@ export const LocalAdapter = {
       safeSave(STORAGE_KEYS.PRODUCTS, SEED_PRODUCTS);
       safeSave(STORAGE_KEYS.CATEGORIES, SEED_CATEGORIES);
       safeSave(STORAGE_KEYS.COUPONS, SEED_COUPONS);
+      safeSave(STORAGE_KEYS.SHOWCASE, SEED_SHOWCASE);
       safeSave(STORAGE_KEYS.ORDERS, []);
       safeSave(STORAGE_KEYS.SETTINGS, {
         brandName: CONFIG.BRAND_NAME,
@@ -178,6 +180,11 @@ export const LocalAdapter = {
         freeShippingThreshold: CONFIG.FREE_SHIPPING_THRESHOLD
       });
       return;
+    }
+
+    // Ensure showcase seeded if missing
+    if (!localStorage.getItem(STORAGE_KEYS.SHOWCASE)) {
+      safeSave(STORAGE_KEYS.SHOWCASE, SEED_SHOWCASE);
     }
 
     // If existing data was unversioned, treat as 0.0.0 (F-01 fix: never overwrite existing data with seeds)
@@ -418,6 +425,42 @@ export const LocalAdapter = {
     return settings;
   },
 
+  // Showcase
+  async getShowcase() {
+    return safeLoad(STORAGE_KEYS.SHOWCASE, SEED_SHOWCASE);
+  },
+  async saveShowcase(items) {
+    safeSave(STORAGE_KEYS.SHOWCASE, items);
+    return items;
+  },
+  async saveShowcaseItem(item) {
+    const list = await this.getShowcase();
+    const cleanItem = {
+      id: item.id || 'sc-' + Date.now(),
+      image: item.image || '',
+      captionAr: stripEmoji(item.captionAr || item.caption || ''),
+      captionEn: stripEmoji(item.captionEn || item.caption || ''),
+      deviceTag: item.deviceTag || 'other',
+      productId: item.productId || '',
+      active: item.active !== false,
+      order: item.order !== undefined ? item.order : list.length + 1
+    };
+    const idx = list.findIndex(x => x.id === cleanItem.id);
+    if (idx !== -1) {
+      list[idx] = cleanItem;
+    } else {
+      list.push(cleanItem);
+    }
+    safeSave(STORAGE_KEYS.SHOWCASE, list);
+    return cleanItem;
+  },
+  async deleteShowcaseItem(id) {
+    const list = await this.getShowcase();
+    const filtered = list.filter(x => x.id !== id);
+    safeSave(STORAGE_KEYS.SHOWCASE, filtered);
+    return true;
+  },
+
   // Export / Import
   async exportData() {
     return {
@@ -428,6 +471,7 @@ export const LocalAdapter = {
       orders: await this.getOrders(),
       categories: await this.getCategories(),
       coupons: await this.getCoupons(),
+      showcase: await this.getShowcase(),
       settings: await this.getSettings()
     };
   },
@@ -456,6 +500,7 @@ export const LocalAdapter = {
     if (Array.isArray(migrated.orders)) safeSave(STORAGE_KEYS.ORDERS, migrated.orders);
     if (Array.isArray(migrated.categories)) safeSave(STORAGE_KEYS.CATEGORIES, migrated.categories);
     if (Array.isArray(migrated.coupons)) safeSave(STORAGE_KEYS.COUPONS, migrated.coupons);
+    if (Array.isArray(migrated.showcase)) safeSave(STORAGE_KEYS.SHOWCASE, migrated.showcase);
     if (migrated.settings) safeSave(STORAGE_KEYS.SETTINGS, migrated.settings);
 
     return true;
@@ -473,6 +518,7 @@ export const LocalAdapter = {
     safeSave(STORAGE_KEYS.PRODUCTS, SEED_PRODUCTS);
     safeSave(STORAGE_KEYS.CATEGORIES, SEED_CATEGORIES);
     safeSave(STORAGE_KEYS.COUPONS, SEED_COUPONS);
+    safeSave(STORAGE_KEYS.SHOWCASE, SEED_SHOWCASE);
     safeSave(STORAGE_KEYS.ORDERS, []);
     safeSave(STORAGE_KEYS.SETTINGS, {
       brandName: CONFIG.BRAND_NAME,

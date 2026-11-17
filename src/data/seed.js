@@ -320,3 +320,56 @@ export const SEED_PRODUCTS = [
     stockQuantity: 45
   }
 ];
+
+export const SEED_SHOWCASE = [
+  {
+    id: 'sc-1',
+    image: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%231E2024"/><rect x="80" y="60" width="440" height="280" rx="16" fill="%232D3039" stroke="%234A4E5C" stroke-width="2"/><rect x="180" y="110" width="100" height="100" rx="20" fill="%23FF5000"/><text x="230" y="170" fill="white" font-family="sans-serif" font-weight="900" font-size="20" text-anchor="middle">DEV</text><circle cx="380" cy="210" r="45" fill="%230E0E10" stroke="%23FF5000" stroke-width="3"/><text x="380" y="217" fill="white" font-family="sans-serif" font-weight="bold" font-size="14" text-anchor="middle">STICKIFY</text><text x="300" y="370" fill="%238E929E" font-family="sans-serif" font-size="13" text-anchor="middle">Silver Laptop Lid</text></svg>',
+    captionAr: 'استيكر البرمجة على لابتوب العمل اليومي',
+    captionEn: 'Coding sticker on daily work laptop',
+    deviceTag: 'laptop',
+    productId: 'stk-1',
+    active: true,
+    order: 1
+  },
+  {
+    id: 'sc-2',
+    image: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%2323272E"/><rect x="220" y="50" width="160" height="300" rx="24" fill="%233A3F4B" stroke="%23565C6D" stroke-width="2"/><ellipse cx="300" cy="50" rx="40" ry="12" fill="%231E2024"/><circle cx="300" cy="180" r="48" fill="%23FF5000"/><text x="300" y="188" fill="white" font-family="sans-serif" font-weight="bold" font-size="15" text-anchor="middle">RAMEN</text><text x="300" y="380" fill="%238E929E" font-family="sans-serif" font-size="13" text-anchor="middle">Stainless Steel Tumbler</text></svg>',
+    captionAr: 'استيكر على مج حراري مقاوم للماء والغسيل',
+    captionEn: 'Waterproof sticker on stainless steel tumbler',
+    deviceTag: 'bottle',
+    productId: 'stk-6',
+    active: true,
+    order: 2
+  },
+  {
+    id: 'sc-3',
+    image: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%231B1C20"/><rect x="160" y="70" width="280" height="260" rx="8" fill="%232C241E" stroke="%234A3E34" stroke-width="2"/><rect x="260" y="30" width="45" height="180" rx="4" fill="%23FF5000" stroke="white" stroke-width="2"/><text x="282" y="130" fill="white" font-family="sans-serif" font-weight="bold" font-size="11" transform="rotate(90 282 130)" text-anchor="middle">BOOKMARK</text><text x="300" y="375" fill="%238E929E" font-family="sans-serif" font-size="13" text-anchor="middle">Reading Novel</text></svg>',
+    captionAr: 'بوك مارك فاخر يزين رواية أدبية',
+    captionEn: 'Luxury bookmark inside literature novel',
+    deviceTag: 'book',
+    productId: 'bm-1',
+    active: true,
+    order: 3
+  },
+  {
+    id: 'sc-4',
+    image: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23212328"/><rect x="170" y="60" width="260" height="280" rx="12" fill="%23D9C3A5" stroke="%23B8A181" stroke-width="2"/><rect x="155" y="80" width="15" height="240" fill="%238B2500"/><rect x="230" y="140" width="110" height="110" rx="16" fill="%230E0E10"/><circle cx="285" cy="195" r="35" fill="%23FF5000"/><text x="285" y="202" fill="white" font-family="sans-serif" font-weight="900" font-size="16" text-anchor="middle">S21</text><text x="300" y="375" fill="%238E929E" font-family="sans-serif" font-size="13" text-anchor="middle">Kraft A5 Notebook</text></svg>',
+    captionAr: 'مجموعة استيكرات ملهمة على كشكول ملاحظات A5',
+    captionEn: 'Inspiring stickers on A5 kraft notebook',
+    deviceTag: 'notebook',
+    productId: 'stk-2',
+    active: true,
+    order: 4
+  },
+  {
+    id: 'sc-5',
+    image: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23191B20"/><rect x="230" y="50" width="140" height="290" rx="28" fill="%231E2024" stroke="%233A3D44" stroke-width="3"/><rect x="245" y="65" width="55" height="55" rx="14" fill="%232D3039"/><circle cx="300" cy="220" r="36" fill="%23FF5000"/><text x="300" y="226" fill="white" font-family="sans-serif" font-weight="bold" font-size="13" text-anchor="middle">STICK</text><text x="300" y="375" fill="%238E929E" font-family="sans-serif" font-size="13" text-anchor="middle">Phone Case</text></svg>',
+    captionAr: 'استيكر شعار STICKIFY 21 على ظهر الهاتف',
+    captionEn: 'STICKIFY 21 logo sticker on phone back cover',
+    deviceTag: 'phone',
+    productId: 'stk-logo',
+    active: true,
+    order: 5
+  }
+];

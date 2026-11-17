@@ -30,10 +30,19 @@ export const CONFIG = {
 
   // Sticker Sizes System
   STICKER_SIZES: [
-    { key: 'small', labelAr: '6 سم (Small)', cm: '6cm', badge: 'Small', scale: 0.75, priceOffset: -10, stageClass: 'w-24 h-24' },
-    { key: 'medium', labelAr: '8 سم (Medium)', cm: '8cm', badge: 'Medium', scale: 1.0, priceOffset: 0, stageClass: 'w-28 h-28' },
-    { key: 'large', labelAr: '10 سم (Large)', cm: '10cm', badge: 'Large', scale: 1.35, priceOffset: 15, stageClass: 'w-36 h-36' }
+    { key: 'small', labelAr: '6 سم (Small)', labelEn: '6 cm (Small)', cm: '6cm', sizeCm: 6, badge: 'Small', priceOffset: -10, stageClass: 'w-24 h-24' },
+    { key: 'medium', labelAr: '8 سم (Medium)', labelEn: '8 cm (Medium)', cm: '8cm', sizeCm: 8, badge: 'Medium', priceOffset: 0, stageClass: 'w-28 h-28' },
+    { key: 'large', labelAr: '10 سم (Large)', labelEn: '10 cm (Large)', cm: '10cm', sizeCm: 10, badge: 'Large', priceOffset: 15, stageClass: 'w-36 h-36' }
   ],
+
+  // Mockup Studio Devices Dimensions (Ground Truth for True-to-Scale calculations)
+  MOCKUP_DEVICES: {
+    laptop: { id: 'laptop', nameAr: 'لابتوب', nameEn: 'Laptop', realWidthCm: 30, realHeightCm: 21 },
+    phone: { id: 'phone', nameAr: 'موبايل', nameEn: 'Phone', realWidthCm: 7.1, realHeightCm: 14.7 },
+    bottle: { id: 'bottle', nameAr: 'زجاجة مياه', nameEn: 'Water Bottle', realWidthCm: 11.8, realHeightCm: 26 },
+    notebook: { id: 'notebook', nameAr: 'كشكول ملاحظات', nameEn: 'Notebook', realWidthCm: 14.8, realHeightCm: 21 },
+    book: { id: 'book', nameAr: 'كتاب / رواية', nameEn: 'Book', realWidthCm: 13, realHeightCm: 20 }
+  },
 
   // Bookmark Specs
   BOOKMARK_SPECS: {

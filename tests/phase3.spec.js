@@ -100,15 +100,15 @@ test.describe('Phase 3 Acceptance Tests', () => {
     await expect(paymentDetails).toContainText('01043546503');
   });
 
-  test('4. Mockup Studio supports neutral shapes including Car Window and switches cleanly', async ({ page }) => {
+  test('4. Mockup Studio supports neutral shapes and switches cleanly', async ({ page }) => {
     // Check initial device (Laptop)
     const deviceWrapper = page.locator('#device-wrapper');
     await expect(deviceWrapper).toHaveClass(/mockup-laptop-realistic/);
 
-    // Switch to Car Window
-    const carWindowBtn = page.locator('button[data-device="car_window"]');
-    await carWindowBtn.click();
-    await expect(deviceWrapper).toHaveClass(/mockup-car-window-realistic/);
+    // Switch to Book
+    const bookBtn = page.locator('button[data-device="book"]');
+    await bookBtn.click();
+    await expect(deviceWrapper).toHaveClass(/mockup-book-realistic/);
 
     // Switch to Phone
     const phoneBtn = page.locator('button[data-device="phone"]');

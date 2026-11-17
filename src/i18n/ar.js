@@ -135,7 +135,29 @@ export const AR = {
   devicePhone: 'موبايل',
   deviceBottle: 'زجاجة مياه',
   deviceNotebook: 'دفتر ملاحظات',
-  deviceCar: 'نافذة سيارة',
+  deviceBook: 'كتاب / رواية',
+  scaleCaption: 'استيكر {size} على {device} {deviceWidth}',
+  scaleCaptionBookmark: 'بوك مارك {size} داخل {device} {deviceWidth}',
+  rulerToggle: 'عرض المسطرة',
+  rulerHide: 'إخفاء المسطرة',
+  sizeGuideBtn: 'دليل المقاسات',
+
+  // Size Guide Modal
+  sizeGuideTitle: 'دليل المقاسات والأبعاد الحقيقية',
+  sizeGuideSubtitle: 'مقارنة مقاسات الاستيكرات والبوك مارك مع عناصر من حياتك اليومية',
+  sizeSmallDesc: 'مثالي لظهر الهاتف، كفر السماعات، الميداليات، والباور بانك.',
+  sizeMediumDesc: 'المقاس الأكثر طلباً! مثالي للابتوب، زجاجات المياه، وكشاكيل الملاحظات.',
+  sizeLargeDesc: 'استيكر كبير وبارز للابتوب، التابلت، الزجاج، أو لوح التزلج.',
+  sizeBookmarkDesc: 'كرتون مقوى 350gsm بسلوفان مطفي فاخر، مثالي للروايات والكتب الدراسية.',
+  refCard: 'بطاقة بنكية / بطاقة الرقم القومي (8.5 × 5.4 سم)',
+  refPhone: 'هاتف ذكي حديث (7.1 × 14.7 سم)',
+  refBook: 'رواية / كتاب متوسط (13 × 20 سم)',
+
+  // Showcase Section
+  showcaseTitle: 'معرض الاستيكرات في الواقع',
+  showcaseSubtitle: 'لقطات حقيقية من عملائنا على اللابتوب، الزجاجات، والدفاتر',
+  showcaseEmpty: 'لا توجد صور في المعرض حالياً',
+  stuckOn: 'مُلصق على: ',
 
   // Order Tracking
   trackingTitle: 'تتبع حالة الشحنة',

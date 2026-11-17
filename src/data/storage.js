@@ -124,6 +124,24 @@ class StorageService {
     };
   }
 
+  // Showcase
+  async getShowcase() {
+    await this.init();
+    return this.adapter.getShowcase();
+  }
+  async saveShowcase(items) {
+    await this.init();
+    return this.adapter.saveShowcase(items);
+  }
+  async saveShowcaseItem(item) {
+    await this.init();
+    return this.adapter.saveShowcaseItem(item);
+  }
+  async deleteShowcaseItem(id) {
+    await this.init();
+    return this.adapter.deleteShowcaseItem(id);
+  }
+
   // Backup & Restore
   async exportData() {
     await this.init();

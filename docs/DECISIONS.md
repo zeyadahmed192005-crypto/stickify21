@@ -274,3 +274,61 @@ This document records all architectural decisions, ground-truth constraints, and
 - **Decision:** Store policies and FAQ specifications are maintained in structured data (`src/data/policies.js`) and persisted in `stickify21_settings.policies` for real-time admin editing.
 - **Admin Control:** Admin Settings tab includes `#policies-faq-manager` enabling the store owner to customize Arabic and English text for Shipping, Returns, Specs & Materials, and Privacy.
 - **Storefront Access:** Storefront `#policy-modal` dynamically reads and displays the active policies according to the current customer language.
+
+### AD-38: Complete Removal of Car Windshield Mockup (R5)
+- **Decision:** Remove the car windshield device (`car_window` / "زجاج سيارة") entirely from the Mockup Studio, CSS styles (`.mockup-car-window-realistic`), i18n dictionaries, DOM pills, and regression test suites.
+- **Rationale:** Automotive windshield glass is not a primary target surface for small die-cut vinyl stickers (6/8/10 cm) and diverted focus from everyday everyday carry (EDC) items.
+- **Preserved Core Devices:** Laptop (`laptop`), Phone (`phone`), Tumbler / Thermal Bottle (`bottle`), Spiral Notebook (`notebook`), and Book (`book`).
+
+### AD-39: True-to-Scale Dynamic Pixel Ratio & Mockup Ruler (R7)
+- **Decision:** Establish physically accurate scale matching in the Mockup Studio.
+- **Physical Specifications:**
+  - Standard sticker dimensions: 6 cm, 8 cm, 10 cm; Bookmarks: 15 cm × 5 cm.
+  - Realistic ground-truth device dimensions (`src/config/config.js`):
+    - Laptop lid: 30 cm width × 21 cm height (standard 14" ultraportable).
+    - Smartphone back: 7.1 cm width × 14.7 cm height.
+    - Tumbler bottle: 11.8 cm width × 26 cm height.
+    - Spiral notebook: 14.8 cm width × 21 cm height (A5).
+    - Hardcover book: 13.0 cm width × 20.0 cm height.
+- **Scale Calculation:**
+  - `pxPerCm = renderedContainerWidthPx / realWidthCm`.
+  - When rendered on a 30 cm laptop lid, an 8 cm sticker occupies exactly $8 / 30 = 26.67\%$ of container width ($153.6\text{ px}$ in a $576\text{ px}$ container).
+  - Relative scale is strictly preserved across all devices: $10\text{ cm} > 8\text{ cm} > 6\text{ cm}$ with exact mathematical proportions.
+- **Visual Scale Caption & Interactive Ruler:**
+  - Dynamic scale caption (`#mockup-scale-caption`) computes and displays live millimeter-to-pixel ratio.
+  - Optional centimeter overlay ruler (`#mockup-ruler-overlay`, toggled via `#toggle-mockup-ruler`) renders tick marks every 1 cm with 5 cm labels.
+  - Responsive re-computation via `ResizeObserver` on `#device-wrapper` ensures scale fidelity across mobile and desktop viewports.
+
+### AD-40: Realistic Neutral Device SVGs, Tumbler Curvature & Bookmark Slot (R6)
+- **Decision:** Upgrade Mockup Studio with high-fidelity, neutral SVGs and realistic surface behaviors without trademarked brand logos or parentheticals.
+- **Device Design:** Clean layered vector illustrations with soft shadows, screen bevels, and texture highlights. All brand naming ("(MacBook)", "(iPhone)") purged in favor of generic device terms.
+- **Cylindrical Tumbler Curvature:**
+  - Stickers placed on the cylindrical tumbler (`bottle`) undergo horizontal cosine compression: `scaleX = Math.cos(normX * Math.PI / 2.6)`, where `normX = (x% - 50%) / 45%`.
+  - Edge shading (`brightness(0.92)`) is applied when moved near the curved contours.
+- **Book Bookmark Slot:**
+  - Placing a bookmark on the `book` device positions it at `x: 62%`, `y: 15%` protruding cleanly out of the top page edge, mimicking a physical ribbon or paper marker.
+- **Finish Overlays:**
+  - Glossy finish renders a subtle specular highlight diagonal sheen (`.sticker-glossy-sheen`).
+  - Matte finish renders a soft diffuse highlight without reflection.
+
+### AD-41: Customer Showcase Strip & Admin Showcase Manager (R8)
+- **Decision:** Implement a customer sticker showcase below the hero on the storefront, managed directly from the Admin panel.
+- **Storefront Carousel / Strip (`#showcase-section`):**
+  - Renders customer photos showing stickers applied to real objects (laptops, tumblers, notebooks, phones, books).
+  - Hovering/tapping displays sticker name, tagged device, and customer caption.
+  - Automatically hides cleanly when zero active showcase items exist.
+- **Admin Showcase Management (`admin.html` > `#tab-showcase`):**
+  - List showcase items with live status toggling (active / inactive), re-ordering (move up / down), and deletion.
+  - Modal form allows uploading photo (with client-side WebP compression), setting bilingual captions (`captionAr`, `captionEn`), tagging device type, and linking to a catalog product.
+  - Initial seed data includes 5 neutral showcase demonstrations (`src/data/seed.js`).
+
+### AD-42: Interactive Visual Size Guide Modal (A4)
+- **Decision:** Provide an accessible visual size comparison modal (`#size-guide-modal`, opened via `#open-size-guide-btn`) to eliminate customer uncertainty about physical dimensions.
+- **Visual Comparison:**
+  - Displays all 3 sticker sizes (6 cm, 8 cm, 10 cm) and the 15×5 cm bookmark side-by-side to scale.
+  - Compares stickers against everyday household reference items:
+    - Standard Bank Card / National ID (8.5 cm × 5.4 cm).
+    - Smartphone (approx. 14.7 cm × 7.1 cm).
+    - Paperback Novel (approx. 20 cm × 13 cm).
+- **Practical Recommendations:** Clarifies ideal placement for each size (e.g. 6 cm for phone backs / chargers; 8 cm for tumblers / tablet cases; 10 cm for laptop lids / luggage; 15×5 cm for books / planners).
+

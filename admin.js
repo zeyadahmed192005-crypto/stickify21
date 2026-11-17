@@ -27,6 +27,7 @@ let adminState = {
   products: [],
   categories: [],
   coupons: [],
+  showcase: [],
   settings: {},
   productSearch: '',
   productCategoryFilter: 'all',
@@ -184,6 +185,7 @@ export async function loadData() {
   adminState.categories = await storage.getCategories();
   adminState.coupons = await storage.getCoupons();
   adminState.settings = await storage.getSettings();
+  adminState.showcase = await storage.getShowcase();
 
   renderAll();
 }
@@ -193,6 +195,7 @@ function renderAll() {
   renderProducts();
   renderCategories();
   renderCoupons();
+  renderAdminShowcase();
   renderSettings();
   updateBadges();
 }
@@ -200,7 +203,7 @@ function renderAll() {
 // Tab Switching
 export function switchTab(tabName) {
   adminState.currentTab = tabName;
-  ['orders', 'products', 'categories', 'coupons', 'settings'].forEach(t => {
+  ['orders', 'products', 'categories', 'coupons', 'showcase', 'settings'].forEach(t => {
     const section = document.getElementById(`tab-${t}`);
     const btn = document.getElementById(`tab-btn-${t}`);
     if (section && btn) {
@@ -218,11 +221,13 @@ function updateBadges() {
   const cBadge = document.getElementById('coupons-count-badge');
   const catAdminBadge = document.getElementById('categories-admin-badge');
   const couponsActiveCount = document.getElementById('coupons-active-count');
+  const scBadge = document.getElementById('showcase-count-badge');
   
   if (oBadge) oBadge.innerText = adminState.orders.length;
   if (pBadge) pBadge.innerText = adminState.products.length;
   if (catBadge) catBadge.innerText = adminState.categories.length;
   if (cBadge) cBadge.innerText = adminState.coupons.length;
+  if (scBadge && adminState.showcase) scBadge.innerText = adminState.showcase.length;
   if (catAdminBadge) catAdminBadge.innerText = `${adminState.categories.length} أقسام`;
   if (couponsActiveCount) {
     const activeC = adminState.coupons.filter(c => c.active !== false).length;
@@ -2098,6 +2103,271 @@ export async function deleteCoupon(index) {
 }
 
 // ==========================================
+// SHOWCASE CONTROLLER (R8)
+// ==========================================
+export function renderAdminShowcase() {
+  const container = document.getElementById('showcase-admin-list');
+  if (!container) return;
+
+  const items = adminState.showcase || [];
+  if (items.length === 0) {
+    container.innerHTML = `
+      <div class="py-12 text-center text-zinc-400">
+        <p class="text-xs font-semibold">لا توجد صور في معرض الواقع حالياً. اضغط على "إضافة صورة للمعرض" لإضافة أول صورة.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const deviceTagMap = {
+    laptop: 'لابتوب',
+    bottle: 'زجاجة مياه',
+    book: 'كتاب / رواية',
+    notebook: 'كشكول ملاحظات',
+    phone: 'موبايل',
+    other: 'أخرى'
+  };
+
+  container.innerHTML = items.map((item, index) => {
+    const isSvgData = item.image && item.image.startsWith('data:image/svg+xml');
+    const tagName = deviceTagMap[item.deviceTag] || item.deviceTag || 'أخرى';
+    const isActive = item.active !== false;
+
+    return `
+      <div class="showcase-admin-row p-4 flex items-center justify-between gap-4 flex-wrap hover:bg-zinc-50/80 transition" data-id="${escapeHtml(item.id)}">
+        <div class="flex items-center gap-3.5 min-w-[260px]">
+          <div class="w-16 h-12 rounded-xl bg-zinc-100 border border-zinc-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+            ${isSvgData
+              ? `<img src="${item.image}" alt="" class="w-full h-full object-cover">`
+              : `<img src="${escapeHtml(item.image)}" alt="" class="w-full h-full object-cover">`
+            }
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-zinc-900">${escapeHtml(item.captionAr || 'بدون وصف عربي')}</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-zinc-100 text-zinc-500 border border-zinc-200'}">
+                ${isActive ? 'معروض' : 'معطل'}
+              </span>
+            </div>
+            <div class="flex items-center gap-2 mt-1 text-[11px] text-zinc-400 font-mono">
+              <span class="text-zinc-500">${escapeHtml(item.captionEn || '')}</span>
+              <span>•</span>
+              <span class="bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold">${escapeHtml(tagName)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Reorder buttons -->
+          <button onclick="moveShowcaseItem('${escapeHtml(item.id)}', -1)" class="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 transition" title="تحريك لأعلى" ${index === 0 ? 'disabled opacity-30' : ''}>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 15.75l7.5-7.5 7.5 7.5"/></svg>
+          </button>
+          <button onclick="moveShowcaseItem('${escapeHtml(item.id)}', 1)" class="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 transition" title="تحريك لأسفل" ${index === items.length - 1 ? 'disabled opacity-30' : ''}>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+          </button>
+
+          <!-- Toggle active -->
+          <button onclick="toggleShowcaseActive('${escapeHtml(item.id)}')" class="px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${isActive ? 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
+            ${isActive ? 'تعطيل' : 'تفعيل'}
+          </button>
+
+          <!-- Edit button -->
+          <button onclick="openEditShowcaseModal('${escapeHtml(item.id)}')" class="px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition">
+            تعديل
+          </button>
+
+          <!-- Delete button -->
+          <button onclick="deleteShowcaseItem('${escapeHtml(item.id)}')" class="p-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition" title="حذف الصورة">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+export function openAddShowcaseModal() {
+  const modal = document.getElementById('showcase-item-modal');
+  if (!modal) return;
+
+  document.getElementById('showcase-modal-title').textContent = 'إضافة صورة لمعرض الواقع';
+  document.getElementById('showcase-item-id').value = '';
+  document.getElementById('showcase-caption-ar').value = '';
+  document.getElementById('showcase-caption-en').value = '';
+  document.getElementById('showcase-device-tag').value = 'laptop';
+  document.getElementById('showcase-image-data').value = '';
+
+  const previewBox = document.getElementById('showcase-preview-box');
+  if (previewBox) previewBox.innerHTML = '<span class="text-xs text-zinc-400">معاينة الصورة</span>';
+
+  // Populate products dropdown
+  const prodSelect = document.getElementById('showcase-product-id');
+  if (prodSelect) {
+    prodSelect.innerHTML = '<option value="">-- بدون ربط --</option>' + (adminState.products || []).map(p => 
+      `<option value="${escapeHtml(p.id)}">${escapeHtml(p.nameAr || p.name)} (${escapeHtml(p.sku)})</option>`
+    ).join('');
+  }
+
+  setupShowcaseFileInput();
+  modal.classList.remove('hidden');
+}
+
+export function openEditShowcaseModal(id) {
+  const item = (adminState.showcase || []).find(x => x.id === id);
+  if (!item) return;
+
+  const modal = document.getElementById('showcase-item-modal');
+  if (!modal) return;
+
+  document.getElementById('showcase-modal-title').textContent = 'تعديل صورة معرض الواقع';
+  document.getElementById('showcase-item-id').value = item.id;
+  document.getElementById('showcase-caption-ar').value = item.captionAr || '';
+  document.getElementById('showcase-caption-en').value = item.captionEn || '';
+  document.getElementById('showcase-device-tag').value = item.deviceTag || 'laptop';
+  document.getElementById('showcase-image-data').value = item.image || '';
+
+  const previewBox = document.getElementById('showcase-preview-box');
+  if (previewBox && item.image) {
+    previewBox.innerHTML = `<img src="${item.image}" alt="" class="w-full h-full object-cover">`;
+  }
+
+  // Populate products dropdown
+  const prodSelect = document.getElementById('showcase-product-id');
+  if (prodSelect) {
+    prodSelect.innerHTML = '<option value="">-- بدون ربط --</option>' + (adminState.products || []).map(p => 
+      `<option value="${escapeHtml(p.id)}" ${p.id === item.productId ? 'selected' : ''}>${escapeHtml(p.nameAr || p.name)} (${escapeHtml(p.sku)})</option>`
+    ).join('');
+  }
+
+  setupShowcaseFileInput();
+  modal.classList.remove('hidden');
+}
+
+export function closeShowcaseModal() {
+  const modal = document.getElementById('showcase-item-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function setupShowcaseFileInput() {
+  const fileInput = document.getElementById('showcase-file-input');
+  if (!fileInput || fileInput.dataset.listenerAttached) return;
+  fileInput.dataset.listenerAttached = 'true';
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (loadEvt) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1400;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/webp', 0.85);
+        document.getElementById('showcase-image-data').value = compressedDataUrl;
+        const previewBox = document.getElementById('showcase-preview-box');
+        if (previewBox) {
+          previewBox.innerHTML = `<img src="${compressedDataUrl}" alt="" class="w-full h-full object-cover">`;
+        }
+      };
+      img.src = loadEvt.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function saveShowcaseItemFromForm() {
+  const id = document.getElementById('showcase-item-id')?.value;
+  const captionAr = stripEmoji(document.getElementById('showcase-caption-ar')?.value?.trim() || '');
+  const captionEn = stripEmoji(document.getElementById('showcase-caption-en')?.value?.trim() || '');
+  const deviceTag = document.getElementById('showcase-device-tag')?.value || 'other';
+  const productId = document.getElementById('showcase-product-id')?.value || '';
+  const imageData = document.getElementById('showcase-image-data')?.value;
+
+  if (!captionAr && !captionEn) {
+    showAdminToast('يرجى إدخال وصف للصورة', 'error');
+    return;
+  }
+
+  const existing = id ? (adminState.showcase || []).find(x => x.id === id) : null;
+  const finalImage = imageData || (existing ? existing.image : '');
+
+  if (!finalImage) {
+    showAdminToast('يرجى اختيار أو رفع صورة للمعرض', 'error');
+    return;
+  }
+
+  const itemObj = {
+    id: id || ('sc-' + Date.now()),
+    image: finalImage,
+    captionAr: captionAr || captionEn,
+    captionEn: captionEn || captionAr,
+    deviceTag,
+    productId,
+    active: existing ? existing.active : true,
+    order: existing ? existing.order : (adminState.showcase.length + 1)
+  };
+
+  await storage.saveShowcaseItem(itemObj);
+  adminState.showcase = await storage.getShowcase();
+  renderAdminShowcase();
+  updateBadges();
+  closeShowcaseModal();
+  showAdminToast('تم حفظ صورة المعرض بنجاح');
+}
+
+export async function toggleShowcaseActive(id) {
+  const item = (adminState.showcase || []).find(x => x.id === id);
+  if (!item) return;
+  item.active = !item.active;
+  await storage.saveShowcase(adminState.showcase);
+  renderAdminShowcase();
+  showAdminToast(`تم ${item.active ? 'تفعيل' : 'تعطيل'} ظهور الصورة في المعرض`);
+}
+
+export async function moveShowcaseItem(id, direction) {
+  const items = [...adminState.showcase];
+  const idx = items.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  const targetIdx = idx + direction;
+  if (targetIdx < 0 || targetIdx >= items.length) return;
+
+  const temp = items[idx];
+  items[idx] = items[targetIdx];
+  items[targetIdx] = temp;
+
+  items.forEach((it, i) => { it.order = i + 1; });
+  adminState.showcase = items;
+  await storage.saveShowcase(items);
+  renderAdminShowcase();
+}
+
+export async function deleteShowcaseItem(id) {
+  if (!confirm('هل أنت متأكد من حذف هذه الصورة من المعرض؟')) return;
+  await storage.deleteShowcaseItem(id);
+  adminState.showcase = await storage.getShowcase();
+  renderAdminShowcase();
+  updateBadges();
+  showAdminToast('تم حذف الصورة من المعرض');
+}
+
+// ==========================================
 // SETTINGS & BACKUP CONTROLLER
 // ==========================================
 export async function renderSettings() {
@@ -2443,5 +2713,12 @@ window.openFullProofImageModal = openFullProofImageModal;
 window.savePaymentAccountsSettings = savePaymentAccountsSettings;
 window.saveWhatsAppTemplatesSettings = saveWhatsAppTemplatesSettings;
 window.resetWhatsAppTemplates = resetWhatsAppTemplates;
+window.openAddShowcaseModal = openAddShowcaseModal;
+window.openEditShowcaseModal = openEditShowcaseModal;
+window.closeShowcaseModal = closeShowcaseModal;
+window.saveShowcaseItemFromForm = saveShowcaseItemFromForm;
+window.toggleShowcaseActive = toggleShowcaseActive;
+window.moveShowcaseItem = moveShowcaseItem;
+window.deleteShowcaseItem = deleteShowcaseItem;
 
 document.addEventListener('DOMContentLoaded', initAdmin);

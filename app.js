@@ -48,6 +48,7 @@ const state = {
   settings: null,
   categories: [],
   products: [],
+  showcase: [],
   cart: safeJsonParse(localStorage.getItem('stickify21_cart'), [], 'stickify21_cart'),
   selectedSizes: {}, // { [productId]: 'small' | 'medium' | 'large' }
   selectedCategory: 'all',
@@ -88,11 +89,15 @@ const state = {
   }
 };
 
-// Device definitions for Mockup Studio (Neutral shapes, NO trademark logos)
+// Device definitions for Mockup Studio (Neutral shapes, NO trademark logos, True-to-scale dimensions)
 const devices = {
   laptop: {
     id: 'laptop',
-    name: 'لابتوب (15" Laptop)',
+    name: 'لابتوب',
+    nameAr: 'لابتوب',
+    nameEn: 'Laptop',
+    realWidthCm: 30,
+    realHeightCm: 21,
     frameClass: 'mockup-laptop-realistic relative flex items-center justify-center p-6 min-h-[380px] w-full max-w-xl mx-auto overflow-hidden select-none',
     decorationsHtml: `
       <!-- Display Notch & Hinge Lines -->
@@ -110,7 +115,11 @@ const devices = {
   },
   phone: {
     id: 'phone',
-    name: 'موبايل (Smart Phone)',
+    name: 'موبايل',
+    nameAr: 'موبايل',
+    nameEn: 'Phone',
+    realWidthCm: 7.1,
+    realHeightCm: 14.7,
     frameClass: 'mockup-phone-realistic relative flex items-center justify-center p-6 min-h-[420px] max-w-[240px] mx-auto overflow-hidden select-none',
     decorationsHtml: `
       <!-- Camera Island Plateau -->
@@ -141,60 +150,78 @@ const devices = {
   },
   bottle: {
     id: 'bottle',
-    name: 'زجاجة ماء (Tumbler)',
-    frameClass: 'mockup-bottle-realistic relative flex items-center justify-center p-6 min-h-[420px] max-w-[210px] mx-auto overflow-hidden select-none',
+    name: 'زجاجة مياه',
+    nameAr: 'زجاجة مياه',
+    nameEn: 'Water Bottle',
+    realWidthCm: 11.8,
+    realHeightCm: 26,
+    frameClass: 'mockup-bottle-realistic relative flex items-center justify-center p-6 min-h-[440px] max-w-[220px] mx-auto select-none',
     decorationsHtml: `
-      <!-- Tumbler Cap & Loop Handle -->
-      <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-28 h-9 rounded-t-2xl bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-700 border-t-2 border-zinc-200 shadow-md pointer-events-none flex items-center justify-center">
-        <div class="w-14 h-3 rounded-full border-2 border-zinc-800 bg-zinc-900 shadow-inner"></div>
+      <!-- Tumbler Spout Lid & Loop Handle -->
+      <div class="absolute -top-7 left-1/2 -translate-x-1/2 w-28 h-10 rounded-t-2xl bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-700 border-t-2 border-zinc-200 shadow-md pointer-events-none flex items-center justify-center">
+        <div class="w-14 h-3.5 rounded-full border-2 border-zinc-800 bg-zinc-900 shadow-inner flex items-center justify-center">
+          <div class="w-4 h-1 bg-zinc-600 rounded-full"></div>
+        </div>
       </div>
+      <!-- Neck Band & Bevel Line -->
       <div class="absolute top-3 left-0 right-0 h-1 bg-zinc-600/50 pointer-events-none"></div>
-      <div class="absolute inset-y-0 left-1/2 -translate-x-1/2 w-12 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none"></div>
-      <div class="absolute bottom-0 left-0 right-0 h-6 bg-zinc-950/70 border-t border-zinc-700/50 pointer-events-none"></div>
-    `
-  },
-  book: {
-    id: 'book',
-    name: 'كتاب / رواية (Book)',
-    frameClass: 'mockup-book-realistic relative flex items-center justify-center p-6 min-h-[400px] max-w-[290px] mx-auto select-none',
-    decorationsHtml: `
-      <div class="absolute inset-4 rounded-lg border border-[#D4AF37]/35 pointer-events-none flex flex-col justify-between p-4">
-        <div class="text-center font-mono text-[9px] tracking-widest text-[#D4AF37]/60">STICKIFY 21 LIMITED EDITION</div>
-        <div class="text-center font-mono text-[9px] text-[#D4AF37]/40 tracking-wider">NOVEL &amp; LITERATURE</div>
-      </div>
-      <div class="absolute -top-3 right-10 w-3.5 h-14 bg-[#FF5000] rounded-b-md shadow-md pointer-events-none transform -rotate-2"></div>
-      <div class="absolute top-2 bottom-2 -right-2.5 w-2.5 bg-gradient-to-b from-[#F3EEEA] via-[#E8E2DC] to-[#DDD6CE] rounded-r-sm shadow-md border-r border-[#C9C0B7] pointer-events-none"></div>
+      <div class="absolute top-4 left-0 right-0 h-[1px] bg-zinc-400/30 pointer-events-none"></div>
+      <!-- Specular Highlight Strip along Cylinder -->
+      <div class="absolute inset-y-0 left-1/2 -translate-x-1/2 w-10 bg-gradient-to-r from-transparent via-white/12 to-transparent pointer-events-none"></div>
+      <!-- Powder-Coat Cylindrical Curvature Edge Shadows -->
+      <div class="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-black/50 to-transparent pointer-events-none"></div>
+      <div class="absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-black/50 to-transparent pointer-events-none"></div>
+      <!-- Base Ring -->
+      <div class="absolute bottom-0 left-0 right-0 h-7 bg-gradient-to-r from-zinc-800 via-zinc-400 to-zinc-800 border-t border-zinc-600 pointer-events-none rounded-b-2xl"></div>
     `
   },
   notebook: {
     id: 'notebook',
     name: 'كشكول ملاحظات',
-    frameClass: 'mockup-notebook-realistic relative flex items-center justify-center p-6 min-h-[380px] max-w-[280px] mx-auto select-none',
+    nameAr: 'كشكول ملاحظات',
+    nameEn: 'Notebook',
+    realWidthCm: 14.8,
+    realHeightCm: 21,
+    frameClass: 'mockup-notebook-realistic relative flex items-center justify-center p-6 min-h-[400px] max-w-[300px] mx-auto select-none',
     decorationsHtml: `
-      <div class="absolute -left-3 top-4 bottom-4 w-4 flex flex-col justify-between pointer-events-none z-20">
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
-        <div class="w-5 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-300 to-zinc-800 shadow border border-zinc-500 transform -rotate-6"></div>
+      <!-- Wire Spiral Binding Rings on Left -->
+      <div class="absolute -left-3.5 top-6 bottom-6 w-5 flex flex-col justify-between pointer-events-none z-20">
+        <div class="w-6 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-200 to-zinc-800 shadow border border-zinc-600 transform -rotate-6"></div>
+        <div class="w-6 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-200 to-zinc-800 shadow border border-zinc-600 transform -rotate-6"></div>
+        <div class="w-6 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-200 to-zinc-800 shadow border border-zinc-600 transform -rotate-6"></div>
+        <div class="w-6 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-200 to-zinc-800 shadow border border-zinc-600 transform -rotate-6"></div>
+        <div class="w-6 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-200 to-zinc-800 shadow border border-zinc-600 transform -rotate-6"></div>
+        <div class="w-6 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-200 to-zinc-800 shadow border border-zinc-600 transform -rotate-6"></div>
+        <div class="w-6 h-2 rounded-full bg-gradient-to-r from-zinc-700 via-zinc-200 to-zinc-800 shadow border border-zinc-600 transform -rotate-6"></div>
       </div>
-      <div class="absolute top-0 bottom-0 right-6 w-3 bg-[#18181B] rounded shadow pointer-events-none opacity-80"></div>
+      <!-- Visible Inner Page Block at Right Edge -->
+      <div class="absolute top-2 bottom-2 -right-2 w-2 bg-[#F3EEEA] rounded-r-sm shadow-md border-r border-[#C9C0B7] pointer-events-none"></div>
+      <!-- Elastic Closure Band on Right -->
+      <div class="absolute top-0 bottom-0 right-6 w-3.5 bg-[#18181B] rounded shadow-md pointer-events-none opacity-85 z-15"></div>
     `
   },
-  car_window: {
-    id: 'car_window',
-    name: 'زجاج سيارة (Car Window)',
-    frameClass: 'mockup-car-window-realistic relative flex items-center justify-center p-6 min-h-[380px] max-w-[340px] mx-auto overflow-hidden select-none',
+  book: {
+    id: 'book',
+    name: 'كتاب / رواية',
+    nameAr: 'كتاب / رواية',
+    nameEn: 'Book',
+    realWidthCm: 13,
+    realHeightCm: 20,
+    frameClass: 'mockup-book-realistic relative flex items-center justify-center p-6 min-h-[400px] max-w-[290px] mx-auto select-none',
     decorationsHtml: `
-      <!-- Car Window Edge Weatherstrip & Defroster Filament Lines -->
-      <div class="absolute inset-0 border-[6px] border-[#181D24] rounded-[3rem_1.25rem_0.5rem_0.5rem] pointer-events-none"></div>
-      <div class="absolute top-1/4 left-3 right-3 h-[1px] bg-red-950/40 pointer-events-none"></div>
-      <div class="absolute top-2/4 left-3 right-3 h-[1px] bg-red-950/40 pointer-events-none"></div>
-      <div class="absolute top-3/4 left-3 right-3 h-[1px] bg-red-950/40 pointer-events-none"></div>
-      <!-- Tint Reflection Specular Streak -->
-      <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-cyan-400/5 to-transparent pointer-events-none"></div>
-      <div class="absolute bottom-3 left-4 text-[9px] font-mono font-bold text-slate-500 opacity-50 pointer-events-none">TEMPERED GLASS • S21</div>
+      <!-- Top Page Block (Bookmarks emerge from here!) -->
+      <div class="absolute -top-3.5 left-6 right-6 h-3.5 bg-gradient-to-b from-[#FAF7F2] to-[#E5DFD7] rounded-t-sm border-t border-x border-[#D8D0C5] shadow-inner pointer-events-none z-5">
+        <div class="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent,transparent_2px,rgba(0,0,0,0.04)_2px,rgba(0,0,0,0.04)_3px)]"></div>
+      </div>
+      <!-- Gold Embossed Geometric Filigree Frame -->
+      <div class="absolute inset-5 rounded-lg border border-[#D4AF37]/35 pointer-events-none flex flex-col justify-between p-4">
+        <div class="text-center font-mono text-[9px] tracking-widest text-[#D4AF37]/60">STICKIFY 21 LIMITED EDITION</div>
+        <div class="text-center font-mono text-[9px] text-[#D4AF37]/40 tracking-wider">NOVEL &amp; LITERATURE</div>
+      </div>
+      <!-- Visible Right Edge Page Block -->
+      <div class="absolute top-2 bottom-2 -right-3 w-3 bg-gradient-to-b from-[#F3EEEA] via-[#E8E2DC] to-[#DDD6CE] rounded-r-sm shadow-md border-r border-[#C9C0B7] pointer-events-none">
+        <div class="absolute inset-0 bg-[repeating-linear-gradient(180deg,transparent,transparent_2px,rgba(0,0,0,0.04)_2px,rgba(0,0,0,0.04)_3px)]"></div>
+      </div>
     `
   }
 };
@@ -219,6 +246,7 @@ window.toggleStoreLanguage = toggleStoreLanguage;
 export function renderAppForLanguage() {
   renderCategories();
   renderProducts();
+  renderShowcase();
   renderCart();
   renderPackBuilder();
   renderMockupDevice();
@@ -314,10 +342,12 @@ export async function initApp() {
   // Load from unified storage interface
   state.categories = await storage.getCategories();
   state.products = await storage.getProducts();
+  state.showcase = await storage.getShowcase();
 
   updateProductJsonLd(state.products);
   renderCategories();
   renderProducts();
+  renderShowcase();
   renderCart();
   renderPackBuilder();
   renderMockupDevice();
@@ -341,6 +371,10 @@ export async function initApp() {
       state.products = await storage.getProducts();
       updateProductJsonLd(state.products);
       renderProducts();
+    }
+    if (e.key === 'stickify21_showcase') {
+      state.showcase = await storage.getShowcase();
+      renderShowcase();
     }
     if (e.key === 'stickify21_cart') {
       state.cart = safeJsonParse(e.newValue, [], 'stickify21_cart');
@@ -558,6 +592,63 @@ export function selectCardSize(productId, sizeKey, e) {
       graphicElem.className = 'w-28 h-28 sticker-diecut-minimal flex items-center justify-center transition-all duration-200';
     }
   }
+}
+
+// ==========================================
+// SHOWCASE STRIP (R8)
+// ==========================================
+export function renderShowcase() {
+  const section = document.getElementById('showcase-section');
+  const track = document.getElementById('showcase-track');
+  if (!section || !track) return;
+
+  const items = (state.showcase || []).filter(item => item.active !== false);
+  if (items.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  const lang = getLanguage();
+  const deviceTagMap = {
+    laptop: { ar: 'لابتوب', en: 'Laptop' },
+    bottle: { ar: 'زجاجة مياه', en: 'Water Bottle' },
+    book: { ar: 'كتاب / رواية', en: 'Book' },
+    notebook: { ar: 'كشكول ملاحظات', en: 'Notebook' },
+    phone: { ar: 'موبايل', en: 'Phone' },
+    other: { ar: 'أخرى', en: 'Other' }
+  };
+
+  const renderCard = (item) => {
+    const caption = (lang === 'en' ? (item.captionEn || item.captionAr) : (item.captionAr || item.captionEn)) || '';
+    const tagInfo = deviceTagMap[item.deviceTag] || deviceTagMap.other;
+    const tagName = lang === 'en' ? tagInfo.en : tagInfo.ar;
+    const isSvgData = item.image && item.image.startsWith('data:image/svg+xml');
+
+    return `
+      <div class="showcase-item w-72 flex-shrink-0 bg-white rounded-2xl border border-zinc-200/90 shadow-sm overflow-hidden flex flex-col group hover:border-black transition">
+        <div class="w-full h-48 bg-zinc-100 overflow-hidden flex items-center justify-center relative">
+          ${isSvgData 
+            ? `<img src="${item.image}" alt="${escapeHtml(caption)}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">`
+            : `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(caption)}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">`
+          }
+          <span class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold bg-black/70 backdrop-blur-sm text-white">
+            ${escapeHtml(tagName)}
+          </span>
+        </div>
+        <div class="p-3.5 flex flex-col justify-between flex-1">
+          <p class="text-xs font-bold text-zinc-900 line-clamp-2">${escapeHtml(caption)}</p>
+          <div class="flex items-center justify-between pt-2 mt-2 border-t border-zinc-100 text-[10px] text-zinc-400">
+            <span>STICKIFY 21 Real Life</span>
+            <span class="text-[#FF5000] font-bold">100% فينيل</span>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const cardsHtml = items.map(renderCard).join('');
+  track.innerHTML = cardsHtml;
 }
 
 export function renderCategories() {
@@ -1157,8 +1248,33 @@ export function addPackToCart() {
 }
 
 // ==========================================
-// MOCKUP STUDIO (Fixes Bug 02 & Bug 06)
+// MOCKUP STUDIO (True-to-Scale & Realistic SVGs) (R5, R6, R7, A4)
 // ==========================================
+export function getMockupPxPerCm() {
+  const container = document.getElementById('device-wrapper');
+  const dev = devices[state.activeDevice] || devices.laptop;
+  if (!container) return 15;
+  const rect = container.getBoundingClientRect();
+  const widthPx = rect.width || 500;
+  return widthPx / dev.realWidthCm;
+}
+
+export function getPlacedStickerDimensions(item) {
+  const pxPerCm = getMockupPxPerCm();
+  if (item.isBookmark) {
+    return {
+      widthPx: Math.round(5 * pxPerCm),
+      heightPx: Math.round(15 * pxPerCm)
+    };
+  }
+  const sizeCm = item.sizeKey === 'small' ? 6 : (item.sizeKey === 'large' ? 10 : 8);
+  const sizePx = Math.round(sizeCm * pxPerCm);
+  return {
+    widthPx: sizePx,
+    heightPx: sizePx
+  };
+}
+
 export function renderMockupDevice() {
   const container = document.getElementById('device-wrapper');
   if (!container) return;
@@ -1171,6 +1287,10 @@ export function renderMockupDevice() {
     <div id="mockup-stickers-layer" class="absolute inset-0 z-10 w-full h-full pointer-events-auto"></div>
   `;
   renderPlacedStickers();
+  const rulerOverlay = document.getElementById('mockup-ruler-overlay');
+  if (rulerOverlay && !rulerOverlay.classList.contains('hidden')) {
+    renderMockupRuler();
+  }
 }
 
 export function changeMockupDevice(devId) {
@@ -1189,21 +1309,27 @@ export function addStickerToMockup(productId) {
   const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
   const sizeKey = isBookmark ? 'standard' : (state.selectedSizes[productId] || 'medium');
   const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey);
-  const scale = isBookmark ? 1.0 : (sizeObj ? sizeObj.scale : 1.0);
+
+  const isBookDevice = state.activeDevice === 'book';
+  // Bookmark on book preview emerges naturally from the top page block (R6)
+  const defaultX = isBookmark && isBookDevice ? 62 : (42 + (Math.random() * 16));
+  const defaultY = isBookmark && isBookDevice ? 15 : (38 + (Math.random() * 16));
+  const defaultRotation = isBookmark ? (isBookDevice ? -2 : 0) : 0;
 
   const newPlaced = {
     id: 'placed-' + Date.now(),
     productId: product.id,
     sku: product.sku,
     nameAr: product.nameAr,
+    nameEn: product.nameEn || product.name,
+    finish: product.finish || 'matte',
     svg: product.svg,
     image: product.image,
     isBookmark: isBookmark,
     sizeKey: sizeKey,
-    x: 42 + (Math.random() * 16),
-    y: 38 + (Math.random() * 16),
-    rotation: isBookmark ? (Math.random() * 8 - 4) : ((Math.random() * 20) - 10),
-    scale: scale
+    x: defaultX,
+    y: defaultY,
+    rotation: defaultRotation
   };
 
   state.placedStickers.push(newPlaced);
@@ -1223,22 +1349,44 @@ export function renderPlacedStickers() {
   const board = document.getElementById('mockup-stickers-layer');
   if (!board) return;
 
+  const isBottle = state.activeDevice === 'bottle';
+
   board.innerHTML = state.placedStickers.map(item => {
     const safeImg = sanitizeUrl(item.image);
     const safeSvg = sanitizeSvg(item.svg);
+    const { widthPx, heightPx } = getPlacedStickerDimensions(item);
+
+    // Cylindrical horizontal squeeze for bottle/tumbler (R6)
+    let scaleXTransform = '';
+    let curvatureStyle = '';
+    if (isBottle) {
+      const normX = (item.x - 50) / 45;
+      const angle = Math.max(-1, Math.min(1, normX)) * (Math.PI / 2.6);
+      const cosTheta = Math.max(0.35, Math.cos(angle));
+      scaleXTransform = ` scaleX(${cosTheta.toFixed(3)})`;
+      if (Math.abs(normX) > 0.35) {
+        const brightness = (0.75 + 0.25 * cosTheta).toFixed(2);
+        curvatureStyle = `filter: brightness(${brightness});`;
+      }
+    }
+
+    const isGlossy = item.finish !== 'matte';
+    const finishSheen = isGlossy ? `<div class="sticker-glossy-sheen pointer-events-none"></div>` : '';
 
     return `
       <div id="${escapeHtml(item.id)}" 
-           class="mockup-placed-sticker ${item.isBookmark ? 'w-16 h-32' : 'w-24 h-24'} ${state.selectedPlacedId === item.id ? 'selected' : ''}"
-           style="left: ${item.x}%; top: ${item.y}%; transform: translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale});"
+           class="mockup-placed-sticker sticker-diecut-contour relative ${state.selectedPlacedId === item.id ? 'selected' : ''}"
+           style="width: ${widthPx}px; height: ${heightPx}px; left: ${item.x}%; top: ${item.y}%; transform: translate(-50%, -50%) rotate(${item.rotation}deg)${scaleXTransform}; ${curvatureStyle}"
            data-placed-id="${escapeHtml(item.id)}">
         ${safeImg ? `<img src="${safeImg}" alt="" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
+        ${finishSheen}
       </div>
     `;
   }).join('');
 
   attachPointerDragListeners();
   updatePlacedControls();
+  updateMockupScaleCaption();
 }
 
 function attachPointerDragListeners() {
@@ -1256,6 +1404,7 @@ function attachPointerDragListeners() {
       board.querySelectorAll('.mockup-placed-sticker').forEach(s => s.classList.remove('selected'));
       el.classList.add('selected');
       updatePlacedControls();
+      updateMockupScaleCaption();
 
       const item = state.placedStickers.find(s => s.id === id);
       if (!item) return;
@@ -1274,6 +1423,18 @@ function attachPointerDragListeners() {
         rafId = requestAnimationFrame(() => {
           el.style.left = `${item.x}%`;
           el.style.top = `${item.y}%`;
+          if (state.activeDevice === 'bottle') {
+            const normX = (item.x - 50) / 45;
+            const angle = Math.max(-1, Math.min(1, normX)) * (Math.PI / 2.6);
+            const cosTheta = Math.max(0.35, Math.cos(angle));
+            el.style.transform = `translate(-50%, -50%) rotate(${item.rotation}deg) scaleX(${cosTheta.toFixed(3)})`;
+            if (Math.abs(normX) > 0.35) {
+              const brightness = (0.75 + 0.25 * cosTheta).toFixed(2);
+              el.style.filter = `brightness(${brightness})`;
+            } else {
+              el.style.filter = '';
+            }
+          }
         });
       };
 
@@ -1294,6 +1455,96 @@ function attachPointerDragListeners() {
       el.onpointercancel = onPointerUp;
     };
   });
+}
+
+export function updateMockupScaleCaption() {
+  const captionEl = document.getElementById('mockup-scale-caption');
+  if (!captionEl) return;
+
+  const dev = devices[state.activeDevice] || devices.laptop;
+  const current = state.placedStickers.find(s => s.id === state.selectedPlacedId) || state.placedStickers[0];
+
+  const lang = getLanguage();
+  const devName = lang === 'en' ? dev.nameEn : dev.nameAr;
+
+  if (!current) {
+    captionEl.textContent = lang === 'en' 
+      ? `True-to-scale dimensions matching real-world sizes (${dev.realWidthCm} cm ${devName})`
+      : `المقاسات مطابقة للأبعاد الواقعية (${devName} ${dev.realWidthCm} سم)`;
+    return;
+  }
+
+  if (current.isBookmark) {
+    captionEl.textContent = lang === 'en'
+      ? `15×5 cm bookmark inside ${dev.realWidthCm} cm ${devName}`
+      : `بوك مارك 15×5 سم على ${devName} ${dev.realWidthCm} سم`;
+  } else {
+    const sizeCm = current.sizeKey === 'small' ? 6 : (current.sizeKey === 'large' ? 10 : 8);
+    captionEl.textContent = lang === 'en'
+      ? `${sizeCm} cm sticker on ${dev.realWidthCm} cm ${devName}`
+      : `استيكر ${sizeCm} سم على ${devName} ${dev.realWidthCm} سم`;
+  }
+}
+
+export function renderMockupRuler() {
+  const overlay = document.getElementById('mockup-ruler-overlay');
+  if (!overlay) return;
+
+  const dev = devices[state.activeDevice] || devices.laptop;
+  const pxPerCm = getMockupPxPerCm();
+  const totalCm = dev.realWidthCm;
+
+  let ticksHtml = '';
+  for (let cm = 0; cm <= totalCm; cm++) {
+    const leftPx = cm * pxPerCm;
+    const isMajor = cm % 5 === 0;
+    ticksHtml += `
+      <div class="absolute bottom-0 flex flex-col items-center pointer-events-none" style="left: ${leftPx}px; transform: translateX(-50%);">
+        ${isMajor ? `<span class="text-[9px] font-mono font-bold text-zinc-700 leading-none mb-1">${cm}</span>` : ''}
+        <div class="w-[1px] ${isMajor ? 'h-3.5 bg-zinc-900' : 'h-2 bg-zinc-400'}"></div>
+      </div>
+    `;
+    if (cm < totalCm) {
+      const halfPx = (cm + 0.5) * pxPerCm;
+      ticksHtml += `
+        <div class="absolute bottom-0 pointer-events-none" style="left: ${halfPx}px; transform: translateX(-50%);">
+          <div class="w-[1px] h-1.5 bg-zinc-300"></div>
+        </div>
+      `;
+    }
+  }
+
+  overlay.innerHTML = `
+    <div class="mockup-ruler relative w-full h-8 overflow-hidden rounded-t-xl px-2">
+      <div class="absolute top-1 left-2 text-[8px] font-mono uppercase tracking-wider text-zinc-500 font-bold">Metric (cm)</div>
+      ${ticksHtml}
+    </div>
+  `;
+}
+
+export function toggleMockupRuler() {
+  const overlay = document.getElementById('mockup-ruler-overlay');
+  const btn = document.getElementById('toggle-mockup-ruler');
+  if (!overlay) return;
+  const isHidden = overlay.classList.contains('hidden');
+  overlay.classList.toggle('hidden', !isHidden);
+  if (isHidden) renderMockupRuler();
+  if (btn) {
+    const lang = getLanguage();
+    btn.textContent = isHidden 
+      ? (lang === 'en' ? 'Hide Ruler' : 'إخفاء المسطرة') 
+      : (lang === 'en' ? 'Show Ruler' : 'عرض المسطرة');
+  }
+}
+
+export function openSizeGuideModal() {
+  const modal = document.getElementById('size-guide-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+export function closeSizeGuideModal() {
+  const modal = document.getElementById('size-guide-modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 function updatePlacedControls() {
@@ -1344,9 +1595,7 @@ export function setPlacedStickerSize(sizeKey) {
   const current = state.placedStickers.find(s => s.id === state.selectedPlacedId);
   if (!current || current.isBookmark) return;
 
-  const sizeObj = CONFIG.STICKER_SIZES.find(s => s.key === sizeKey) || CONFIG.STICKER_SIZES[1];
   current.sizeKey = sizeKey;
-  current.scale = sizeObj.scale;
   renderPlacedStickers();
 }
 
@@ -2996,7 +3245,28 @@ window.handlePaymentProofSelected = handlePaymentProofSelected;
 window.clearPaymentProof = clearPaymentProof;
 window.copyToClipboardText = copyToClipboardText;
 window.sharePaymentProofOnWhatsApp = sharePaymentProofOnWhatsApp;
+window.toggleMockupRuler = toggleMockupRuler;
+window.openSizeGuideModal = openSizeGuideModal;
+window.closeSizeGuideModal = closeSizeGuideModal;
+window.renderShowcase = renderShowcase;
+window.renderPlacedStickers = renderPlacedStickers;
+window.__mockupState = state;
 window.analytics = analytics;
+
+// ResizeObserver for True-to-Scale studio recalculation (R7)
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => {
+    if (state.placedStickers && state.placedStickers.length > 0) {
+      renderPlacedStickers();
+    }
+    const ruler = document.getElementById('mockup-ruler-overlay');
+    if (ruler && !ruler.classList.contains('hidden')) {
+      renderMockupRuler();
+    }
+  });
+  const devEl = document.getElementById('device-wrapper');
+  if (devEl) ro.observe(devEl);
+}
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
