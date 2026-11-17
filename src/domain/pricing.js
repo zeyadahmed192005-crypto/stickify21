@@ -197,20 +197,21 @@ export function groupCartItemsIntoPacks(items = [], strategy = null) {
     });
   }
 
-  // 5. Remaining loose units in pool are singles. Re-aggregate identical singles.
-  const singleLines = [];
+  // 5. Remaining loose units in pool are singles. Re-aggregate identical singles in O(n) via Map.
+  const singleMap = new Map();
   pool.forEach(unit => {
     const key = `${unit.sku}_${unit.sizeKey}_${unit.finish}`;
-    const existing = singleLines.find(s => `${s.sku}_${s.sizeKey}_${s.finish}` === key);
+    const existing = singleMap.get(key);
     if (existing) {
       existing.quantity += 1;
     } else {
-      singleLines.push({
+      singleMap.set(key, {
         ...unit,
         quantity: 1
       });
     }
   });
+  const singleLines = Array.from(singleMap.values());
 
   // Calculate dynamic nudge message (R10)
   const totalLooseStickers = looseUnits.length;

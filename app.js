@@ -3729,6 +3729,7 @@ window.openSizeGuideModal = openSizeGuideModal;
 window.closeSizeGuideModal = closeSizeGuideModal;
 window.renderShowcase = renderShowcase;
 window.renderPlacedStickers = renderPlacedStickers;
+window.renderCart = renderCart;
 window.__mockupState = state;
 window.analytics = analytics;
 

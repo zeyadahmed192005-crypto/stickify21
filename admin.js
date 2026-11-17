@@ -49,7 +49,9 @@ let adminState = {
   },
   selectedOrderIds: new Set(),
   activeDetailOrderId: null,
-  orderQuickFilter: 'all'
+  orderQuickFilter: 'all',
+  ordersPage: 1,
+  ordersPageSize: 25
 };
 
 // ==========================================
@@ -390,7 +392,10 @@ export function renderOrders() {
   // Update Bulk Bar State
   updateBulkBarState();
 
+  const paginationContainer = document.getElementById('orders-pagination-container');
+
   if (filtered.length === 0) {
+    if (paginationContainer) paginationContainer.innerHTML = '';
     container.innerHTML = `
       <div class="text-center py-16 bg-zinc-50 rounded-2xl border border-zinc-200">
         <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400"><svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-4a2 2 0 00-2 2v1a2 2 0 01-2 2H8a2 2 0 01-2-2v-1a2 2 0 00-2-2H4"/></svg></div>
@@ -400,6 +405,14 @@ export function renderOrders() {
     `;
     return;
   }
+
+  // P2-2: Pagination (25 orders/page) for smooth rendering with 500+ orders
+  const pageSize = adminState.ordersPageSize || 25;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (!adminState.ordersPage || adminState.ordersPage < 1) adminState.ordersPage = 1;
+  if (adminState.ordersPage > totalPages) adminState.ordersPage = totalPages;
+  const startIdx = (adminState.ordersPage - 1) * pageSize;
+  const pageOrders = filtered.slice(startIdx, startIdx + pageSize);
 
   // Canonical status keys and display mapping (R2: includes ready)
   const statuses = [
@@ -413,7 +426,7 @@ export function renderOrders() {
     { key: 'cancelled', label: 'ملغي' }
   ];
 
-  container.innerHTML = filtered.map((order) => {
+  container.innerHTML = pageOrders.map((order) => {
     const packingSlipUrl = `packing-slip.html?id=${encodeURIComponent(order.id || '')}`;
     const currentKey = normalizeStatusKey(order.status);
     const statusObj = ORDER_STATUSES[currentKey] || ORDER_STATUSES.pending;
@@ -541,6 +554,34 @@ export function renderOrders() {
       </div>
     `;
   }).join('');
+
+  if (paginationContainer) {
+    if (totalPages > 1) {
+      paginationContainer.innerHTML = `
+        <div id="orders-pagination-bar" class="flex items-center justify-between flex-wrap gap-3 p-3 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs">
+          <div class="text-zinc-600 font-semibold">
+            عرض <span class="font-mono font-bold text-zinc-900">${startIdx + 1}–${Math.min(startIdx + pageSize, filtered.length)}</span> من أصل <span class="font-mono font-bold text-[#FF5000]">${filtered.length}</span> طلب
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="orders-prev-page-btn" onclick="goToOrdersPage(${adminState.ordersPage - 1})" ${adminState.ordersPage <= 1 ? 'disabled class="px-3 py-1.5 rounded-xl bg-zinc-100 text-zinc-400 font-bold cursor-not-allowed"' : 'class="px-3 py-1.5 rounded-xl bg-white border border-zinc-200 hover:border-zinc-900 text-zinc-800 font-bold transition"'}>
+              السابق
+            </button>
+            <span class="font-mono font-bold text-zinc-800 px-2">صفحة ${adminState.ordersPage} / ${totalPages}</span>
+            <button type="button" id="orders-next-page-btn" onclick="goToOrdersPage(${adminState.ordersPage + 1})" ${adminState.ordersPage >= totalPages ? 'disabled class="px-3 py-1.5 rounded-xl bg-zinc-100 text-zinc-400 font-bold cursor-not-allowed"' : 'class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white font-bold transition"'}>
+              التالي
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      paginationContainer.innerHTML = '';
+    }
+  }
+}
+
+export function goToOrdersPage(pageNum) {
+  adminState.ordersPage = Math.max(1, parseInt(pageNum, 10) || 1);
+  renderOrders();
 }
 
 function normalizeStatusKey(st) {
@@ -3502,6 +3543,8 @@ window.cancelOpaqueProductPng = cancelOpaqueProductPng;
 window.toggleCustomRequestWhatsAppReceived = toggleCustomRequestWhatsAppReceived;
 window.downloadCustomRequestAsset = downloadCustomRequestAsset;
 window.saveCustomUploadSettings = saveCustomUploadSettings;
+window.renderOrders = renderOrders;
+window.goToOrdersPage = goToOrdersPage;
 window.toggleAdminTheme = toggleAdminTheme;
 
 document.addEventListener('DOMContentLoaded', initAdmin);
