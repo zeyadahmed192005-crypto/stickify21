@@ -1493,6 +1493,18 @@ export function renderPlacedStickers() {
     el.classList.toggle('selected', state.selectedPlacedId === item.id);
     el.style.width = `${widthPx}px`;
     el.style.height = `${heightPx}px`;
+
+    // Sync glossy sheen overlay in place when finish changes (without recreating el)
+    const isGlossyNow = item.finish !== 'matte';
+    const existingSheen = el.querySelector('.sticker-glossy-sheen');
+    if (isGlossyNow && !existingSheen) {
+      const sheenDiv = document.createElement('div');
+      sheenDiv.className = 'sticker-glossy-sheen pointer-events-none';
+      el.appendChild(sheenDiv);
+    } else if (!isGlossyNow && existingSheen) {
+      existingSheen.remove();
+    }
+
     applyStickerTransformStyle(el, item, boardRect);
   });
 
