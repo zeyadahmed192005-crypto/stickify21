@@ -237,8 +237,9 @@ export const LocalAdapter = {
       const cleanNameEn = stripEmoji(p.nameEn || p.name);
       const cleanDescEn = stripEmoji(p.descEn || p.desc);
       const cleanBadgeEn = stripEmoji(p.badgeEn || p.badge);
+      const tags = Array.isArray(p.tags) ? p.tags : (p.category ? [p.category] : []);
 
-      if (cleanNameAr !== p.nameAr || cleanDescAr !== p.descAr || cleanBadgeAr !== p.badgeAr || !p.nameEn) {
+      if (cleanNameAr !== p.nameAr || cleanDescAr !== p.descAr || cleanBadgeAr !== p.badgeAr || !p.nameEn || !p.tags) {
         updated = true;
       }
 
@@ -248,6 +249,7 @@ export const LocalAdapter = {
           ...p,
           finish,
           finishes,
+          tags,
           name: cleanNameAr,
           nameAr: cleanNameAr,
           desc: cleanDescAr,
@@ -526,5 +528,48 @@ export const LocalAdapter = {
       freeShippingThreshold: CONFIG.FREE_SHIPPING_THRESHOLD
     });
     return true;
+  },
+
+  // Storage Meter Calculator (A13)
+  async getStorageUsage() {
+    let localBytes = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const val = localStorage.getItem(key);
+        localBytes += (key.length + (val ? val.length : 0)) * 2; // UTF-16
+      }
+    } catch (e) {}
+
+    let idbBytes = 0;
+    try {
+      const db = await openAssetsDb();
+      const tx = db.transaction(ASSETS_STORE, 'readonly');
+      const store = tx.objectStore(ASSETS_STORE);
+      const all = await new Promise((res, rej) => {
+        const req = store.getAll();
+        req.onsuccess = () => res(req.result || []);
+        req.onerror = () => rej(req.error);
+      });
+      for (const item of all) {
+        if (item.blob) idbBytes += item.blob.size || 0;
+      }
+    } catch (e) {}
+
+    const totalBytes = localBytes + idbBytes;
+    const totalKb = Math.max(1, Math.round(totalBytes / 1024));
+    const totalMb = (totalBytes / (1024 * 1024)).toFixed(2);
+    // Reference 5MB quota
+    const budgetBytes = 5 * 1024 * 1024;
+    const percent = Math.min(100, Math.max(1, Math.round((totalBytes / budgetBytes) * 100)));
+
+    return {
+      localBytes,
+      idbBytes,
+      totalBytes,
+      totalKb,
+      totalMb,
+      percent
+    };
   }
 };

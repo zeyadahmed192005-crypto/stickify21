@@ -332,3 +332,31 @@ This document records all architectural decisions, ground-truth constraints, and
     - Paperback Novel (approx. 20 cm × 13 cm).
 - **Practical Recommendations:** Clarifies ideal placement for each size (e.g. 6 cm for phone backs / chargers; 8 cm for tumblers / tablet cases; 10 cm for laptop lids / luggage; 15×5 cm for books / planners).
 
+### AD-43: Admin Backup Hygiene & Storage Usage Meter (A1, A13)
+- **Decision:** Safeguard prototype `localStorage`/`IndexedDB` data against accidental browser resets or storage exhaustion.
+- **Backup Reminder Banner (`#backup-reminder-banner`):** Checks `stickify21_last_backup_date` on admin boot; if missing or older than 3 days, displays a top warning banner with a 1-click JSON export button (`#download-backup-now-btn`) that refreshes the timestamp upon download.
+- **Storage Quota Meter (`#storage-usage-meter`):** Computes live UTF-16 byte usage across `localStorage` keys plus IndexedDB asset records (`storage.getStorageUsage()`), showing exact KB/MB utilization and progress bar percentage against the 5 MB browser localStorage baseline in Admin Settings.
+
+### AD-44: Admin Power Tools — Duplicate Product, Bulk Actions with 10s Undo & Production Aggregate Sheet (A5, A15, A17)
+- **Decision:** Streamline daily catalog and fulfillment workflows for the store owner without requiring a backend.
+- **Product Duplication:** 1-click duplicate button per product row clones the product immediately with `(نسخة)` suffix and auto-generated SKU.
+- **Bulk Catalog Actions:** Multi-select checkboxes reveal a floating `#bulk-actions-bar` supporting bulk active/inactive toggle, percentage price adjustments, and bulk category reassignment — all wrapped in a 10-second Undo snapshot (`#bulk-undo-toast`).
+- **Production Aggregate Summary (`#production-summary-modal`):** Aggregates required print quantities per SKU and size (6/8/10 cm, 15×5 cm bookmark) across active/confirmed/preparing orders (flattening both single and pack lines) with dedicated `@media print` styling.
+- **Admin Dark Theme (`#admin-theme-toggle`):** Persisted dark mode preference (`stickify21_admin_theme`) toggling `html.dark` for late-night order processing.
+
+### AD-45: Admin Dashboard Analytics Summary & Stock Alerts (A8, A9)
+- **Decision:** Add an executive overview tab (`#tab-dashboard`) as an instant operational pulse check.
+- **Date Range Filtering (`#dashboard-date-range`):** Supports `all`, `today`, `week`, and `month`, calculating total orders, realized revenue, pending payment verification count, and Top 3 Best-Selling designs.
+- **Stock Alerts Card (`#dashboard-stock-alerts`):** Surfaces out-of-stock or low-stock (`stockQuantity <= 10`) catalog items with a live badge counter so the owner can restock proactively.
+
+### AD-46: Storefront Wishlist & Recently Viewed History (A10)
+- **Decision:** Improve returning-customer discovery using client-side persistence (`stickify21_wishlist` and `stickify21_recently_viewed`).
+- **Wishlist:** Heart toggle button (`.wishlist-toggle-btn`) on every product card, navbar wishlist badge (`#wishlist-badge`), quick filter pill (`المفضلة` / `Wishlist`), and cross-tab sync via `window.onstorage`.
+- **Recently Viewed Strip (`#recently-viewed-section`):** Records the last 6 unique products opened in `#product-detail-modal` and displays a compact horizontal grid above the footer with a 1-click clear history action.
+
+### AD-47: Typo-Tolerant Arabic Search Normalization & Product Tags (A12)
+- **Decision:** Solve Egyptian Arabic spelling variation mismatches (e.g., `برمجه` vs `برمجة`, `أ/إ/آ` vs `ا`, `ى` vs `ي`, diacritics) in catalog search.
+- **Normalization Utility (`src/utils/arabic.js`):** Exports `normalizeArabic(text)` stripping tashkeel (`\u064B-\u065F\u0670`) and unifying alef, teh marbuta, alef maqsura, and hamza carriers.
+- **Product Tags & Filter Chips (`#tag-filter-chips`):** Seed products carry curated Egyptian Arabic/English tags; catalog renders clickable top-tag chips above `#products-grid` and matches normalized search queries across product names, descriptions, SKUs, and tags.
+
+

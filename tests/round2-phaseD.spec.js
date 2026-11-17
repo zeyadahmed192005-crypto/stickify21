@@ -31,6 +31,7 @@ test.describe('Round 2 - Phase D: Visual Mockups & Showcase (R5, R6, R7, R8, A4)
 
   test('R6 & R7: Realistic Mockup SVGs, True-to-Scale Dimensions, Ruler & Curvature', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#products-grid .sticker-card');
 
     const studioSection = page.locator('#mockup-studio-section');
     await expect(studioSection).toBeVisible();
@@ -130,6 +131,7 @@ test.describe('Round 2 - Phase D: Visual Mockups & Showcase (R5, R6, R7, R8, A4)
     await expect(showcaseSection).toBeVisible();
 
     // Check seeded items count (4-6 items)
+    await page.waitForSelector('#showcase-section .showcase-item');
     const showcaseItems = showcaseSection.locator('.showcase-item');
     const count = await showcaseItems.count();
     expect(count).toBeGreaterThanOrEqual(4);

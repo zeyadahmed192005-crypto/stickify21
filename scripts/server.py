@@ -3,6 +3,7 @@ import socketserver
 import sys
 
 class DualStackServer(http.server.ThreadingHTTPServer):
+    request_queue_size = 128
     def server_bind(self):
         self.socket.setsockopt(http.server.socket.SOL_SOCKET, http.server.socket.SO_REUSEADDR, 1)
         super().server_bind()

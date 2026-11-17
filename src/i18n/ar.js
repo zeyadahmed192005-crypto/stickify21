@@ -184,5 +184,14 @@ export const AR = {
   toastRemoved: 'تم حذف المنتج من السلة',
   toastFillRequired: 'يرجى ملء جميع الحقول المطلوبة',
   toastUploadRequired: 'يرجى رفع صورة إشعار التحويل لتأكيد طلبك',
-  toastOrderCreated: 'تم تسجيل طلبك بنجاح برقم {orderId}'
+  toastOrderCreated: 'تم تسجيل طلبك بنجاح برقم {orderId}',
+
+  // Phase E: Wishlist, Tags & Recently Viewed
+  navWishlist: 'المفضلة',
+  allTags: 'كل الوسوم',
+  recentlyViewedTitle: 'شاهدتها مؤخراً',
+  recentlyViewedSubtitle: 'المنتجات التي قمت بتصفحها مؤخراً',
+  clearRecentlyViewed: 'مسح السجل',
+  toastWishlistAdded: 'تمت الإضافة إلى المفضلة',
+  toastWishlistRemoved: 'تمت الإزالة من المفضلة'
 };

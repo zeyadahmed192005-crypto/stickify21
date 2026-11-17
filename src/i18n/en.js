@@ -184,5 +184,14 @@ export const EN = {
   toastRemoved: 'Item removed from cart',
   toastFillRequired: 'Please complete all required fields',
   toastUploadRequired: 'Please upload transfer screenshot to confirm your order',
-  toastOrderCreated: 'Order placed successfully with ID {orderId}'
+  toastOrderCreated: 'Order placed successfully with ID {orderId}',
+
+  // Phase E: Wishlist, Tags & Recently Viewed
+  navWishlist: 'Wishlist',
+  allTags: 'All Tags',
+  recentlyViewedTitle: 'Recently Viewed',
+  recentlyViewedSubtitle: 'Products you checked out recently',
+  clearRecentlyViewed: 'Clear History',
+  toastWishlistAdded: 'Added to your Wishlist',
+  toastWishlistRemoved: 'Removed from your Wishlist'
 };

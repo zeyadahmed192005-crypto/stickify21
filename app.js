@@ -18,6 +18,7 @@ import { initI18n, getLanguage, setLanguage, t, formatCurrency } from './src/i18
 import { stripEmoji } from './src/utils/emoji.js';
 import { getIcon } from './src/utils/icons.js';
 import { DEFAULT_POLICIES } from './src/data/policies.js';
+import { normalizeArabic } from './src/utils/arabic.js';
 
 // Safe JSON parser with fallback and corrupted snapshot
 function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
@@ -50,9 +51,12 @@ const state = {
   products: [],
   showcase: [],
   cart: safeJsonParse(localStorage.getItem('stickify21_cart'), [], 'stickify21_cart'),
+  wishlist: safeJsonParse(localStorage.getItem('stickify21_wishlist'), [], 'stickify21_wishlist'),
+  recentlyViewed: safeJsonParse(localStorage.getItem('stickify21_recently_viewed'), [], 'stickify21_recently_viewed'),
   selectedSizes: {}, // { [productId]: 'small' | 'medium' | 'large' }
   selectedCategory: 'all',
   selectedSubCategory: 'all',
+  activeTag: 'all',
   selectedGovernorate: 'القاهرة',
   sortBy: 'featured',
   searchQuery: '',
@@ -245,13 +249,16 @@ window.toggleStoreLanguage = toggleStoreLanguage;
 
 export function renderAppForLanguage() {
   renderCategories();
+  renderTagChips();
   renderProducts();
   renderShowcase();
+  renderRecentlyViewed();
   renderCart();
   renderPackBuilder();
   renderMockupDevice();
   updateCustomPrintSummary();
   updateCartBadge();
+  updateWishlistBadge();
 }
 
 export function applyStaticTranslations(lang = getLanguage()) {
@@ -346,14 +353,17 @@ export async function initApp() {
 
   updateProductJsonLd(state.products);
   renderCategories();
+  renderTagChips();
   renderProducts();
   renderShowcase();
+  renderRecentlyViewed();
   renderCart();
   renderPackBuilder();
   renderMockupDevice();
   updateCustomPrintSummary();
   setupEventListeners();
   updateCartBadge();
+  updateWishlistBadge();
   initHashRouter();
 
   // Restore open cart if reloaded while open
@@ -370,6 +380,7 @@ export async function initApp() {
     if (e.key === 'stickify21_products') {
       state.products = await storage.getProducts();
       updateProductJsonLd(state.products);
+      renderTagChips();
       renderProducts();
     }
     if (e.key === 'stickify21_showcase') {
@@ -381,6 +392,11 @@ export async function initApp() {
       renderCart();
       updateCartBadge();
     }
+    if (e.key === 'stickify21_wishlist') {
+      state.wishlist = safeJsonParse(e.newValue, [], 'stickify21_wishlist');
+      updateWishlistBadge();
+      renderProducts();
+    }
   });
 }
 
@@ -390,9 +406,17 @@ export async function initApp() {
 export function getFilteredProducts() {
   let list = [...state.products];
 
-  // Category filter
-  if (state.selectedCategory !== 'all') {
+  // Category / Wishlist filter
+  if (state.selectedCategory === 'wishlist') {
+    list = list.filter(p => state.wishlist.includes(p.id));
+  } else if (state.selectedCategory !== 'all') {
     list = list.filter(p => p.category === state.selectedCategory);
+  }
+
+  // Tag filter (A12)
+  if (state.activeTag && state.activeTag !== 'all') {
+    const normTag = normalizeArabic(state.activeTag);
+    list = list.filter(p => Array.isArray(p.tags) && p.tags.some(tg => normalizeArabic(tg) === normTag));
   }
 
   // Finish filter
@@ -400,15 +424,23 @@ export function getFilteredProducts() {
     list = list.filter(p => p.finish === state.activeFinish);
   }
 
-  // Search query filter
+  // Search query filter with Arabic normalization tolerance (A12)
   if (state.searchQuery) {
-    const q = state.searchQuery.toLowerCase();
-    list = list.filter(p => 
-      (p.nameAr && p.nameAr.toLowerCase().includes(q)) ||
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.sku && p.sku.toLowerCase().includes(q)) ||
-      (p.desc && p.desc.toLowerCase().includes(q))
-    );
+    const q = state.searchQuery.toLowerCase().trim();
+    const normQ = normalizeArabic(state.searchQuery);
+    list = list.filter(p => {
+      const tagsMatch = Array.isArray(p.tags) && p.tags.some(tg => normalizeArabic(tg).includes(normQ) || String(tg).toLowerCase().includes(q));
+      return (
+        (p.nameAr && normalizeArabic(p.nameAr).includes(normQ)) ||
+        (p.nameEn && p.nameEn.toLowerCase().includes(q)) ||
+        (p.name && normalizeArabic(p.name).includes(normQ)) ||
+        (p.sku && p.sku.toLowerCase().includes(q)) ||
+        (p.descAr && normalizeArabic(p.descAr).includes(normQ)) ||
+        (p.descEn && p.descEn.toLowerCase().includes(q)) ||
+        (p.desc && normalizeArabic(p.desc).includes(normQ)) ||
+        tagsMatch
+      );
+    });
   }
 
   // Sort
@@ -425,7 +457,7 @@ export function getFilteredProducts() {
 
 export function renderProducts() {
   const container = document.getElementById('products-grid');
-  const countBadge = document.getElementById('filtered-count-badge');
+  const countBadge = document.getElementById('filtered-count-badge') || document.getElementById('products-count');
   const emptyState = document.getElementById('catalog-empty-state');
   if (!container) return;
 
@@ -450,6 +482,7 @@ export function renderProducts() {
     const hasImage = Boolean(product.image);
     const safeImage = sanitizeUrl(product.image);
     const safeSvg = sanitizeSvg(product.svg);
+    const isWishlisted = state.wishlist.includes(product.id);
 
     const stockCheck = checkProductStock(product);
     const isOutOfStock = !stockCheck.available;
@@ -480,7 +513,7 @@ export function renderProducts() {
     return `
       <div class="sticker-card group relative rounded-2xl bg-white border border-zinc-200/90 hover:border-zinc-900 p-5 transition-all duration-200 flex flex-col justify-between hover:shadow-sm">
         
-        <!-- Header Tags: Badge + SKU -->
+        <!-- Header Tags: Badge + SKU + Wishlist -->
         <div class="flex items-center justify-between mb-4">
           <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isBookmark ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-zinc-100 text-zinc-700'}">
             ${escapeHtml(displayBadge)}
@@ -488,6 +521,9 @@ export function renderProducts() {
           <div class="flex items-center gap-1.5 font-mono">
             ${isOutOfStock ? `<span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold border border-red-200">${isAr ? 'نفد من المخزون' : 'Out of Stock'}</span>` : ''}
             <span class="text-[10px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-bold border border-zinc-200">#${escapeHtml(product.sku)}</span>
+            <button type="button" onclick="event.stopPropagation(); toggleWishlist('${escapeHtml(product.id)}')" class="wishlist-toggle-btn ${isWishlisted ? 'active text-red-500' : 'text-zinc-400 hover:text-red-500'} p-1 rounded-full hover:bg-zinc-100 transition" title="${isWishlisted ? (isAr ? 'إزالة من المفضلة' : 'Remove from Wishlist') : (isAr ? 'أضف للمفضلة' : 'Add to Wishlist')}" aria-label="Wishlist">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="${isWishlisted ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
+            </button>
           </div>
         </div>
 
@@ -686,9 +722,14 @@ export function renderCategories() {
 
   if (pillsContainer) {
     const isAll = state.selectedCategory === 'all';
+    const isWishlist = state.selectedCategory === 'wishlist';
     let pillsHtml = `
       <button onclick="selectCategoryByCard('all')" data-category="all" class="cat-filter-btn px-4 py-2 rounded-full whitespace-nowrap transition text-xs font-semibold ${isAll ? 'bg-zinc-900 text-white shadow-sm' : 'bg-zinc-100 text-zinc-600 hover:text-black hover:bg-zinc-200'}">
         ${isAr ? 'الكل' : 'All'}
+      </button>
+      <button onclick="selectCategoryByCard('wishlist')" data-category="wishlist" class="cat-filter-btn px-4 py-2 rounded-full whitespace-nowrap transition text-xs font-semibold flex items-center gap-1.5 ${isWishlist ? 'bg-red-600 text-white shadow-sm' : 'bg-red-50 text-red-700 hover:bg-red-100'}">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="${isWishlist ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
+        <span>${isAr ? 'المفضلة' : 'Wishlist'} (${state.wishlist.length})</span>
       </button>
     `;
 
@@ -724,6 +765,7 @@ export function selectCategoryByCard(catId) {
 export function resetFilters() {
   state.selectedCategory = 'all';
   state.selectedSubCategory = 'all';
+  state.activeTag = 'all';
   state.activeFinish = 'all';
   state.searchQuery = '';
   state.sortBy = 'featured';
@@ -2225,6 +2267,7 @@ export async function openProductDetailModal(productId, updateHash = true) {
 
   renderProductDetailModal(product);
   analytics.trackViewItem(product);
+  recordRecentlyViewed(product.id);
 
   const modal = document.getElementById('product-detail-modal');
   if (modal) modal.classList.remove('hidden');
@@ -3194,6 +3237,151 @@ function setupEventListeners() {
 }
 
 // Window exposures for HTML event handlers
+// ==========================================
+// PHASE E: WISHLIST, TAGS & RECENTLY VIEWED (A10, A12)
+// ==========================================
+export function toggleWishlist(productId) {
+  const idx = state.wishlist.indexOf(productId);
+  const isAr = getLanguage() === 'ar';
+  if (idx >= 0) {
+    state.wishlist.splice(idx, 1);
+    showToast(isAr ? 'تمت الإزالة من المفضلة' : 'Removed from Wishlist', 'info');
+  } else {
+    state.wishlist.push(productId);
+    showToast(isAr ? 'تمت الإضافة إلى المفضلة' : 'Added to Wishlist', 'success');
+  }
+  try {
+    localStorage.setItem('stickify21_wishlist', JSON.stringify(state.wishlist));
+  } catch (e) {}
+  updateWishlistBadge();
+  renderCategories();
+  renderProducts();
+}
+
+export function updateWishlistBadge() {
+  const badge = document.getElementById('wishlist-badge');
+  if (badge) {
+    badge.textContent = String(state.wishlist.length);
+  }
+}
+
+export function toggleWishlistFilter() {
+  if (state.selectedCategory === 'wishlist') {
+    selectCategoryByCard('all');
+  } else {
+    selectCategoryByCard('wishlist');
+  }
+  const el = document.getElementById('catalog-products-area');
+  if (el) el.scrollIntoView({ behavior: 'smooth' });
+}
+
+export function renderTagChips() {
+  const container = document.getElementById('tag-filter-chips');
+  if (!container) return;
+  const isAr = getLanguage() === 'ar';
+  const tagCounts = new Map();
+  state.products.forEach(p => {
+    if (Array.isArray(p.tags)) {
+      p.tags.forEach(tg => {
+        const trimmed = String(tg || '').trim();
+        if (trimmed) tagCounts.set(trimmed, (tagCounts.get(trimmed) || 0) + 1);
+      });
+    }
+  });
+  const topTags = Array.from(tagCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([tName]) => tName);
+
+  if (topTags.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const isAll = state.activeTag === 'all';
+  let html = `
+    <button type="button" onclick="filterByTag('all')" class="tag-chip px-3 py-1 rounded-full whitespace-nowrap transition font-semibold border ${isAll ? 'active bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-900 hover:text-black'}">
+      ${isAr ? 'كل الوسوم' : 'All Tags'}
+    </button>
+  `;
+  html += topTags.map(tg => {
+    const isActive = state.activeTag === tg;
+    return `
+      <button type="button" onclick="filterByTag('${escapeHtml(tg)}')" class="tag-chip px-3 py-1 rounded-full whitespace-nowrap transition font-medium border ${isActive ? 'active bg-[#FF5000] text-white border-[#FF5000]' : 'bg-white text-zinc-600 border-zinc-200 hover:border-[#FF5000] hover:text-[#FF5000]'}">
+        #${escapeHtml(tg)}
+      </button>
+    `;
+  }).join('');
+  container.innerHTML = html;
+}
+
+export function filterByTag(tag) {
+  state.activeTag = state.activeTag === tag ? 'all' : tag;
+  renderTagChips();
+  renderProducts();
+}
+
+export function recordRecentlyViewed(productId) {
+  if (!productId) return;
+  const list = Array.isArray(state.recentlyViewed) ? [...state.recentlyViewed] : [];
+  const existingIdx = list.indexOf(productId);
+  if (existingIdx >= 0) list.splice(existingIdx, 1);
+  list.unshift(productId);
+  state.recentlyViewed = list.slice(0, 6);
+  try {
+    localStorage.setItem('stickify21_recently_viewed', JSON.stringify(state.recentlyViewed));
+  } catch (e) {}
+  renderRecentlyViewed();
+}
+
+export function renderRecentlyViewed() {
+  const section = document.getElementById('recently-viewed-section');
+  const track = document.getElementById('recently-viewed-track');
+  if (!section || !track) return;
+
+  const isAr = getLanguage() === 'ar';
+  const curr = isAr ? 'ج.م' : 'EGP';
+  const items = (state.recentlyViewed || [])
+    .map(id => state.products.find(p => p.id === id))
+    .filter(Boolean);
+
+  if (items.length === 0) {
+    section.classList.add('hidden');
+    track.innerHTML = '';
+    return;
+  }
+
+  section.classList.remove('hidden');
+  track.innerHTML = items.map(product => {
+    const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
+    const safeImage = sanitizeUrl(product.image);
+    const safeSvg = sanitizeSvg(product.svg);
+    const displayName = isAr ? (product.nameAr || product.name) : (product.nameEn || product.name || product.nameAr);
+    const price = getProductPriceForSize(product, isBookmark ? 'standard' : 'medium');
+    return `
+      <div onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="recently-viewed-card group bg-white rounded-2xl border border-zinc-200 hover:border-zinc-900 p-3 cursor-pointer transition flex flex-col items-center text-center shadow-sm">
+        <div class="w-16 h-16 flex items-center justify-center mb-2 overflow-hidden">
+          ${product.image && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(displayName)}" class="w-full h-full object-contain">` : `<div class="w-14 h-14 flex items-center justify-center">${safeSvg}</div>`}
+        </div>
+        <div class="text-xs font-bold text-zinc-900 group-hover:text-[#FF5000] line-clamp-1">${escapeHtml(displayName)}</div>
+        <div class="text-[11px] font-mono text-zinc-500 mt-0.5">${price} ${curr}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+export function clearRecentlyViewed() {
+  state.recentlyViewed = [];
+  try {
+    localStorage.removeItem('stickify21_recently_viewed');
+  } catch (e) {}
+  renderRecentlyViewed();
+}
+
+window.toggleWishlist = toggleWishlist;
+window.toggleWishlistFilter = toggleWishlistFilter;
+window.filterByTag = filterByTag;
+window.clearRecentlyViewed = clearRecentlyViewed;
 window.selectCategoryByCard = selectCategoryByCard;
 window.resetFilters = resetFilters;
 window.addToCart = addToCart;

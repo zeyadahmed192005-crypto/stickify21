@@ -10,10 +10,13 @@ This checklist tracks all prerequisites and technical tasks required before laun
 | :--- | :--- | :--- |
 | **Catalog & Orders Storage** | Browser `localStorage` | Central cloud database (PostgreSQL / Supabase / MongoDB) |
 | **Image & Artwork Storage** | Browser `IndexedDB` (max 1000px WebP) | S3-compatible Object Storage (Cloudflare R2, AWS S3) |
-| **Admin Authentication** | Web Crypto PBKDF2 in client | Server-side sessions / JWT with HTTP-only Secure cookies |
-| **Order Receipt** | WhatsApp message + Order Code import | Real-time database write + admin notifications |
-| **Coupon Validation** | Client-side `src/domain/coupons.js` | Authoritative server-side price & coupon verification |
-| **Payment Gateway** | Cash on Delivery (COD) / WhatsApp manual | Integrated payment gateway (Paymob, Fawry, Kashier) |
+| **Admin Authentication** | Web Crypto PBKDF2 + 12h sliding `localStorage` session (`DEMO`) | Server-side sessions / JWT with HTTP-only Secure cookies |
+| **Order Receipt** | WhatsApp message + Base64url `S21CODE:v2` import (`DEMO`) | Real-time database write + admin notifications |
+| **Coupon Validation** | Client-side `src/domain/coupons.js` (`DEMO`) | Authoritative server-side price & coupon verification |
+| **Payment Gateway & Proof** | COD / InstaPay / Vodafone Cash manual + IndexedDB proof upload (`DEMO`) | Integrated payment gateway (Paymob, Fawry, Kashier) + S3 proof storage |
+| **Showcase & Custom Print Uploads** | Client-side WebP compression into `IndexedDB` (`DEMO`) | Cloud Object Storage (Cloudflare R2 / S3) + CDN URLs |
+| **Wishlist & Recently Viewed** | Browser `localStorage` (`stickify21_wishlist`, `stickify21_recently_viewed`) | Optional synced customer account profile |
+| **Backup & Analytics** | Admin JSON download reminder (>3 days) + local order aggregation (`DEMO`) | Scheduled cloud DB snapshots + server-side BI queries |
 
 ---
 

@@ -249,3 +249,68 @@ body {
     opacity: 1 !important;
   }
 }
+
+/* Wishlist Toggle Button (A10) */
+.wishlist-toggle-btn.active svg {
+  fill: #FF5000;
+  stroke: #FF5000;
+}
+
+/* Tag filter chips */
+.tag-chip.active {
+  background-color: #FF5000 !important;
+  color: #FFFFFF !important;
+  border-color: #FF5000 !important;
+}
+
+/* Admin Dark Theme (A17) */
+html.dark, body.dark {
+  background-color: #0E0E10 !important;
+  color: #F4F4F5 !important;
+}
+html.dark .bg-white {
+  background-color: #18181B !important;
+  color: #F4F4F5 !important;
+}
+html.dark .bg-zinc-50 {
+  background-color: #121215 !important;
+}
+html.dark .bg-zinc-100 {
+  background-color: #27272A !important;
+}
+html.dark .text-zinc-900 {
+  color: #FAFAFA !important;
+}
+html.dark .text-zinc-700, html.dark .text-zinc-800 {
+  color: #E4E4E7 !important;
+}
+html.dark .text-zinc-500, html.dark .text-zinc-600 {
+  color: #A1A1AA !important;
+}
+html.dark .border-zinc-200, html.dark .border-zinc-100 {
+  border-color: #27272A !important;
+}
+
+/* Production Summary Print Sheet (A15) */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #production-summary-modal, #production-summary-modal * {
+    visibility: visible;
+  }
+  #production-summary-modal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+

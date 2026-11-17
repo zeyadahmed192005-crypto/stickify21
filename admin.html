@@ -97,8 +97,11 @@
           </div>
         </div>
 
-        <!-- Navigation Tabs: Orders, Products, Categories, Coupons, Settings -->
+        <!-- Navigation Tabs: Dashboard, Orders, Products, Categories, Coupons, Showcase, Settings -->
         <nav class="flex items-center gap-1 bg-zinc-100 p-1.5 rounded-2xl text-xs font-bold overflow-x-auto">
+          <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="admin-tab-btn px-3.5 py-2 rounded-xl text-zinc-600 hover:text-black transition whitespace-nowrap">
+             المتابعة والمؤشرات
+          </button>
           <button onclick="switchTab('orders')" id="tab-btn-orders" class="admin-tab-btn active px-3.5 py-2 rounded-xl transition whitespace-nowrap">
              الطلبات (<span id="orders-count-badge">0</span>)
           </button>
@@ -119,8 +122,11 @@
           </button>
         </nav>
 
-        <!-- Quick Store Link & Logout -->
+        <!-- Quick Store Link, Theme & Logout -->
         <div class="flex items-center gap-2">
+          <button id="admin-theme-toggle" onclick="toggleAdminTheme()" class="p-2 rounded-xl hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900 transition" title="تبديل الوضع الليلي">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          </button>
           <a href="index.html" target="_blank" class="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition flex items-center gap-1.5">
             <span>المتجر</span>
             <span>↗</span>
@@ -133,8 +139,79 @@
       </div>
     </header>
 
+    <!-- Backup Reminder Banner (A1) -->
+    <div id="backup-reminder-banner" class="hidden bg-amber-500/10 border-b border-amber-500/20 px-4 py-3">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 font-bold">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <span id="backup-reminder-text">تنبيه أمان البيانات: لم تقم بتنزيل نسخة احتياطية من بيانات المتجر منذ فترة.</span>
+        </div>
+        <button id="download-backup-now-btn" onclick="downloadFullBackupNow()" class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition shadow-sm">
+          تنزيل نسخة احتياطية الآن
+        </button>
+      </div>
+    </div>
+
     <!-- Main Container -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+      <!-- ========================================== -->
+      <!-- TAB 0: DASHBOARD & SUMMARY (A8, A9)        -->
+      <!-- ========================================== -->
+      <section id="tab-dashboard" class="hidden space-y-6">
+        
+        <!-- A8 Analytics Summary -->
+        <div id="dashboard-analytics-summary" class="bg-white rounded-3xl p-6 border border-zinc-200/80 shadow-sm space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-100 pb-4">
+            <div>
+              <h2 class="text-base font-extrabold text-zinc-900">ملخص نشاط وأداء المتجر</h2>
+              <p class="text-xs text-zinc-500">نظرة عامة على الطلبات والإيرادات والمبيعات</p>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-bold">
+              <span class="text-zinc-500">الفترة:</span>
+              <select id="dashboard-date-range" onchange="renderDashboardAnalytics(this.value)" class="bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-1.5 text-xs text-zinc-800 focus:outline-none font-bold">
+                <option value="all">كل الوقت</option>
+                <option value="today">اليوم</option>
+                <option value="week">آخر 7 أيام</option>
+                <option value="month">آخر 30 يوماً</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Metrics 4-grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-100 space-y-1">
+              <span class="text-xs text-zinc-500 font-bold">إجمالي الطلبات</span>
+              <div id="metric-total-orders" class="text-2xl font-black text-zinc-900 font-mono">0</div>
+            </div>
+            <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-100 space-y-1">
+              <span class="text-xs text-zinc-500 font-bold">إجمالي الإيرادات</span>
+              <div id="metric-total-revenue" class="text-2xl font-black text-[#FF5000] font-mono">0 ج.م</div>
+            </div>
+            <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-100 space-y-1">
+              <span class="text-xs text-zinc-500 font-bold">مدفوعات بانتظار التحقق</span>
+              <div id="metric-pending-payments" class="text-2xl font-black text-amber-600 font-mono">0</div>
+            </div>
+            <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-100 space-y-1">
+              <span class="text-xs text-zinc-500 font-bold">التصاميم الأكثر طلباً</span>
+              <div id="metric-top-sellers" class="text-xs text-zinc-800 font-bold truncate">لا توجد مبيعات بعد</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- A9 Stock Alerts -->
+        <div id="dashboard-stock-alerts" class="bg-white rounded-3xl p-6 border border-zinc-200/80 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
+            <h3 class="text-sm font-extrabold text-zinc-900 flex items-center gap-2">
+              <span>تنبيهات المخزون والتوافر</span>
+              <span id="low-stock-count-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700">0</span>
+            </h3>
+          </div>
+          <div id="low-stock-items-list" class="space-y-2 text-xs">
+            <div class="text-zinc-400 py-2">جميع المنتجات متوفرة بمخزون كافٍ</div>
+          </div>
+        </div>
+      </section>
       
       <!-- ========================================== -->
       <!-- TAB 1: ORDERS MANAGEMENT                   -->
@@ -216,6 +293,10 @@
             <div class="flex items-center gap-2 flex-wrap">
               <button onclick="openWhatsAppImportModal()" id="btn-open-whatsapp-import" class="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm">
                 <span> استيراد طلب من واتساب</span>
+              </button>
+              <button onclick="openProductionSummaryModal()" id="open-production-summary-btn" class="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm" title="تجميع كميات الطباعة للمطبعة">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/></svg>
+                <span>تجميع كميات الطباعة</span>
               </button>
               <button onclick="exportOrdersCsv()" class="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white font-bold text-xs transition flex items-center gap-1.5 shadow-sm" title="تصدير بصيغة Excel UTF-8 BOM">
                 <span> تصدير الكل CSV</span>
@@ -353,9 +434,56 @@
           </div>
         </div>
 
-        <div id="admin-products-table" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <!-- Injected via JavaScript -->
+        <!-- Bulk Actions Bar (A5) -->
+        <div id="bulk-actions-bar" class="hidden sticky top-24 z-30 bg-zinc-900 text-white p-4 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span id="product-bulk-selected-count" class="font-bold text-xs bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-700">تم تحديد 0</span>
+            <button id="bulk-toggle-active-btn" onclick="applyBulkToggleActive()" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold transition">
+              تبديل التوفر
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
+              <input type="number" id="bulk-price-percent-input" placeholder="+% أو -%" class="w-20 bg-zinc-800 border border-zinc-700 rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none">
+              <button id="bulk-price-adjust-btn" onclick="applyBulkPricePercent()" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold transition">
+                تعديل الأسعار %
+              </button>
+              <button id="apply-bulk-price-btn" onclick="applyBulkPricePercent()" class="px-3 py-1.5 rounded-xl bg-[#FF5000] hover:bg-[#E04600] text-xs font-bold transition">
+                تطبيق
+              </button>
+            </div>
+            <select id="bulk-category-select" onchange="applyBulkCategoryMove(this.value)" class="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none font-bold">
+              <option value="">نقل لقسم...</option>
+            </select>
+          </div>
         </div>
+
+        <!-- Products Table (A5) -->
+        <div class="bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+              <thead class="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-bold">
+                <tr>
+                  <th class="p-3 w-10 text-center">
+                    <input type="checkbox" id="select-all-products" onchange="toggleSelectAllProducts(this.checked)" class="rounded border-zinc-300 text-[#FF5000]">
+                  </th>
+                  <th class="p-3 w-16">المعاينة</th>
+                  <th class="p-3">اسم المنتج</th>
+                  <th class="p-3">SKU</th>
+                  <th class="p-3">القسم</th>
+                  <th class="p-3">السعر</th>
+                  <th class="p-3">التوفر</th>
+                  <th class="p-3 text-center">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="products-table-body" class="divide-y divide-zinc-100">
+                <!-- Injected via JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="admin-products-table" class="hidden"></div>
 
       </section>
 
@@ -609,6 +737,18 @@
                 <button onclick="handleResetDemoDataWithPrompt()" class="w-full py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs transition flex items-center justify-center gap-1.5 border border-red-200">
                   <span> إعادة ضبط المصنع للبيانات التجريبية</span>
                 </button>
+              </div>
+
+              <!-- Storage Usage Meter (A13) -->
+              <div id="storage-usage-meter" class="p-4 bg-zinc-50 border border-zinc-200 rounded-2xl space-y-2">
+                <div class="flex items-center justify-between text-xs font-bold text-zinc-700">
+                  <span>استهلاك الذاكرة المحلية (Storage Meter):</span>
+                  <span id="storage-meter-text" class="font-mono text-zinc-900">0 KB / 5 MB</span>
+                </div>
+                <div class="w-full h-2 bg-zinc-200 rounded-full overflow-hidden">
+                  <div id="storage-meter-bar" class="h-full bg-[#FF5000] rounded-full transition-all duration-500" style="width: 1%;"></div>
+                </div>
+                <p class="text-[10px] text-zinc-400">إجمالي حجم الطلبات والكتالوج وإعدادات المتجر والصور المخزنة محلياً.</p>
               </div>
             </div>
 
@@ -1297,6 +1437,39 @@
         تراجع (<span id="status-undo-timer">10</span> ث)
       </button>
       <button onclick="dismissStatusUndoToast()" class="text-zinc-400 hover:text-white text-sm"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+  </div>
+
+  <!-- Bulk Undo Toast (A5) -->
+  <div id="bulk-undo-toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden bg-zinc-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-zinc-700 flex items-center gap-4 text-xs font-bold">
+    <div class="flex items-center gap-2">
+      <span class="text-[#FF5000]">●</span>
+      <span id="bulk-undo-text">تم تنفيذ الإجراء الجماعي بنجاح.</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="handleBulkUndo()" class="px-3 py-1 bg-[#FF5000] text-white rounded-xl hover:bg-[#E04600] transition shadow-sm font-bold">
+        تراجع (<span id="bulk-undo-timer">10</span> ث)
+      </button>
+      <button onclick="dismissBulkUndoToast()" class="text-zinc-400 hover:text-white text-sm"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+  </div>
+
+  <!-- Production Summary Modal (A15) -->
+  <div id="production-summary-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+        <div>
+          <h3 class="text-base font-extrabold text-zinc-900">أمر تشغيل الإنتاج وتجميع كميات الطباعة</h3>
+          <p class="text-xs text-zinc-500">حصر إجمالي الاستيكرات المطلوبة ومقاساتها عبر الطلبات الجارية</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="no-print px-3.5 py-1.5 rounded-xl bg-[#FF5000] text-white font-bold text-xs hover:bg-[#E04600] transition">طباعة أمر الإنتاج</button>
+          <button onclick="closeProductionSummaryModal()" class="modal-close-btn p-2 rounded-xl hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition" title="إغلاق"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+      </div>
+      <div id="production-summary-content" class="space-y-4 text-xs">
+        <!-- Rendered via JavaScript -->
+      </div>
     </div>
   </div>
 

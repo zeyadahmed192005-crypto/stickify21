@@ -93,3 +93,18 @@
 3. **Data Security & Privacy:**
    - Pure client-side prototype storage (`localStorage` & `IndexedDB`).
    - No tracking telemetry or unauthorized third-party scripts.
+
+---
+
+## 7. Wishlist, Product Tags & Recently Viewed (Phase E — A10 & A12)
+
+| Element | Arabic | English | Notes |
+| :--- | :--- | :--- | :--- |
+| **Navbar Wishlist** | المفضلة | Wishlist | Header heart button with live counter badge. |
+| **All Tags Chip** | كل الوسوم | All Tags | Resets tag filtering above the catalog grid. |
+| **Recently Viewed Title** | شاهدتها مؤخراً | Recently Viewed | Section header above footer displaying last 6 opened items. |
+| **Recently Viewed Subtitle** | المنتجات التي قمت بتصفحها مؤخراً | Products you checked out recently | Secondary helper caption. |
+| **Clear History** | مسح السجل | Clear History | Clears `stickify21_recently_viewed` immediately. |
+| **Wishlist Added Toast** | تمت الإضافة إلى المفضلة | Added to your Wishlist | Confirmation toast on heart toggle. |
+| **Wishlist Removed Toast** | تمت الإزالة من المفضلة | Removed from your Wishlist | Removal toast on heart toggle. |
+

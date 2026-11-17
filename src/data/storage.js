@@ -155,6 +155,10 @@ class StorageService {
     await this.init();
     return this.adapter.resetDemoData();
   }
+  async getStorageUsage() {
+    await this.init();
+    return this.adapter.getStorageUsage();
+  }
 }
 
 /**

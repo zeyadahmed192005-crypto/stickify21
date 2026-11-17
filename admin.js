@@ -46,6 +46,8 @@ let adminState = {
 // INITIALIZATION & AUTH
 // ==========================================
 export async function initAdmin() {
+  initAdminTheme();
+  checkBackupReminder();
   await storage.init();
 
   // Check if active session in sessionStorage
@@ -197,21 +199,30 @@ function renderAll() {
   renderCoupons();
   renderAdminShowcase();
   renderSettings();
+  renderDashboardAnalytics();
+  renderStockAlerts();
+  renderStorageUsageMeter();
+  checkBackupReminder();
   updateBadges();
 }
 
 // Tab Switching
 export function switchTab(tabName) {
+  if (tabName === 'catalog') tabName = 'products';
   adminState.currentTab = tabName;
-  ['orders', 'products', 'categories', 'coupons', 'showcase', 'settings'].forEach(t => {
+  ['dashboard', 'orders', 'products', 'categories', 'coupons', 'showcase', 'settings'].forEach(t => {
     const section = document.getElementById(`tab-${t}`);
-    const btn = document.getElementById(`tab-btn-${t}`);
+    const btn = document.getElementById(`tab-btn-${t}`) || (t === 'products' ? document.getElementById('tab-btn-catalog') : null);
     if (section && btn) {
       section.classList.toggle('hidden', t !== tabName);
       btn.classList.toggle('active', t === tabName);
       btn.classList.toggle('text-zinc-600', t !== tabName);
     }
   });
+  if (tabName === 'dashboard') {
+    renderDashboardAnalytics();
+    renderStockAlerts();
+  }
 }
 
 function updateBadges() {
@@ -1415,7 +1426,7 @@ export async function exportAllDataJson() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     showAdminToast('تم تصدير ملف النسخة الاحتياطية بنجاح');
   } catch (err) {
     console.error(err);
@@ -1776,6 +1787,538 @@ export function renderProducts() {
       </div>
     `;
   }).join('');
+
+  // Also render into products-table-body (A5)
+  const tbody = document.getElementById('products-table-body');
+  if (tbody) {
+    if (list.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-zinc-400 font-bold">لا توجد منتجات مطابقة للبحث أو الفلتر</td></tr>`;
+    } else {
+      tbody.innerHTML = list.map(p => {
+        const realIndex = adminState.products.findIndex(prod => prod.id === p.id);
+        const safeImage = sanitizeUrl(p.image);
+        const safeSvg = sanitizeSvg(p.svg);
+        const inStock = p.inStock !== false;
+        const isChecked = selectedProductIds.has(p.id);
+
+        return `
+          <tr class="hover:bg-zinc-50/80 transition ${!inStock ? 'opacity-60 bg-zinc-50/50' : ''}">
+            <td class="p-3 text-center">
+              <input type="checkbox" class="product-select-chk rounded border-zinc-300 text-[#FF5000]" data-product-id="${p.id}" ${isChecked ? 'checked' : ''} onchange="toggleProductSelect('${p.id}', this.checked)">
+            </td>
+            <td class="p-3">
+              <div class="w-10 h-10 rounded-lg bg-zinc-100 border border-zinc-200 overflow-hidden flex items-center justify-center p-1">
+                ${safeImage ? `<img src="${safeImage}" class="w-full h-full object-contain" alt="">` : safeSvg}
+              </div>
+            </td>
+            <td class="p-3">
+              <div class="product-name-cell font-bold text-zinc-900">${escapeHtml(p.nameAr || p.name)}</div>
+              <div class="text-[10px] text-zinc-400 font-mono">${escapeHtml(p.nameEn || '')}</div>
+            </td>
+            <td class="p-3 font-mono font-bold text-zinc-700">#${escapeHtml(p.sku || '')}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded bg-zinc-100 text-zinc-600 font-bold">${escapeHtml(p.category)}</span></td>
+            <td class="p-3 font-mono font-extrabold text-zinc-900">${p.price || 35} ${CONFIG.CURRENCY}</td>
+            <td class="p-3">
+              <button onclick="toggleProductInStock('${p.id}')" class="px-2 py-0.5 rounded-full text-[10px] font-bold border transition ${inStock ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-red-50 text-red-700 border-red-300'}">
+                ${inStock ? 'متوفر' : 'نفد'}
+              </button>
+            </td>
+            <td class="p-3 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button data-action="duplicate" onclick="duplicateProduct('${p.id}')" class="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-bold transition">
+                  تكرار
+                </button>
+                <button onclick="openProductModal(${realIndex})" class="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] font-bold transition">
+                  تعديل
+                </button>
+                <button onclick="deleteProduct(${realIndex})" class="p-1 rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-500 transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+// ==========================================
+// A5: PRODUCT DUPLICATION & BULK ACTIONS
+// ==========================================
+let productUndoState = {
+  active: false,
+  previousProducts: null,
+  countdownInterval: null,
+  secondsLeft: 10
+};
+
+export async function duplicateProduct(productId) {
+  const prod = adminState.products.find(p => p.id === productId);
+  if (!prod) return;
+
+  const newId = 'stk-copy-' + Date.now().toString(36);
+  const newSku = (prod.sku || 'SKU') + '-CP';
+  const newProd = {
+    ...prod,
+    id: newId,
+    sku: newSku,
+    name: `${prod.name || prod.nameAr} (نسخة)`,
+    nameAr: `${prod.nameAr || prod.name} (نسخة)`,
+    nameEn: prod.nameEn ? `${prod.nameEn} (Copy)` : `${prod.name || prod.nameAr} (Copy)`,
+    dateAdded: Date.now()
+  };
+
+  await storage.saveProduct(newProd);
+  await loadData();
+  showAdminToast(`تم نسخ المنتج بنجاح: ${newProd.nameAr}`);
+}
+
+const selectedProductIds = new Set();
+
+export function toggleProductSelect(productId, checked) {
+  if (checked) {
+    selectedProductIds.add(productId);
+  } else {
+    selectedProductIds.delete(productId);
+  }
+  updateProductBulkBar();
+}
+
+export function toggleSelectAllProducts(checked) {
+  const checkboxes = document.querySelectorAll('.product-select-chk');
+  checkboxes.forEach(chk => {
+    chk.checked = checked;
+    const id = chk.getAttribute('data-product-id');
+    if (id) {
+      if (checked) selectedProductIds.add(id);
+      else selectedProductIds.delete(id);
+    }
+  });
+  updateProductBulkBar();
+}
+
+export function updateProductBulkBar() {
+  const bar = document.getElementById('bulk-actions-bar');
+  const countSpan = document.getElementById('product-bulk-selected-count') || document.getElementById('bulk-selected-count');
+  const count = selectedProductIds.size;
+  if (!bar) return;
+
+  if (count > 0) {
+    bar.classList.remove('hidden');
+    if (countSpan) countSpan.textContent = `تم تحديد ${count}`;
+  } else {
+    bar.classList.add('hidden');
+  }
+
+  const catSelect = document.getElementById('bulk-category-select');
+  if (catSelect && catSelect.children.length <= 1) {
+    adminState.categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nameAr;
+      catSelect.appendChild(opt);
+    });
+  }
+}
+
+export async function applyBulkToggleActive() {
+  if (selectedProductIds.size === 0) return;
+  startProductUndo();
+
+  for (const p of adminState.products) {
+    if (selectedProductIds.has(p.id)) {
+      p.inStock = p.inStock === false ? true : false;
+      await storage.saveProduct(p);
+    }
+  }
+  selectedProductIds.clear();
+  updateProductBulkBar();
+  await loadData();
+  showBulkUndoToast('تم تحديث حالة التوفر للمنتجات المحددة');
+}
+
+export async function applyBulkPricePercent() {
+  const input = document.getElementById('bulk-price-percent-input');
+  const percent = parseFloat(input ? input.value : 0);
+  if (!percent || isNaN(percent)) {
+    showAdminToast('يرجى إدخال نسبة مئوية صالحة (مثال: 10 أو -10)', 'warning');
+    return;
+  }
+  if (selectedProductIds.size === 0) return;
+
+  startProductUndo();
+
+  for (const p of adminState.products) {
+    if (selectedProductIds.has(p.id)) {
+      const current = p.price || 35;
+      const factor = 1 + (percent / 100);
+      p.price = Math.max(5, Math.round(current * factor));
+      await storage.saveProduct(p);
+    }
+  }
+  selectedProductIds.clear();
+  updateProductBulkBar();
+  await loadData();
+  showBulkUndoToast(`تم تعديل أسعار المنتجات المحددة بنسبة ${percent}%`);
+}
+
+export async function applyBulkCategoryMove(catId) {
+  if (!catId || selectedProductIds.size === 0) return;
+  startProductUndo();
+
+  for (const p of adminState.products) {
+    if (selectedProductIds.has(p.id)) {
+      p.category = catId;
+      await storage.saveProduct(p);
+    }
+  }
+  selectedProductIds.clear();
+  updateProductBulkBar();
+  await loadData();
+  showBulkUndoToast('تم نقل المنتجات المحددة إلى القسم الجديد');
+}
+
+function startProductUndo() {
+  productUndoState.previousProducts = JSON.parse(JSON.stringify(adminState.products));
+}
+
+function showBulkUndoToast(message) {
+  dismissBulkUndoToast();
+  productUndoState.active = true;
+  productUndoState.secondsLeft = 10;
+
+  const toast = document.getElementById('bulk-undo-toast');
+  const text = document.getElementById('bulk-undo-text');
+  const timer = document.getElementById('bulk-undo-timer');
+  if (toast) {
+    if (text) text.textContent = message;
+    if (timer) timer.textContent = '10s';
+    toast.classList.remove('hidden');
+
+    productUndoState.countdownInterval = setInterval(() => {
+      productUndoState.secondsLeft--;
+      if (timer) timer.textContent = `${productUndoState.secondsLeft}s`;
+      if (productUndoState.secondsLeft <= 0) {
+        dismissBulkUndoToast();
+      }
+    }, 1000);
+  }
+}
+
+export function dismissBulkUndoToast() {
+  if (productUndoState.countdownInterval) {
+    clearInterval(productUndoState.countdownInterval);
+    productUndoState.countdownInterval = null;
+  }
+  productUndoState.active = false;
+  const toast = document.getElementById('bulk-undo-toast');
+  if (toast) toast.classList.add('hidden');
+}
+
+export async function handleBulkUndo() {
+  if (!productUndoState.previousProducts) return;
+  dismissBulkUndoToast();
+
+  const prev = productUndoState.previousProducts;
+  productUndoState.previousProducts = null;
+
+  for (const p of prev) {
+    await storage.saveProduct(p);
+  }
+  await loadData();
+  showAdminToast('تم التراجع عن الإجراء الجماعي بنجاح');
+}
+
+// ==========================================
+// A1: BACKUP REMINDER & DOWNLOAD
+// ==========================================
+export function checkBackupReminder() {
+  const banner = document.getElementById('backup-reminder-banner');
+  const textEl = document.getElementById('backup-reminder-text');
+  if (!banner) return;
+
+  const lastBackupStr = localStorage.getItem('stickify21_last_backup_date');
+  if (!lastBackupStr) {
+    if (textEl) textEl.textContent = 'تنبيه أمان البيانات: لم تقم بحفظ نسخة احتياطية من بيانات المتجر بعد (البيانات مخزنة في متصفحك ومعرضة للفقدان).';
+    banner.classList.remove('hidden');
+    return;
+  }
+
+  const lastBackupDate = new Date(lastBackupStr);
+  const diffDays = Math.floor((Date.now() - lastBackupDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays >= 3) {
+    if (textEl) textEl.textContent = `تنبيه أمان البيانات: آخر نسخة احتياطية كانت منذ ${diffDays} أيام. اضغط هنا لتنزيل نسخة احتياطية فورية.`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+export async function downloadFullBackupNow() {
+  try {
+    const data = await storage.exportData();
+    const jsonStr = JSON.stringify(data, null, 2);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `stickify21-backup-${dateStr}.json`;
+
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    localStorage.setItem('stickify21_last_backup_date', new Date().toISOString());
+    const banner = document.getElementById('backup-reminder-banner');
+    if (banner) banner.classList.add('hidden');
+    showAdminToast('تم تنزيل النسخة الاحتياطية بنجاح!');
+  } catch (err) {
+    console.error('Backup download failed', err);
+    showAdminToast('حدث خطأ أثناء تنزيل النسخة الاحتياطية', 'error');
+  }
+}
+
+// ==========================================
+// A8 & A9: DASHBOARD ANALYTICS & STOCK ALERTS
+// ==========================================
+export function renderDashboardAnalytics(dateRange = 'all') {
+  const rangeSelect = document.getElementById('dashboard-date-range');
+  if (rangeSelect && rangeSelect.value !== dateRange) {
+    rangeSelect.value = dateRange;
+  }
+
+  let orders = adminState.orders || [];
+  const now = Date.now();
+  if (dateRange === 'today') {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    orders = orders.filter(o => new Date(o.createdAt || o.date || 0) >= startOfDay);
+  } else if (dateRange === 'week') {
+    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    orders = orders.filter(o => new Date(o.createdAt || o.date || 0).getTime() >= weekAgo);
+  } else if (dateRange === 'month') {
+    const monthAgo = now - 30 * 24 * 60 * 60 * 1000;
+    orders = orders.filter(o => new Date(o.createdAt || o.date || 0).getTime() >= monthAgo);
+  }
+
+  const totalOrders = orders.length;
+  const totalRevenue = orders.reduce((sum, o) => sum + (parseInt(o.total, 10) || 0), 0);
+  const pendingPayments = orders.filter(o => {
+    const isOnline = o.paymentMethod === 'instapay' || o.paymentMethod === 'vodafone_cash' || (typeof o.payment === 'string' && (o.payment.includes('InstaPay') || o.payment.includes('فودافون')));
+    return isOnline && !o.paymentVerified;
+  }).length;
+
+  const productSales = {};
+  orders.forEach(o => {
+    const lines = o.lines || [];
+    lines.forEach(l => {
+      if (l.type === 'pack' && Array.isArray(l.items)) {
+        l.items.forEach(it => {
+          const name = it.name || it.sku;
+          productSales[name] = (productSales[name] || 0) + 1;
+        });
+      } else {
+        const name = l.name || l.sku;
+        productSales[name] = (productSales[name] || 0) + (l.quantity || 1);
+      }
+    });
+  });
+
+  const sortedSellers = Object.entries(productSales).sort((a, b) => b[1] - a[1]);
+  const topSellersText = sortedSellers.length > 0 
+    ? sortedSellers.slice(0, 3).map(([name, count]) => `${name} (${count})`).join('، ')
+    : 'لا توجد مبيعات في هذه الفترة';
+
+  const oEl = document.getElementById('metric-total-orders');
+  const rEl = document.getElementById('metric-total-revenue');
+  const pEl = document.getElementById('metric-pending-payments');
+  const sEl = document.getElementById('metric-top-sellers');
+
+  if (oEl) oEl.textContent = String(totalOrders);
+  if (rEl) rEl.textContent = `${totalRevenue} ${CONFIG.CURRENCY}`;
+  if (pEl) pEl.textContent = String(pendingPayments);
+  if (sEl) sEl.textContent = topSellersText;
+}
+
+export function renderStockAlerts() {
+  const container = document.getElementById('low-stock-items-list');
+  const badge = document.getElementById('low-stock-count-badge');
+  if (!container) return;
+
+  const lowStockItems = adminState.products.filter(p => {
+    const qty = p.stockQuantity !== undefined ? p.stockQuantity : (p.inStock === false ? 0 : 50);
+    return qty <= 10 || p.inStock === false;
+  });
+
+  if (badge) badge.textContent = String(lowStockItems.length);
+
+  if (lowStockItems.length === 0) {
+    container.innerHTML = '<div class="text-zinc-400 py-2">جميع المنتجات متوفرة بمخزون كافٍ</div>';
+    return;
+  }
+
+  container.innerHTML = lowStockItems.map(p => {
+    const isOut = p.inStock === false || p.stockQuantity === 0;
+    const qty = p.stockQuantity !== undefined ? p.stockQuantity : 0;
+    return `
+      <div class="flex items-center justify-between p-3 rounded-xl ${isOut ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}">
+        <div class="flex items-center gap-3">
+          <span class="font-bold text-zinc-900">${escapeHtml(p.nameAr || p.name)}</span>
+          <span class="font-mono text-xs text-zinc-500">#${escapeHtml(p.sku)}</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isOut ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}">
+            ${isOut ? 'نفد من المخزون' : `متبقي ${qty} قطع فقط`}
+          </span>
+          <button onclick="toggleProductInStock('${p.id}')" class="text-xs font-bold text-zinc-700 hover:text-black underline">
+            ${isOut ? 'تحديد كمتوفر' : 'تحديد كنفد'}
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ==========================================
+// A13: STORAGE METER
+// ==========================================
+export async function renderStorageUsageMeter() {
+  const usage = await storage.getStorageUsage();
+  const textEl = document.getElementById('storage-meter-text');
+  const barEl = document.getElementById('storage-meter-bar');
+  if (textEl) {
+    textEl.textContent = `${usage.totalKb} KB / 5 MB (${usage.percent}%)`;
+  }
+  if (barEl) {
+    barEl.style.width = `${usage.percent}%`;
+    if (usage.percent > 80) barEl.className = 'h-full bg-red-500 rounded-full transition-all duration-500';
+    else if (usage.percent > 50) barEl.className = 'h-full bg-amber-500 rounded-full transition-all duration-500';
+    else barEl.className = 'h-full bg-[#FF5000] rounded-full transition-all duration-500';
+  }
+}
+
+// ==========================================
+// A15: PRODUCTION AGGREGATE SUMMARY
+// ==========================================
+export function openProductionSummaryModal() {
+  const modal = document.getElementById('production-summary-modal');
+  const content = document.getElementById('production-summary-content');
+  if (!modal || !content) return;
+
+  const activeOrders = adminState.orders.filter(o => {
+    const s = normalizeStatusKey(o.status);
+    return s === 'confirmed' || s === 'preparing' || s === 'pending';
+  });
+
+  const aggregate = {};
+
+  activeOrders.forEach(o => {
+    const lines = o.lines || [];
+    lines.forEach(line => {
+      if (line.type === 'pack' && Array.isArray(line.items)) {
+        line.items.forEach(it => {
+          const sku = it.sku || it.id || 'ITEM';
+          if (!aggregate[sku]) {
+            aggregate[sku] = {
+              sku,
+              name: it.name || it.nameAr || sku,
+              image: it.image,
+              sizes: { '6cm': 0, '8cm': 0, '10cm': 0, 'standard': 0 },
+              total: 0
+            };
+          }
+          const sz = it.sizeKey === 'small' ? '6cm' : (it.sizeKey === 'large' ? '10cm' : (it.sizeKey === 'standard' ? 'standard' : '8cm'));
+          aggregate[sku].sizes[sz] = (aggregate[sku].sizes[sz] || 0) + 1;
+          aggregate[sku].total += 1;
+        });
+      } else {
+        const sku = line.sku || line.id || 'ITEM';
+        if (!aggregate[sku]) {
+          aggregate[sku] = {
+            sku,
+            name: line.name || line.nameAr || sku,
+            image: line.image,
+            sizes: { '6cm': 0, '8cm': 0, '10cm': 0, 'standard': 0 },
+            total: 0
+          };
+        }
+        const sz = line.sizeKey === 'small' ? '6cm' : (line.sizeKey === 'large' ? '10cm' : (line.sizeKey === 'standard' ? 'standard' : '8cm'));
+        const qty = line.quantity || 1;
+        aggregate[sku].sizes[sz] = (aggregate[sku].sizes[sz] || 0) + qty;
+        aggregate[sku].total += qty;
+      }
+    });
+  });
+
+  const items = Object.values(aggregate);
+  const totalStickersToPrint = items.reduce((sum, it) => sum + it.total, 0);
+
+  if (items.length === 0) {
+    content.innerHTML = `
+      <div class="text-center py-8 text-zinc-400">
+        <p class="font-bold">لا توجد طلبات جارية بحاجة لتشغيل إنتاج حالياً.</p>
+        <p class="text-[11px] mt-1">يتم التجميع تلقائياً من الطلبات المؤكدة وقيد التجهيز.</p>
+      </div>
+    `;
+  } else {
+    content.innerHTML = `
+      <div class="flex items-center justify-between bg-zinc-50 p-3 rounded-2xl border border-zinc-200">
+        <span class="font-bold text-zinc-700">إجمالي القطع المطلوبة للطباعة:</span>
+        <span class="font-mono text-base font-black text-[#FF5000]">${totalStickersToPrint} قطعة</span>
+      </div>
+
+      <div class="divide-y divide-zinc-100 border border-zinc-200 rounded-2xl overflow-hidden">
+        <div class="bg-zinc-50 p-2.5 grid grid-cols-12 font-bold text-zinc-500 text-[11px]">
+          <span class="col-span-5">التصميم / SKU</span>
+          <span class="col-span-2 text-center">6 سم</span>
+          <span class="col-span-2 text-center">8 سم</span>
+          <span class="col-span-2 text-center">10 سم</span>
+          <span class="col-span-1 text-center">الإجمالي</span>
+        </div>
+        ${items.map(it => `
+          <div class="p-3 grid grid-cols-12 items-center hover:bg-zinc-50 transition">
+            <div class="col-span-5 flex items-center gap-2">
+              <span class="font-mono text-[10px] bg-zinc-100 px-1.5 py-0.5 rounded text-zinc-600">#${escapeHtml(it.sku)}</span>
+              <span class="font-bold text-zinc-900 truncate">${escapeHtml(it.name)}</span>
+            </div>
+            <div class="col-span-2 text-center font-mono font-bold ${it.sizes['6cm'] > 0 ? 'text-[#FF5000]' : 'text-zinc-300'}">${it.sizes['6cm']}</div>
+            <div class="col-span-2 text-center font-mono font-bold ${it.sizes['8cm'] > 0 ? 'text-[#FF5000]' : 'text-zinc-300'}">${it.sizes['8cm']}</div>
+            <div class="col-span-2 text-center font-mono font-bold ${it.sizes['10cm'] > 0 ? 'text-[#FF5000]' : 'text-zinc-300'}">${it.sizes['10cm']}</div>
+            <div class="col-span-1 text-center font-mono font-black text-zinc-900">${it.total}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+export function closeProductionSummaryModal() {
+  const modal = document.getElementById('production-summary-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// ==========================================
+// A17: ADMIN THEME TOGGLE
+// ==========================================
+export function toggleAdminTheme() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  document.body.classList.toggle('dark', isDark);
+  localStorage.setItem('stickify21_admin_theme', isDark ? 'dark' : 'light');
+  showAdminToast(isDark ? 'تم تفعيل الوضع الليلي' : 'تم تفعيل الوضع النهاري');
+}
+
+export function initAdminTheme() {
+  const saved = localStorage.getItem('stickify21_admin_theme');
+  if (saved === 'dark') {
+    document.documentElement.classList.add('dark');
+    document.body.classList.add('dark');
+  }
 }
 
 export async function toggleProductInStock(productId) {
@@ -2720,5 +3263,22 @@ window.saveShowcaseItemFromForm = saveShowcaseItemFromForm;
 window.toggleShowcaseActive = toggleShowcaseActive;
 window.moveShowcaseItem = moveShowcaseItem;
 window.deleteShowcaseItem = deleteShowcaseItem;
+window.checkBackupReminder = checkBackupReminder;
+window.downloadFullBackupNow = downloadFullBackupNow;
+window.duplicateProduct = duplicateProduct;
+window.toggleProductSelect = toggleProductSelect;
+window.toggleSelectAllProducts = toggleSelectAllProducts;
+window.updateProductBulkBar = updateProductBulkBar;
+window.applyBulkToggleActive = applyBulkToggleActive;
+window.applyBulkPricePercent = applyBulkPricePercent;
+window.applyBulkCategoryMove = applyBulkCategoryMove;
+window.handleBulkUndo = handleBulkUndo;
+window.dismissBulkUndoToast = dismissBulkUndoToast;
+window.renderDashboardAnalytics = renderDashboardAnalytics;
+window.renderStockAlerts = renderStockAlerts;
+window.renderStorageUsageMeter = renderStorageUsageMeter;
+window.openProductionSummaryModal = openProductionSummaryModal;
+window.closeProductionSummaryModal = closeProductionSummaryModal;
+window.toggleAdminTheme = toggleAdminTheme;
 
 document.addEventListener('DOMContentLoaded', initAdmin);

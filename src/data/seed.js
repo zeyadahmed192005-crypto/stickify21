@@ -53,7 +53,8 @@ export const SEED_PRODUCTS = [
     image: 'logo.jpg',
     dateAdded: 15,
     inStock: true,
-    stockQuantity: 100
+    stockQuantity: 100,
+    tags: ['شعار', 'لوجو', 'براند']
   },
   {
     id: 'stk-1',
@@ -75,7 +76,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="15" width="130" height="130" rx="26" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><circle cx="80" cy="52" r="13" fill="#FF5000"/><circle cx="52" cy="108" r="13" fill="#FFFFFF"/><circle cx="108" cy="108" r="13" fill="#FFFFFF"/><path d="M80 65 L52 95 M80 65 L108 95" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/><text x="80" y="140" font-family="'Space Grotesk', monospace" font-weight="800" font-size="12" fill="#FF5000" text-anchor="middle">GIT --FORCE</text></svg>`,
     dateAdded: 9,
     inStock: true,
-    stockQuantity: 60
+    stockQuantity: 60,
+    tags: ['برمجة', 'كود', 'تك', 'مطورين']
   },
   {
     id: 'stk-3',
@@ -97,7 +99,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="18" y="24" width="124" height="112" rx="18" fill="#18181B" stroke="#0E0E10" stroke-width="3"/><text x="80" y="74" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="36" fill="#FF5000" text-anchor="middle">404</text><text x="80" y="104" font-family="'Readex Pro', sans-serif" font-weight="600" font-size="13" fill="#FFFFFF" text-anchor="middle">SLEEP NOT FOUND</text></svg>`,
     dateAdded: 8,
     inStock: true,
-    stockQuantity: 50
+    stockQuantity: 50,
+    tags: ['برمجة', 'كود', 'تك', 'سهر']
   },
   {
     id: 'stk-2',
@@ -119,7 +122,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="30" width="130" height="100" rx="22" fill="#FFFFFF" stroke="#0E0E10" stroke-width="5"/><text x="80" y="85" font-family="'Readex Pro', sans-serif" font-weight="800" font-size="34" fill="#0E0E10" text-anchor="middle">فَكّـكْ</text><line x1="45" y1="98" x2="115" y2="98" stroke="#FF5000" stroke-width="5" stroke-linecap="round"/><text x="80" y="118" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="10" fill="#71717A" text-anchor="middle" letter-spacing="2">LET IT GO</text></svg>`,
     dateAdded: 7,
     inStock: true,
-    stockQuantity: 80
+    stockQuantity: 80,
+    tags: ['عربي', 'اقتباسات', 'ميمز', 'روقان']
   },
   {
     id: 'stk-5',
@@ -141,7 +145,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><circle cx="80" cy="80" r="66" fill="#FFFFFF" stroke="#0E0E10" stroke-width="5"/><circle cx="80" cy="80" r="56" fill="none" stroke="#FF5000" stroke-width="2" stroke-dasharray="3 3"/><text x="80" y="76" font-family="'Readex Pro', sans-serif" font-weight="700" font-size="20" fill="#0E0E10" text-anchor="middle">سِيبْهَا لِله</text><text x="80" y="104" font-family="'Readex Pro', sans-serif" font-weight="600" font-size="13" fill="#FF5000" text-anchor="middle">وَتَوَكَّلْ</text></svg>`,
     dateAdded: 6,
     inStock: true,
-    stockQuantity: 50
+    stockQuantity: 50,
+    tags: ['عربي', 'اقتباسات', 'طمأنينة', 'إسلامي']
   },
   {
     id: 'stk-eng',
@@ -163,7 +168,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="20" y="20" width="120" height="120" rx="24" fill="#FFFFFF" stroke="#0E0E10" stroke-width="5"/><path d="M 80 40 L 50 110 M 80 40 L 110 110 M 60 90 L 100 90" stroke="#0E0E10" stroke-width="6" stroke-linecap="round"/><circle cx="80" cy="40" r="7" fill="#FF5000"/><text x="80" y="132" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FF5000" text-anchor="middle">هندسة</text></svg>`,
     dateAdded: 5,
     inStock: true,
-    stockQuantity: 40
+    stockQuantity: 40,
+    tags: ['هندسة', 'كليات', 'طلاب', 'دراسة']
   },
   {
     id: 'stk-med',
@@ -185,7 +191,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><circle cx="80" cy="80" r="64" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><path d="M 55 45 L 55 75 Q 80 110 105 75 L 105 45" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="80" cy="115" r="9" fill="#FF5000"/><line x1="80" y1="95" x2="80" y2="106" stroke="#FFFFFF" stroke-width="5"/><text x="80" y="70" font-family="'Readex Pro'" font-weight="800" font-size="16" fill="#FFFFFF" text-anchor="middle">DR</text></svg>`,
     dateAdded: 4,
     inStock: true,
-    stockQuantity: 40
+    stockQuantity: 40,
+    tags: ['طب', 'كليات', 'طلاب', 'دراسة']
   },
   {
     id: 'stk-6',
@@ -207,7 +214,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="15" y="15" width="130" height="130" rx="26" fill="#18181B" stroke="#FF5000" stroke-width="4"/><ellipse cx="80" cy="95" rx="45" ry="32" fill="#E4E4E7" stroke="#0E0E10" stroke-width="4"/><path d="M 40 90 Q 80 135 120 90 Z" fill="#FF5000" stroke="#0E0E10" stroke-width="3"/><circle cx="68" cy="88" r="8" fill="#FFF"/><circle cx="68" cy="88" r="4" fill="#FFC107"/><line x1="45" y1="65" x2="115" y2="78" stroke="#D4AF37" stroke-width="4" stroke-linecap="round"/><line x1="48" y1="58" x2="118" y2="71" stroke="#D4AF37" stroke-width="4" stroke-linecap="round"/><text x="80" y="48" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FFFFFF" text-anchor="middle">RAMEN VIBES</text></svg>`,
     dateAdded: 3,
     inStock: true,
-    stockQuantity: 45
+    stockQuantity: 45,
+    tags: ['أنمي', 'ياباني', 'طعام']
   },
   {
     id: 'stk-8',
@@ -229,7 +237,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="22" y="44" width="116" height="72" rx="20" fill="#F4F4F5" stroke="#0E0E10" stroke-width="5"/><rect x="42" y="74" width="22" height="7" fill="#0E0E10"/><rect x="49" y="67" width="7" height="22" fill="#0E0E10"/><circle cx="106" cy="74" r="7" fill="#FF5000"/><circle cx="94" cy="85" r="7" fill="#0E0E10"/></svg>`,
     dateAdded: 2,
     inStock: true,
-    stockQuantity: 30
+    stockQuantity: 30,
+    tags: ['جيمنج', 'ألعاب', 'كلاسيك']
   },
   {
     id: 'stk-7',
@@ -251,7 +260,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 160 160" class="w-full h-full"><rect x="18" y="22" width="124" height="116" rx="20" fill="#0E0E10" stroke="#FF5000" stroke-width="4"/><rect x="25" y="74" width="110" height="12" fill="#E4E4E7"/><rect x="38" y="55" width="14" height="50" rx="3" fill="#FF5000"/><rect x="108" y="55" width="14" height="50" rx="3" fill="#FF5000"/><text x="80" y="122" font-family="'Space Grotesk', sans-serif" font-weight="800" font-size="12" fill="#FFFFFF" text-anchor="middle">DISCIPLINE</text></svg>`,
     dateAdded: 1,
     inStock: true,
-    stockQuantity: 50
+    stockQuantity: 50,
+    tags: ['جيم', 'رياضة', 'فورمة']
   },
   {
     id: 'bm-1',
@@ -273,7 +283,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#18181B" stroke="#FF5000" stroke-width="3"/><circle cx="50" cy="25" r="4" fill="#FF5000"/><line x1="20" y1="45" x2="80" y2="45" stroke="#E4E4E7" stroke-width="1"/><text x="50" y="85" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FFFFFF" text-anchor="middle">خَيْرُ جَلِيسٍ</text><text x="50" y="105" font-family="'Readex Pro'" font-weight="700" font-size="12" fill="#FF5000" text-anchor="middle">فِي الزَّمَانِ</text><text x="50" y="125" font-family="'Readex Pro'" font-weight="800" font-size="14" fill="#FFFFFF" text-anchor="middle">كِتَابُ</text><circle cx="50" cy="155" r="14" fill="#27272A"/><path d="M42 150 Q50 146 58 150 M42 158 Q50 154 58 158 M50 146 L50 162" stroke="#FF5000" stroke-width="2" fill="none"/></svg>`,
     dateAdded: 14,
     inStock: true,
-    stockQuantity: 50
+    stockQuantity: 50,
+    tags: ['فواصل كتب', 'قراءة', 'كتب', 'اقتباسات']
   },
   {
     id: 'bm-2',
@@ -295,7 +306,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#FDFBF7" stroke="#0E0E10" stroke-width="3"/><circle cx="50" cy="24" r="4" fill="#0E0E10"/><ellipse cx="40" cy="65" rx="12" ry="8" fill="#0E0E10"/><ellipse cx="60" cy="65" rx="12" ry="8" fill="#0E0E10"/><line x1="48" y1="65" x2="52" y2="65" stroke="#0E0E10" stroke-width="2"/><line x1="20" y1="90" x2="80" y2="90" stroke="#FF5000" stroke-width="2"/><text x="50" y="115" font-family="'Readex Pro'" font-weight="700" font-size="11" fill="#0E0E10" text-anchor="middle">نغم أصيل</text><text x="50" y="132" font-family="'Readex Pro'" font-weight="600" font-size="10" fill="#71717A" text-anchor="middle">روقان زمان</text><text x="50" y="170" font-family="'Space Grotesk'" font-weight="800" font-size="10" fill="#FF5000" text-anchor="middle">S21 BOOKS</text></svg>`,
     dateAdded: 13,
     inStock: true,
-    stockQuantity: 40
+    stockQuantity: 40,
+    tags: ['فواصل كتب', 'قراءة', 'كتب', 'طرب']
   },
   {
     id: 'bm-3',
@@ -317,7 +329,8 @@ export const SEED_PRODUCTS = [
     svg: `<svg viewBox="0 0 100 200" class="w-full h-full"><rect x="10" y="10" width="80" height="180" rx="8" fill="#0E0E10" stroke="#E4E4E7" stroke-width="2"/><circle cx="50" cy="25" r="4" fill="#FF5000"/><path d="M42 55 L58 55 Q56 68 50 68 Q44 68 42 55 Z M58 58 Q64 58 64 67" stroke="#FF5000" stroke-width="2" fill="none"/><text x="50" y="95" font-family="'Readex Pro'" font-weight="700" font-size="11" fill="#FFFFFF" text-anchor="middle">صفحة كمان</text><text x="50" y="112" font-family="'Readex Pro'" font-weight="600" font-size="10" fill="#FF5000" text-anchor="middle">وهنام خلاص!</text><rect x="25" y="130" width="50" height="4" rx="2" fill="#27272A"/><rect x="35" y="140" width="30" height="4" rx="2" fill="#27272A"/><text x="50" y="172" font-family="'Space Grotesk'" font-weight="700" font-size="9" fill="#71717A" text-anchor="middle">CHAPTER NEXT</text></svg>`,
     dateAdded: 12,
     inStock: true,
-    stockQuantity: 45
+    stockQuantity: 45,
+    tags: ['فواصل كتب', 'قراءة', 'كتب', 'قهوة']
   }
 ];
 
