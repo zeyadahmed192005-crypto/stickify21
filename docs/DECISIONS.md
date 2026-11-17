@@ -222,3 +222,29 @@ This document records all architectural decisions, ground-truth constraints, and
   - Direct deep-link button to live self-service tracking (`#/track/:id`).
   - Reopen WhatsApp button in case the browser popup was initially blocked.
 
+### AD-31: Automatic Sticker Pack Grouping & Dynamic Cart Nudge (R10)
+- **Decision:** Automatic pack algorithm in `pricing.js` (`groupCartItemsIntoPacks`) groups loose standard stickers in the cart into 10-packs (-30% discount) and 5-packs (-20% discount) without requiring manual pack builder assembly.
+- **Rules & Edge Cases:**
+  - Strict exclusion of bookmarks (`type === 'bookmark'`, `category === 'bookmarks'`, SKU `BM-*`), custom print items, and explicit custom packs.
+  - Supports mixed sizes and mixed base prices; respects deterministic grouping strategy `added_order` (or `lowest_price` / `highest_price`).
+  - Dynamic cart banner (`#pack-nudge-banner`) visibly indicates the remaining stickers needed to unlock the next discount tier.
+  - Pack lines in cart are atomic and removable as a unified unit via `removeGroupedLine(index)`.
+
+### AD-32: Payment Accounts Management & Client-Side Proof Upload (R12)
+- **Decision:** Admin Settings manages payment accounts (InstaPay, Vodafone Cash, Bank) with account names, handles, QR images, and instructions.
+- **Non-COD Checkout Flow:**
+  - Displays selected method account details with 1-click copy buttons and exact transfer total.
+  - Requires proof image upload (JPG/PNG/WebP, <= 5MB) validated with client-side image compression and preview.
+  - Honest Prototype Handling: image is stored locally in IndexedDB/session and made shareable via Web Share API / WhatsApp upload prompt.
+  - Admin Order Details renders the payment proof thumbnail and offers a 1-click "تأكيد صحة الدفع" verification button.
+
+### AD-33: Complete Purge of "Holographic" Finish & Automatic Migration (R3)
+- **Decision:** Fully eliminate holographic finish from all catalog filters, product cards, detail modals, custom print options, and sheen CSS (`hologram-effect`).
+- **Standard Finishes:** Exclusively `glossy` (لامع) and `matte` (مطفي).
+- **Auto-Migration:** Existing catalog products or stored items with `finish: 'holographic'` are automatically migrated to `'glossy'` on startup.
+
+### AD-34: Admin Quick Order Filters & Dynamic WhatsApp Message Templates (A6, A7)
+- **Decision:** Orders view features live quick-filter pill buttons: "الكل", "اليوم", "محتاج تجهيز", "محتاج شحن", "مدفوع بانتظار التحقق" with dynamic count badges.
+- **WhatsApp Message Templates:** Admin Settings enables customizing message templates for new orders, preparation completion, and courier dispatch with bracketed placeholders (`{name}`, `{order}`, `{tracking}`, `{courier}`, `{total}`).
+
+

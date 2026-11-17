@@ -170,8 +170,7 @@ ${orderCode ? orderCode : ''}`;
 export function formatCustomPrintWhatsAppMessage(customOrder) {
   const finishLabels = {
     glossy: 'لامع (Glossy)',
-    matte: 'مطفي (Matte)',
-    holographic: 'هولوجرام (Holographic ✨)'
+    matte: 'مطفي (Matte)'
   };
   const finishStr = finishLabels[customOrder.finish] || customOrder.finish;
 

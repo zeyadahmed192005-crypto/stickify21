@@ -35,7 +35,8 @@ let adminState = {
     date: 'all'
   },
   selectedOrderIds: new Set(),
-  activeDetailOrderId: null
+  activeDetailOrderId: null,
+  orderQuickFilter: 'all'
 };
 
 // ==========================================
@@ -269,11 +270,46 @@ export function renderOrders() {
   if (statShipped) statShipped.innerText = shippedCount;
   if (statConversion) statConversion.innerText = `${conversionRate}%`;
 
+  // Quick Filter Counts & Badges (A6)
+  const nowDate = new Date();
+  const qfCounts = {
+    all: orders.length,
+    today: orders.filter(o => new Date(o.date || Date.now()).toDateString() === nowDate.toDateString()).length,
+    needs_preparing: orders.filter(o => normalizeStatusKey(o.status) === 'confirmed').length,
+    needs_shipping: orders.filter(o => normalizeStatusKey(o.status) === 'ready').length,
+    unverified_payment: orders.filter(o => {
+      const s = normalizeStatusKey(o.status);
+      const isCod = o.paymentMethod === 'cod' || (typeof o.payment === 'string' && o.payment.includes('COD'));
+      return s !== 'completed' && s !== 'cancelled' && !isCod && !o.paymentVerified;
+    }).length
+  };
+
+  ['all', 'today', 'needs_preparing', 'needs_shipping', 'unverified_payment'].forEach(k => {
+    const el = document.getElementById(`qf-count-${k}`);
+    if (el) el.textContent = qfCounts[k];
+  });
+
   // 2. Populate Governorate Filter dropdown if needed
   populateGovernorateFilter();
 
   // 3. Filter orders based on active filters
   let filtered = [...orders];
+
+  // Apply Quick Filter (A6)
+  const activeQf = adminState.orderQuickFilter || 'all';
+  if (activeQf === 'today') {
+    filtered = filtered.filter(o => new Date(o.date || Date.now()).toDateString() === nowDate.toDateString());
+  } else if (activeQf === 'needs_preparing') {
+    filtered = filtered.filter(o => normalizeStatusKey(o.status) === 'confirmed');
+  } else if (activeQf === 'needs_shipping') {
+    filtered = filtered.filter(o => normalizeStatusKey(o.status) === 'ready');
+  } else if (activeQf === 'unverified_payment') {
+    filtered = filtered.filter(o => {
+      const s = normalizeStatusKey(o.status);
+      const isCod = o.paymentMethod === 'cod' || (typeof o.payment === 'string' && o.payment.includes('COD'));
+      return s !== 'completed' && s !== 'cancelled' && !isCod && !o.paymentVerified;
+    });
+  }
 
   if (adminState.orderFilters.search) {
     const q = adminState.orderFilters.search.toLowerCase();
@@ -519,6 +555,20 @@ export function resetOrderFilters() {
   if (sStatus) sStatus.value = 'all';
   if (sGov) sGov.value = 'all';
   if (sDate) sDate.value = 'all';
+  renderOrders();
+}
+
+export function setOrdersQuickFilter(filterKey) {
+  adminState.orderQuickFilter = filterKey;
+  const buttons = document.querySelectorAll('#orders-quick-filter-tabs button');
+  buttons.forEach(btn => {
+    const isCurrent = btn.getAttribute('data-quick-filter') === filterKey;
+    btn.classList.toggle('active', isCurrent);
+    btn.classList.toggle('bg-zinc-900', isCurrent);
+    btn.classList.toggle('text-white', isCurrent);
+    btn.classList.toggle('bg-zinc-100', !isCurrent);
+    btn.classList.toggle('text-zinc-700', !isCurrent);
+  });
   renderOrders();
 }
 
@@ -1041,6 +1091,55 @@ export function openOrderDetailModal(orderId) {
     notesBox.classList.add('hidden');
   }
 
+  // Payment Details & Verification (R12)
+  const isCod = order.paymentMethod === 'cod' || (typeof order.payment === 'string' && order.payment.includes('COD'));
+  const payMethodBadge = document.getElementById('modal-payment-method-badge');
+  if (payMethodBadge) {
+    payMethodBadge.textContent = order.paymentMethod ? (order.paymentMethod === 'instapay' ? 'InstaPay ⚡' : (order.paymentMethod === 'vodafone_cash' ? 'فودافون كاش 📱' : 'عند الاستلام (COD)')) : (order.payment || 'عند الاستلام');
+  }
+
+  const proofImgContainer = document.getElementById('modal-payment-proof-container');
+  const proofImg = document.getElementById('modal-payment-proof-thumb');
+  const proofUrl = order.paymentProof || (order.payment && (order.payment.proofDataUrl || order.payment.proof));
+  if (proofImgContainer && proofImg) {
+    if (proofUrl) {
+      proofImg.src = proofUrl;
+      proofImgContainer.classList.remove('hidden');
+    } else {
+      proofImgContainer.classList.add('hidden');
+      proofImg.src = '';
+    }
+  }
+
+  const payStatusBadge = document.getElementById('modal-payment-status-badge');
+  const payStatusSelect = document.getElementById('modal-payment-status-select');
+  const isVerified = Boolean(order.paymentVerified || (order.payment && order.payment.verified));
+  const currentPayStatus = isVerified ? 'verified' : (proofUrl ? 'proof_received' : (isCod ? 'unpaid' : 'pending_proof'));
+
+  if (payStatusSelect) {
+    payStatusSelect.value = currentPayStatus;
+  }
+  if (payStatusBadge) {
+    if (isVerified) {
+      payStatusBadge.textContent = 'تم التحقق ✓';
+      payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-200';
+    } else if (proofUrl) {
+      payStatusBadge.textContent = 'بانتظار التحقق من الإشعار ⏳';
+      payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-amber-100 text-amber-800 border border-amber-200';
+    } else if (isCod) {
+      payStatusBadge.textContent = 'دفع عند الاستلام 💵';
+      payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-zinc-100 text-zinc-700';
+    } else {
+      payStatusBadge.textContent = 'لم يتم الدفع / لا يوجد إشعار ✕';
+      payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-red-100 text-red-700';
+    }
+  }
+
+  const unverifiedWarn = document.getElementById('modal-unverified-payment-warning');
+  if (unverifiedWarn) {
+    unverifiedWarn.classList.toggle('hidden', isCod || isVerified);
+  }
+
   // Items (R1: Pack contents rendered with .pack-sub-item and [data-pack-item])
   const itemsContainer = document.getElementById('modal-items-container');
   const lines = normalizeOrderLines(order);
@@ -1204,6 +1303,55 @@ export async function promptCancelCurrentOrder() {
   if (!adminState.activeDetailOrderId) return;
   await promptCancelOrder(adminState.activeDetailOrderId);
   openOrderDetailModal(adminState.activeDetailOrderId);
+}
+
+export async function verifyCurrentOrderPayment() {
+  const orderId = adminState.activeDetailOrderId;
+  const order = adminState.orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  order.paymentVerified = true;
+  if (!order.payment || typeof order.payment === 'string') {
+    order.payment = { method: order.paymentMethod || 'electronic', label: order.payment, verified: true, status: 'verified' };
+  } else {
+    order.payment.verified = true;
+    order.payment.status = 'verified';
+  }
+
+  await storage.updateOrder(order);
+  showAdminToast(`تم تأكيد استلام دفعة الطلب #${order.id} بنجاح! ✓`);
+  openOrderDetailModal(order.id);
+  renderOrders();
+}
+
+export async function handleModalPaymentStatusChange(newStatus) {
+  const orderId = adminState.activeDetailOrderId;
+  const order = adminState.orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  order.paymentVerified = (newStatus === 'verified');
+  if (!order.payment || typeof order.payment === 'string') {
+    order.payment = { method: order.paymentMethod || 'electronic', label: order.payment, verified: order.paymentVerified, status: newStatus };
+  } else {
+    order.payment.verified = order.paymentVerified;
+    order.payment.status = newStatus;
+  }
+
+  await storage.updateOrder(order);
+  showAdminToast(`تم تحديث حالة الدفع إلى "${newStatus}"`);
+  openOrderDetailModal(order.id);
+  renderOrders();
+}
+
+export function openFullProofImageModal() {
+  const order = adminState.orders.find(o => o.id === adminState.activeDetailOrderId);
+  const proofUrl = order?.paymentProof || (order?.payment && (order.payment.proofDataUrl || order.payment.proof));
+  if (proofUrl) {
+    const w = window.open('');
+    if (w) {
+      w.document.write(`<title>إشعار التحويل - ${order.id}</title><img src="${proofUrl}" style="max-width:100%; height:auto; display:block; margin:20px auto;">`);
+    }
+  }
 }
 
 // ==========================================
@@ -1955,23 +2103,129 @@ export async function renderSettings() {
 
   // Render 27 Governorates Grid
   const grid = document.getElementById('gov-rates-grid');
-  if (!grid) return;
+  if (grid) {
+    const currentRates = settings.shippingRates || CONFIG.SHIPPING_RATES;
+    const govs = settings.governorates || CONFIG.GOVERNORATES;
 
-  const currentRates = settings.shippingRates || CONFIG.SHIPPING_RATES;
-  const govs = settings.governorates || CONFIG.GOVERNORATES;
-
-  grid.innerHTML = govs.map((gov, idx) => {
-    const rate = currentRates[gov.nameAr] !== undefined ? currentRates[gov.nameAr] : gov.rate;
-    return `
-      <div class="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 flex items-center justify-between gap-2">
-        <span class="font-bold text-xs text-zinc-800 truncate">${escapeHtml(gov.nameAr)}</span>
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <input type="number" id="gov-rate-${idx}" data-gov-name="${escapeHtml(gov.nameAr)}" value="${rate}" min="0" class="w-16 text-center font-mono font-bold text-xs bg-white border border-zinc-200 rounded-lg px-1.5 py-1 text-zinc-900 focus:outline-none focus:border-[#FF5000]">
-          <span class="text-[10px] text-zinc-400 font-bold">${CONFIG.CURRENCY}</span>
+    grid.innerHTML = govs.map((gov, idx) => {
+      const rate = currentRates[gov.nameAr] !== undefined ? currentRates[gov.nameAr] : gov.rate;
+      return `
+        <div class="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 flex items-center justify-between gap-2">
+          <span class="font-bold text-xs text-zinc-800 truncate">${escapeHtml(gov.nameAr)}</span>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <input type="number" id="gov-rate-${idx}" data-gov-name="${escapeHtml(gov.nameAr)}" value="${rate}" min="0" class="w-16 text-center font-mono font-bold text-xs bg-white border border-zinc-200 rounded-lg px-1.5 py-1 text-zinc-900 focus:outline-none focus:border-[#FF5000]">
+            <span class="text-[10px] text-zinc-400 font-bold">${CONFIG.CURRENCY}</span>
+          </div>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
+  }
+
+  // Populate Payment Accounts (R12)
+  const payAccounts = settings.paymentAccounts || CONFIG.PAYMENT_ACCOUNTS || [];
+  const instapayAcc = payAccounts.find(a => a.type === 'instapay');
+  if (instapayAcc) {
+    const activeEl = document.getElementById('pay-acc-instapay-active');
+    const handleEl = document.getElementById('pay-acc-instapay-handle');
+    const holderEl = document.getElementById('pay-acc-instapay-holder');
+    if (activeEl) activeEl.checked = Boolean(instapayAcc.active);
+    if (handleEl) handleEl.value = instapayAcc.handle || '';
+    if (holderEl) holderEl.value = instapayAcc.holder || '';
+  }
+
+  const vodafoneAcc = payAccounts.find(a => a.type === 'vodafone_cash');
+  if (vodafoneAcc) {
+    const activeEl = document.getElementById('pay-acc-vodafone-active');
+    const numberEl = document.getElementById('pay-acc-vodafone-number');
+    const holderEl = document.getElementById('pay-acc-vodafone-holder');
+    if (activeEl) activeEl.checked = Boolean(vodafoneAcc.active);
+    if (numberEl) numberEl.value = vodafoneAcc.number || '';
+    if (holderEl) holderEl.value = vodafoneAcc.holder || '';
+  }
+
+  const bankAcc = payAccounts.find(a => a.type === 'bank');
+  if (bankAcc) {
+    const activeEl = document.getElementById('pay-acc-bank-active');
+    const ibanEl = document.getElementById('pay-acc-bank-iban');
+    const holderEl = document.getElementById('pay-acc-bank-holder');
+    if (activeEl) activeEl.checked = Boolean(bankAcc.active);
+    if (ibanEl) ibanEl.value = bankAcc.iban || '';
+    if (holderEl) holderEl.value = bankAcc.holder || '';
+  }
+
+  // Populate WhatsApp Templates (A7)
+  const templates = settings.whatsappTemplates || CONFIG.WHATSAPP_TEMPLATES || {};
+  const readyTpl = document.getElementById('wa-template-ready');
+  const shippedTpl = document.getElementById('wa-template-shipped');
+  if (readyTpl) readyTpl.value = templates.ready || CONFIG.WHATSAPP_TEMPLATES.ready;
+  if (shippedTpl) shippedTpl.value = templates.shipped || CONFIG.WHATSAPP_TEMPLATES.shipped;
+}
+
+export async function savePaymentAccountsSettings() {
+  const current = adminState.settings || await storage.getSettings();
+  const accounts = [
+    {
+      id: 'acc-instapay-1',
+      type: 'instapay',
+      nameAr: 'إنستاباي الرسمي (InstaPay)',
+      active: Boolean(document.getElementById('pay-acc-instapay-active')?.checked),
+      handle: document.getElementById('pay-acc-instapay-handle')?.value.trim() || 'stickify21@instapay',
+      holder: document.getElementById('pay-acc-instapay-holder')?.value.trim() || 'STICKIFY 21',
+      order: 1
+    },
+    {
+      id: 'acc-vodafone-1',
+      type: 'vodafone_cash',
+      nameAr: 'فودافون كاش كاشير (Vodafone Cash)',
+      active: Boolean(document.getElementById('pay-acc-vodafone-active')?.checked),
+      number: document.getElementById('pay-acc-vodafone-number')?.value.trim() || '01043546503',
+      holder: document.getElementById('pay-acc-vodafone-holder')?.value.trim() || 'أحمد STICKIFY',
+      order: 2
+    },
+    {
+      id: 'acc-bank-1',
+      type: 'bank',
+      nameAr: 'البنك التجاري الدولي CIB',
+      active: Boolean(document.getElementById('pay-acc-bank-active')?.checked),
+      iban: document.getElementById('pay-acc-bank-iban')?.value.trim() || '',
+      holder: document.getElementById('pay-acc-bank-holder')?.value.trim() || '',
+      order: 3
+    }
+  ];
+
+  const updated = {
+    ...current,
+    paymentAccounts: accounts
+  };
+  await storage.saveSettings(updated);
+  adminState.settings = updated;
+  showAdminToast('تم حفظ وتحديث حسابات الدفع بنجاح! ✓');
+}
+
+export async function saveWhatsAppTemplatesSettings() {
+  const current = adminState.settings || await storage.getSettings();
+  const readyVal = document.getElementById('wa-template-ready')?.value.trim() || CONFIG.WHATSAPP_TEMPLATES.ready;
+  const shippedVal = document.getElementById('wa-template-shipped')?.value.trim() || CONFIG.WHATSAPP_TEMPLATES.shipped;
+
+  const updated = {
+    ...current,
+    whatsappTemplates: {
+      ...(current.whatsappTemplates || {}),
+      ready: readyVal,
+      shipped: shippedVal
+    }
+  };
+  await storage.saveSettings(updated);
+  adminState.settings = updated;
+  showAdminToast('تم حفظ وتحديث قوالب رسائل واتساب بنجاح! ✓');
+}
+
+export function resetWhatsAppTemplates() {
+  const readyTpl = document.getElementById('wa-template-ready');
+  const shippedTpl = document.getElementById('wa-template-shipped');
+  if (readyTpl) readyTpl.value = CONFIG.WHATSAPP_TEMPLATES.ready;
+  if (shippedTpl) shippedTpl.value = CONFIG.WHATSAPP_TEMPLATES.shipped;
+  showAdminToast('تمت استعادة قوالب الواتساب الافتراضية');
 }
 
 export async function handleSaveStoreSettings(e) {
@@ -2109,5 +2363,12 @@ window.toggleCustomCourierInput = toggleCustomCourierInput;
 window.confirmShippingDispatch = confirmShippingDispatch;
 window.toggleOrderPacksExpand = toggleOrderPacksExpand;
 window.handleChangePasscode = handleChangePasscode;
+window.setOrdersQuickFilter = setOrdersQuickFilter;
+window.verifyCurrentOrderPayment = verifyCurrentOrderPayment;
+window.handleModalPaymentStatusChange = handleModalPaymentStatusChange;
+window.openFullProofImageModal = openFullProofImageModal;
+window.savePaymentAccountsSettings = savePaymentAccountsSettings;
+window.saveWhatsAppTemplatesSettings = saveWhatsAppTemplatesSettings;
+window.resetWhatsAppTemplates = resetWhatsAppTemplates;
 
 document.addEventListener('DOMContentLoaded', initAdmin);

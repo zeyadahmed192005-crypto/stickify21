@@ -49,6 +49,7 @@ export const CONFIG = {
     5: { discountRate: 0.20, labelAr: 'باقة 5 استيكرات (-20% 🔥)' },
     10: { discountRate: 0.30, labelAr: 'باقة 10 استيكرات (-30% 👑)' }
   },
+  AUTO_PACK_STRATEGY: 'added_order', // 'added_order' | 'highest_price' | 'lowest_price'
 
   // 27 Official Egyptian Governorates and Shipping Rates
   GOVERNORATES: [
@@ -174,6 +175,48 @@ export const CONFIG = {
     }
   },
 
+  // Configurable Payment Accounts (R12)
+  PAYMENT_ACCOUNTS: [
+    {
+      id: 'acc-instapay-1',
+      type: 'instapay',
+      nameAr: 'إنستاباي الرسمي (InstaPay)',
+      holder: 'STICKIFY 21',
+      handle: 'stickify21@instapay',
+      instructionsAr: 'تحويل عبر تطبيق إنستاباي للمعرف stickify21@instapay',
+      active: true,
+      order: 1
+    },
+    {
+      id: 'acc-vodafone-1',
+      type: 'vodafone_cash',
+      nameAr: 'فودافون كاش كاشير (Vodafone Cash)',
+      holder: 'أحمد STICKIFY',
+      number: '01043546503',
+      instructionsAr: 'تحويل كاش على الرقم 01043546503',
+      active: true,
+      order: 2
+    },
+    {
+      id: 'acc-bank-1',
+      type: 'bank',
+      nameAr: 'البنك التجاري الدولي CIB',
+      holder: 'شركة ستيكيفاي 21',
+      iban: 'EG0000000000000000000000000',
+      bankName: 'CIB Egypt',
+      instructionsAr: 'تحويل بنكي / إيداع فوري لحساب CIB',
+      active: false,
+      order: 3
+    }
+  ],
+
+  // Customizable WhatsApp Message Templates (A7)
+  WHATSAPP_TEMPLATES: {
+    new_order: 'مرحباً {name} 👋\nشكراً لطلبك من STICKIFY 21!\nتم استلام طلبك #{order} بنجاح.\nإجمالي الطلب: {total} ج.م\nسنقوم بتأكيد الطلب وتجهيزه فوراً.',
+    ready: 'مرحباً {name} 👋\nطلبك #{order} تم تجهيزه وتغليفه بنجاح وهو الآن بانتظار استلام المندوب! 📦\nإجمالي المبلغ: {total} ج.م',
+    shipped: 'مرحباً {name} 👋\nتم شحن طلبك #{order} عبر {courier}!\nرقم البوليصة / التتبع: {tracking}\nالمبلغ المطلوب: {total} ج.م\nرابط التتبع: {tracking_url}'
+  },
+
   // Custom Print Order Tiers
   CUSTOM_PRINT: {
     MIN_QUANTITY: 10,
@@ -185,8 +228,7 @@ export const CONFIG = {
     ],
     FINISH_EXTRAS: {
       glossy: 0,
-      matte: 0,
-      holographic: 5
+      matte: 0
     },
     SIZE_EXTRAS: {
       '6cm': 0,

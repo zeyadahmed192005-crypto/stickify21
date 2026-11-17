@@ -33,7 +33,18 @@ const MIGRATIONS = [
   {
     version: '2.0.0',
     description: 'Round 2 schema with composite lines[], status ready, courier/tracking fields, and payment verification',
-    migrateProduct: (p) => p,
+    migrateProduct: (p) => {
+      const finish = p.finish === 'holographic' ? 'glossy' : (p.finish || 'matte');
+      const finishes = Array.isArray(p.finishes)
+        ? p.finishes.filter(f => f !== 'holographic')
+        : ['matte', 'glossy'];
+      if (!finishes.includes('glossy')) finishes.push('glossy');
+      return {
+        ...p,
+        finish,
+        finishes
+      };
+    },
     migrateOrder: (o) => {
       // Normalize status
       let s = o.status || 'pending';

@@ -205,7 +205,31 @@ export const LocalAdapter = {
 
   // Products
   async getProducts() {
-    return safeLoad(STORAGE_KEYS.PRODUCTS, SEED_PRODUCTS);
+    let prods = safeLoad(STORAGE_KEYS.PRODUCTS, SEED_PRODUCTS);
+    let changed = false;
+    prods = prods.map(p => {
+      let updated = false;
+      let finish = p.finish;
+      let finishes = p.finishes;
+      if (finish === 'holographic') {
+        finish = 'glossy';
+        updated = true;
+      }
+      if (Array.isArray(finishes) && finishes.includes('holographic')) {
+        finishes = finishes.filter(f => f !== 'holographic');
+        if (!finishes.includes('glossy')) finishes.push('glossy');
+        updated = true;
+      }
+      if (updated) {
+        changed = true;
+        return { ...p, finish, finishes };
+      }
+      return p;
+    });
+    if (changed) {
+      safeSave(STORAGE_KEYS.PRODUCTS, prods);
+    }
+    return prods;
   },
   async saveProduct(product) {
     const products = await this.getProducts();
@@ -319,10 +343,17 @@ export const LocalAdapter = {
       freeShippingThreshold: CONFIG.FREE_SHIPPING_THRESHOLD,
       defaultShipping: CONFIG.DEFAULT_SHIPPING,
       shippingRates: { ...CONFIG.SHIPPING_RATES },
-      governorates: CONFIG.GOVERNORATES.map(g => ({ ...g }))
+      governorates: CONFIG.GOVERNORATES.map(g => ({ ...g })),
+      paymentAccounts: (CONFIG.PAYMENT_ACCOUNTS || []).map(a => ({ ...a })),
+      whatsappTemplates: { ...(CONFIG.WHATSAPP_TEMPLATES || {}) }
     };
     const loaded = safeLoad(STORAGE_KEYS.SETTINGS, defaultSettings);
-    return { ...defaultSettings, ...loaded };
+    return {
+      ...defaultSettings,
+      ...loaded,
+      paymentAccounts: loaded.paymentAccounts || defaultSettings.paymentAccounts,
+      whatsappTemplates: { ...defaultSettings.whatsappTemplates, ...(loaded.whatsappTemplates || {}) }
+    };
   },
   async saveSettings(settings) {
     safeSave(STORAGE_KEYS.SETTINGS, settings);

@@ -85,9 +85,9 @@ test.describe('Phase 6: Full End-to-End Integration & Migration-Ready Regression
     await expect(productModal).toBeVisible();
     await expect(productModal).toContainText('جيت بوش');
 
-    // Select 10cm size and holographic finish
+    // Select 10cm size and glossy finish
     await productModal.locator('button', { hasText: '10 سم' }).click();
-    await productModal.locator('button', { hasText: 'هولوجرام' }).click();
+    await productModal.locator('button', { hasText: 'لامع' }).click();
 
     // Increase quantity to 2 (total = 100 EGP to satisfy STICKIFY10 coupon minSubtotal)
     await productModal.locator('button', { hasText: '+' }).click();
@@ -138,6 +138,15 @@ test.describe('Phase 6: Full End-to-End Integration & Migration-Ready Regression
     // Select payment method: Vodafone Cash
     await page.locator('input[value="vodafone_cash"]').check();
     await expect(page.locator('#payment-method-details')).toContainText('01043546503');
+
+    // Attach required payment proof image for Vodafone Cash (R12)
+    const proofFile = {
+      name: 'vodafone_receipt.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
+    };
+    await page.setInputFiles('#payment-proof-file', proofFile);
+    await page.waitForTimeout(100);
 
     // Submit order
     await page.click('#checkout-submit-btn');

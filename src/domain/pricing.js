@@ -9,7 +9,7 @@ import { CONFIG } from '../config/config.js';
  * Calculates unit price for a given product and size.
  * @param {object} product
  * @param {string} sizeKey - 'small' | 'medium' | 'large' | 'standard'
- * @param {string} finish - 'holographic' | 'glossy' | 'matte'
+ * @param {string} finish - 'glossy' | 'matte'
  * @returns {number} Integer price in EGP
  */
 export function getProductPriceForSize(product, sizeKey = 'medium', finish = 'matte') {
@@ -29,7 +29,7 @@ export function getProductPriceForSize(product, sizeKey = 'medium', finish = 'ma
  * Calculates tiered pricing breakdown for custom print orders (min 10 pcs).
  * @param {number} quantity - Quantity of custom prints (min 10)
  * @param {string} sizeKey - '6cm' | '8cm' | '10cm' | 'custom'
- * @param {string} finish - 'glossy' | 'matte' | 'holographic'
+ * @param {string} finish - 'glossy' | 'matte'
  * @returns {object} Tier calculation details
  */
 export function calculateCustomPrintSummary(quantity = 10, sizeKey = '8cm', finish = 'glossy') {
@@ -84,16 +84,195 @@ export function calculatePackSummary(items, targetSize = 5) {
 }
 
 /**
+ * Groups loose standard stickers into automatic packs (5-pack -20%, 10-pack -30%).
+ * Bookmarks, explicit packs, and custom print items are excluded from auto-pack grouping.
+ * @param {Array<object>} items - Raw cart items
+ * @param {string} [strategy] - 'added_order' | 'highest_price' | 'lowest_price'
+ * @returns {{ groupedLines: Array<object>, nudge: object|null, packSavings: number, rawSubtotal: number, looseStickerCount: number }}
+ */
+export function groupCartItemsIntoPacks(items = [], strategy = null) {
+  const chosenStrategy = strategy || CONFIG.AUTO_PACK_STRATEGY || 'added_order';
+
+  const nonStickerLines = [];
+  const looseUnits = [];
+
+  // 1. Separate loose standard stickers from bookmarks, packs, and custom prints
+  items.forEach((item, originalIndex) => {
+    const isBookmark = item.type === 'bookmark' || item.category === 'bookmarks' || (item.sku && String(item.sku).startsWith('BM-'));
+    const isPack = item.type === 'pack';
+    const isCustom = item.type === 'custom_print';
+
+    if (isBookmark || isPack || isCustom) {
+      nonStickerLines.push({
+        ...item,
+        originalIndex
+      });
+    } else {
+      // Expand item quantity into individual sticker units
+      const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
+      for (let q = 0; q < qty; q++) {
+        looseUnits.push({
+          id: item.id || generateCartLineKey(item),
+          productId: item.productId || item.id,
+          sku: item.sku,
+          name: item.name,
+          nameAr: item.nameAr,
+          category: item.category,
+          type: 'sticker',
+          size: item.size || '8 سم (Medium)',
+          sizeKey: item.sizeKey || 'medium',
+          finish: item.finish || 'matte',
+          price: Math.max(0, parseInt(item.price, 10) || 35),
+          image: item.image,
+          svg: item.svg,
+          originalIndex
+        });
+      }
+    }
+  });
+
+  // 2. Sort loose units if strategy requested
+  const sortedUnits = [...looseUnits];
+  if (chosenStrategy === 'lowest_price') {
+    sortedUnits.sort((a, b) => a.price - b.price);
+  } else if (chosenStrategy === 'highest_price') {
+    sortedUnits.sort((a, b) => b.price - a.price);
+  }
+  // 'added_order' preserves addition sequence
+
+  const pool = [...sortedUnits];
+  const autoPackLines = [];
+  let packSavings = 0;
+
+  // 3. Extract 10-packs first (30% discount)
+  while (pool.length >= 10) {
+    const packUnits = pool.splice(0, 10);
+    const rawTotal = packUnits.reduce((sum, u) => sum + u.price, 0);
+    const discountedTotal = Math.round(rawTotal * (1 - (CONFIG.PACK_CONFIG[10]?.discountRate || 0.30)));
+    const savings = Math.max(0, rawTotal - discountedTotal);
+    packSavings += savings;
+
+    autoPackLines.push({
+      id: `auto-pack-10-${autoPackLines.length + 1}`,
+      type: 'pack',
+      autoPack: true,
+      size: 10,
+      packSize: 10,
+      discountRate: CONFIG.PACK_CONFIG[10]?.discountRate || 0.30,
+      nameAr: 'باقة توفير (10 استيكرات)',
+      name: '10 Sticker Pack (-30%)',
+      price: discountedTotal,
+      packPrice: discountedTotal,
+      rawTotal,
+      savings,
+      quantity: 1,
+      items: packUnits
+    });
+  }
+
+  // 4. Extract 5-pack if >= 5 remain (20% discount)
+  if (pool.length >= 5) {
+    const packUnits = pool.splice(0, 5);
+    const rawTotal = packUnits.reduce((sum, u) => sum + u.price, 0);
+    const discountedTotal = Math.round(rawTotal * (1 - (CONFIG.PACK_CONFIG[5]?.discountRate || 0.20)));
+    const savings = Math.max(0, rawTotal - discountedTotal);
+    packSavings += savings;
+
+    autoPackLines.push({
+      id: `auto-pack-5-${autoPackLines.length + 1}`,
+      type: 'pack',
+      autoPack: true,
+      size: 5,
+      packSize: 5,
+      discountRate: CONFIG.PACK_CONFIG[5]?.discountRate || 0.20,
+      nameAr: 'باقة توفير (5 استيكرات)',
+      name: '5 Sticker Pack (-20%)',
+      price: discountedTotal,
+      packPrice: discountedTotal,
+      rawTotal,
+      savings,
+      quantity: 1,
+      items: packUnits
+    });
+  }
+
+  // 5. Remaining loose units in pool are singles. Re-aggregate identical singles.
+  const singleLines = [];
+  pool.forEach(unit => {
+    const key = `${unit.sku}_${unit.sizeKey}_${unit.finish}`;
+    const existing = singleLines.find(s => `${s.sku}_${s.sizeKey}_${s.finish}` === key);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      singleLines.push({
+        ...unit,
+        quantity: 1
+      });
+    }
+  });
+
+  // Calculate dynamic nudge message (R10)
+  const totalLooseStickers = looseUnits.length;
+  let nudge = null;
+  if (totalLooseStickers > 0) {
+    if (totalLooseStickers < 5) {
+      const needed = 5 - totalLooseStickers;
+      nudge = {
+        neededCount: needed,
+        targetDiscount: 20,
+        message: `أضف ${needed} ستيكر واحد كمان لتحصل على خصم باقة الـ 5 (20%)! 🔥`
+      };
+    } else if (totalLooseStickers < 10) {
+      const needed = 10 - totalLooseStickers;
+      nudge = {
+        neededCount: needed,
+        targetDiscount: 30,
+        message: `أضف ${needed} ستيكر كمان لترقية الخصم إلى باقة الـ 10 (30%)! 👑`
+      };
+    } else {
+      const rem = totalLooseStickers % 10;
+      if (rem > 0 && rem < 5) {
+        const needed = 5 - rem;
+        nudge = {
+          neededCount: needed,
+          targetDiscount: 20,
+          message: `أضف ${needed} ستيكر إضافي لتحصل على باقة 5 إضافية بخصم 20%! 🔥`
+        };
+      } else if (rem >= 5) {
+        const needed = 10 - rem;
+        nudge = {
+          neededCount: needed,
+          targetDiscount: 30,
+          message: `أضف ${needed} ستيكر إضافي لترقية الباقة الإضافية إلى باقة 10 بخصم 30%! 👑`
+        };
+      }
+    }
+  }
+
+  const groupedLines = [...autoPackLines, ...singleLines, ...nonStickerLines];
+
+  return {
+    groupedLines,
+    nudge,
+    packSavings,
+    looseStickerCount: totalLooseStickers
+  };
+}
+
+/**
  * Calculates comprehensive cart figures.
  * Free shipping is strictly evaluated on the post-discount subtotal.
  * @param {object} params
  * @param {Array<object>} params.items - Cart items
  * @param {object|null} params.coupon - Active coupon { code, discountPercent, discountFixed, type, minOrder }
  * @param {string|null} params.governorate - Selected Egyptian governorate
+ * @param {string|null} [params.strategy] - Pack strategy
  * @returns {object} Cart calculation breakdown
  */
-export function calculateCart({ items = [], coupon = null, governorate = null }) {
-  const subtotal = items.reduce((sum, item) => {
+export function calculateCart({ items = [], coupon = null, governorate = null, strategy = null }) {
+  const { groupedLines, nudge, packSavings, looseStickerCount } = groupCartItemsIntoPacks(items, strategy);
+
+  const subtotal = groupedLines.reduce((sum, item) => {
     const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
     const price = Math.max(0, parseInt(item.price, 10) || 0);
     return sum + (price * qty);
@@ -173,7 +352,11 @@ export function calculateCart({ items = [], coupon = null, governorate = null })
     freeShippingRemaining,
     freeShippingProgress,
     couponWarning,
-    itemCount: items.reduce((sum, item) => sum + (parseInt(item.quantity, 10) || 1), 0)
+    itemCount: items.reduce((sum, item) => sum + (parseInt(item.quantity, 10) || 1), 0),
+    groupedLines,
+    nudge,
+    packSavings,
+    looseStickerCount
   };
 }
 

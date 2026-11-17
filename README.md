@@ -9,7 +9,7 @@
 ## 🌟 English Overview
 
 **STICKIFY 21** is a specialized Egyptian e-commerce brand designed for university students, tech enthusiasts, and avid readers. It offers:
-- **Die-cut waterproof vinyl stickers:** 3 official sizes (Small 6 cm, Medium 8 cm, Large 10 cm) with 3 finishes (Holographic ✨, Glossy, Matte).
+- **Die-cut waterproof vinyl stickers:** 3 official sizes (Small 6 cm, Medium 8 cm, Large 10 cm) with 2 finishes (Glossy, Matte).
 - **Premium cardstock bookmarks:** 15 × 5 cm, 350gsm cardstock with double-sided matte lamination.
 - **Custom print studio:** Custom batch orders for universities, tech clubs, book clubs, and corporate branding starting from 10 pieces with tiered volume pricing.
 - **Identity & Colors:** Brand Orange `#FF5000` (hover `#E04600`), Deep Black `#0E0E10`, Clean White `#FAFAFA`, WhatsApp Green `#25D366`.
@@ -221,7 +221,7 @@ npx playwright test tests/phase6.spec.js
 ### نبذة عن المشروع
 **STICKIFY 21** هو متجر إلكتروني مصري متخصص في بيع استيكرات فينيل عالية الجودة مقاومة للماء وفواصل كتب أنيقة، مع ستوديو مخصص لطباعة التصاميم والكميات للمجموعات والجامعات والشركات:
 - **المقاسات الرسمية للاستيكرات:** 6 سم (صغير)، 8 سم (وسط)، 10 سم (كبير).
-- **الخامات واللمسات:** هولوجرام ✨، لامع (Glossy)، ومطفي (Matte).
+- **الخامات واللمسات:** لامع (Glossy)، ومطفي (Matte).
 - **فواصل الكتب:** كوشيه 350 جرام، سلوفان مطفي فاخر وجهين، مقاس 15 × 5 سم.
 - **الطباعة المخصصة:** بدءاً من 10 قطع بأسعار تنافسية متدرجة (10-49 قطعة: 20 ج.م، 50-99 قطعة: 15 ج.م، 100+ قطعة: 10 ج.م).
 

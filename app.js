@@ -216,6 +216,11 @@ export async function initApp() {
   updateCartBadge();
   initHashRouter();
 
+  // Restore open cart if reloaded while open
+  if (sessionStorage.getItem('stickify21_cart_open') === '1') {
+    toggleCartModal(true);
+  }
+
   // Cross-tab sync
   window.addEventListener('storage', async (e) => {
     if (e.key === 'stickify21_categories') {
@@ -296,7 +301,6 @@ export function renderProducts() {
 
   container.innerHTML = products.map(product => {
     const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
-    const isHolo = product.finish === 'holographic';
     const hasImage = Boolean(product.image);
     const safeImage = sanitizeUrl(product.image);
     const safeSvg = sanitizeSvg(product.svg);
@@ -329,7 +333,7 @@ export function renderProducts() {
         
         <!-- Header Tags: Badge + SKU -->
         <div class="flex items-center justify-between mb-4">
-          <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isBookmark ? 'bg-amber-50 text-amber-800 border border-amber-200' : (isHolo ? 'bg-[#FF5000]/10 text-[#FF5000] border border-[#FF5000]/30' : 'bg-zinc-100 text-zinc-700')}">
+          <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isBookmark ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-zinc-100 text-zinc-700'}">
             ${escapeHtml(product.badge)}
           </span>
           <div class="flex items-center gap-1.5 font-mono">
@@ -339,7 +343,7 @@ export function renderProducts() {
         </div>
 
         <!-- Graphic Stage -->
-        <div onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="relative w-full aspect-square p-6 flex items-center justify-center rounded-xl bg-zinc-50 border border-zinc-100 mb-4 overflow-hidden cursor-pointer ${isHolo ? 'hologram-effect' : ''}">
+        <div onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="relative w-full aspect-square p-6 flex items-center justify-center rounded-xl bg-zinc-50 border border-zinc-100 mb-4 overflow-hidden cursor-pointer">
           <div id="graphic-wrapper-${escapeHtml(product.id)}" class="${stageClass} sticker-diecut-minimal flex items-center justify-center transition-all duration-200">
             ${hasImage && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(product.nameAr)}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
           </div>
@@ -626,12 +630,41 @@ export function updateCartBadge() {
   }
 }
 
+export function removeGroupedLine(groupedIndex) {
+  const calc = calculateCart({ items: state.cart, coupon: state.coupon, governorate: state.selectedGovernorate });
+  const line = calc.groupedLines[groupedIndex];
+  if (!line) return;
+
+  if (line.autoPack && Array.isArray(line.items)) {
+    // Remove each item that was in this pack from state.cart
+    line.items.forEach(u => {
+      const idx = state.cart.findIndex(c => (c.id === u.id || c.productId === u.productId) && c.quantity > 0);
+      if (idx > -1) {
+        state.cart[idx].quantity -= 1;
+        if (state.cart[idx].quantity <= 0) {
+          state.cart.splice(idx, 1);
+        }
+      }
+    });
+  } else if (line.originalIndex !== undefined && state.cart[line.originalIndex]) {
+    state.cart.splice(line.originalIndex, 1);
+  }
+  saveCart();
+  renderCart();
+  updateCartBadge();
+}
+
 export function renderCart() {
   const itemsContainer = document.getElementById('cart-items-container');
   const summaryContainer = document.getElementById('cart-summary-container');
+  const nudgeEl = document.getElementById('pack-nudge-banner');
   if (!itemsContainer || !summaryContainer) return;
 
   if (state.cart.length === 0) {
+    if (nudgeEl) {
+      nudgeEl.classList.add('hidden');
+      nudgeEl.innerHTML = '';
+    }
     itemsContainer.innerHTML = `
       <div class="text-center py-20">
         <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-zinc-100 flex items-center justify-center text-2xl text-zinc-400">🛍️</div>
@@ -646,8 +679,29 @@ export function renderCart() {
     return;
   }
 
-  // Render items (Supports both loose items and custom packs as a single unit)
-  itemsContainer.innerHTML = state.cart.map((item, index) => {
+  // Calculations via single source of truth (pricing.js)
+  const calc = calculateCart({
+    items: state.cart,
+    coupon: state.coupon,
+    governorate: state.selectedGovernorate
+  });
+
+  // Dynamic Pack Nudge Banner (R10)
+  if (nudgeEl) {
+    if (calc.nudge && calc.nudge.message) {
+      nudgeEl.innerHTML = `
+        <span class="text-base flex-shrink-0">🎁</span>
+        <span class="flex-grow">${escapeHtml(calc.nudge.message)}</span>
+      `;
+      nudgeEl.classList.remove('hidden');
+    } else {
+      nudgeEl.classList.add('hidden');
+      nudgeEl.innerHTML = '';
+    }
+  }
+
+  // Render items (Groups loose standard stickers into automatic packs R10)
+  itemsContainer.innerHTML = calc.groupedLines.map((item, index) => {
     const isPack = item.type === 'pack';
     const safeImage = sanitizeUrl(item.image);
     const safeSvg = sanitizeSvg(item.svg);
@@ -658,15 +712,10 @@ export function renderCart() {
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-1.5">
               <span class="bg-[#FF5000] text-white px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">باقة توفير</span>
-              <h4 class="font-bold text-zinc-900 text-xs">${escapeHtml(item.nameAr)}</h4>
+              <h4 class="font-bold text-zinc-900 text-xs">${escapeHtml(item.nameAr || 'باقة استيكرات')}</h4>
             </div>
             <div class="flex items-center gap-2">
-              <div class="flex items-center border border-zinc-300 rounded-lg overflow-hidden bg-white">
-                <button onclick="updateCartQuantity(${index}, -1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">-</button>
-                <span class="px-2 py-1 text-xs font-bold text-zinc-900 font-mono">${item.quantity}</span>
-                <button onclick="updateCartQuantity(${index}, 1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">+</button>
-              </div>
-              <button onclick="removeCartItem(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition" title="حذف الباقة بالكامل">✕</button>
+              <button onclick="removeGroupedLine(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition" title="حذف الباقة بالكامل">✕</button>
             </div>
           </div>
 
@@ -676,7 +725,7 @@ export function renderCart() {
               const subImg = sanitizeUrl(sub.image);
               const subSvg = sanitizeSvg(sub.svg);
               return `
-                <div class="w-8 h-8 rounded-lg bg-white border border-zinc-200 p-0.5 flex-shrink-0 flex items-center justify-center overflow-hidden" title="${escapeHtml(sub.nameAr)}">
+                <div class="w-8 h-8 rounded-lg bg-white border border-zinc-200 p-0.5 flex-shrink-0 flex items-center justify-center overflow-hidden" title="${escapeHtml(sub.nameAr || sub.name || '')}">
                   ${subImg ? `<img src="${subImg}" class="w-full h-full object-contain">` : subSvg}
                 </div>
               `;
@@ -684,10 +733,10 @@ export function renderCart() {
           </div>
 
           <div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono border-t border-orange-100 pt-1.5">
-            <span>المقاس: ${escapeHtml(item.size)}</span>
+            <span>${item.autoPack ? 'باقة تلقائية' : `المقاس: ${escapeHtml(item.size || '8 سم')}`}</span>
             <div>
               ${item.savings ? `<span class="line-through text-zinc-400 ml-1.5">${item.rawTotal} ${CONFIG.CURRENCY}</span>` : ''}
-              <span class="text-[#FF5000] font-black text-xs">${item.price * item.quantity} ${CONFIG.CURRENCY}</span>
+              <span class="text-[#FF5000] font-black text-xs">${item.price * (item.quantity || 1)} ${CONFIG.CURRENCY}</span>
             </div>
           </div>
         </div>
@@ -702,32 +751,25 @@ export function renderCart() {
         <div class="flex-grow min-w-0">
           <div class="flex items-center gap-1.5 truncate">
             <span class="bg-zinc-200 text-zinc-800 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold">#${escapeHtml(item.sku || 'SKU')}</span>
-            <h4 class="font-bold text-zinc-900 text-xs truncate">${escapeHtml(item.nameAr)}</h4>
+            <h4 class="font-bold text-zinc-900 text-xs truncate">${escapeHtml(item.nameAr || item.name)}</h4>
           </div>
           <div class="text-[11px] text-zinc-500 flex items-center gap-2 mt-1 font-mono">
-            <span>${escapeHtml(item.type === 'bookmark' ? 'بوك مارك' : item.size)}</span>
+            <span>${escapeHtml(item.type === 'bookmark' ? 'بوك مارك' : (item.size || '8 سم'))}</span>
             <span>•</span>
             <span class="text-zinc-900 font-bold">${item.price * item.quantity} ${CONFIG.CURRENCY}</span>
           </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           <div class="flex items-center border border-zinc-300 rounded-lg overflow-hidden bg-white">
-            <button onclick="updateCartQuantity(${index}, -1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">-</button>
+            <button onclick="updateCartQuantity(${item.originalIndex !== undefined ? item.originalIndex : index}, -1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">-</button>
             <span class="px-2 py-1 text-xs font-bold text-zinc-900 font-mono">${item.quantity}</span>
-            <button onclick="updateCartQuantity(${index}, 1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">+</button>
+            <button onclick="updateCartQuantity(${item.originalIndex !== undefined ? item.originalIndex : index}, 1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">+</button>
           </div>
-          <button onclick="removeCartItem(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition">✕</button>
+          <button onclick="removeCartItem(${item.originalIndex !== undefined ? item.originalIndex : index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition">✕</button>
         </div>
       </div>
     `;
   }).join('');
-
-  // Calculations via single source of truth (pricing.js)
-  const calc = calculateCart({
-    items: state.cart,
-    coupon: state.coupon,
-    governorate: state.selectedGovernorate
-  });
 
   summaryContainer.innerHTML = `
     <!-- Coupon -->
@@ -1197,7 +1239,9 @@ export function clearMockupStickers() {
 export function toggleCartModal(open) {
   const modal = document.getElementById('cart-modal');
   if (modal) {
-    modal.classList.toggle('hidden', !open);
+    const shouldOpen = open !== undefined ? Boolean(open) : modal.classList.contains('hidden');
+    modal.classList.toggle('hidden', !shouldOpen);
+    sessionStorage.setItem('stickify21_cart_open', shouldOpen ? '1' : '0');
   }
 }
 
@@ -1212,6 +1256,7 @@ export function openCheckoutModal() {
     citySelect.value = state.selectedGovernorate;
   }
 
+  handlePaymentMethodChange(state.paymentMethod || 'cod');
   updateCheckoutPricingPreview();
   const pricing = calculateCart({ items: state.cart, coupon: state.coupon, governorate: state.selectedGovernorate });
   analytics.trackBeginCheckout(state.cart, pricing.total);
@@ -1234,8 +1279,14 @@ export function updateCheckoutPricingPreview() {
   const container = document.getElementById('checkout-pricing-preview');
   const itemsContainer = document.getElementById('checkout-items-summary');
 
+  const calc = calculateCart({
+    items: state.cart,
+    coupon: state.coupon,
+    governorate: state.selectedGovernorate
+  });
+
   if (itemsContainer) {
-    itemsContainer.innerHTML = state.cart.map((item, idx) => {
+    itemsContainer.innerHTML = calc.groupedLines.map((item, idx) => {
       if (item.type === 'pack') {
         const subListHtml = (item.items || []).map(sub => `
           <div class="flex items-center gap-2 p-1.5 bg-white rounded-lg border border-zinc-100 text-[11px]">
@@ -1271,12 +1322,6 @@ export function updateCheckoutPricingPreview() {
   }
 
   if (!container) return;
-
-  const calc = calculateCart({
-    items: state.cart,
-    coupon: state.coupon,
-    governorate: state.selectedGovernorate
-  });
 
   container.innerHTML = `
     <div class="flex justify-between">
@@ -1377,13 +1422,28 @@ export async function submitOrder(e) {
     const idempotencyKey = generateIdempotencyKey();
 
     const paymentRadio = document.querySelector('input[name="payment_method"]:checked')?.value || 'cod';
+    const proofError = document.getElementById('payment-proof-error');
+
+    if (paymentRadio !== 'cod' && !state.checkoutPaymentProof) {
+      if (proofError) {
+        proofError.textContent = 'يرجى رفع صورة إشعار التحويل لتأكيد حجز طلبك *';
+        proofError.classList.remove('hidden');
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+      showToast('يرجى رفع صورة إشعار التحويل لتأكيد طلبك', 'error');
+      return;
+    }
+
     const paymentLabel = paymentRadio === 'vodafone_cash' 
       ? 'فودافون كاش (01043546503)' 
       : (paymentRadio === 'instapay' ? 'InstaPay (stickify21@instapay)' : 'عند الاستلام (COD)');
 
-    const structuredLines = state.cart.map(item => {
+    const structuredLines = calc.groupedLines.map(item => {
       if (item.type === 'pack') {
-        const pSize = item.packSize || (item.items ? item.items.length : 5);
+        const pSize = item.packSize || item.size || (item.items ? item.items.length : 5);
         const dRate = item.discountRate || (pSize === 10 ? 0.3 : 0.2);
         return {
           type: 'pack',
@@ -1430,6 +1490,16 @@ export async function submitOrder(e) {
       },
       payment: paymentLabel,
       paymentMethod: paymentRadio,
+      paymentVerified: false,
+      paymentProof: state.checkoutPaymentProof || null,
+      paymentDetails: {
+        method: paymentRadio,
+        label: paymentLabel,
+        proofAttached: Boolean(state.checkoutPaymentProof),
+        proofDataUrl: state.checkoutPaymentProof || null,
+        status: state.checkoutPaymentProof ? 'proof_received' : (paymentRadio === 'cod' ? 'unpaid' : 'pending_proof'),
+        verified: false
+      },
       subtotal: calc.subtotal,
       discount: calc.discount,
       shippingCost: calc.shipping,
@@ -1437,7 +1507,6 @@ export async function submitOrder(e) {
       couponCode: state.coupon.code || null,
       courier: null,
       trackingNumber: null,
-      paymentVerified: false,
       lines: structuredLines,
       items: state.cart.map(item => ({
         id: item.id,
@@ -1578,6 +1647,20 @@ export function openConfirmationModal(order, whatsappUrl, whatsappMsg) {
   }
 
   if (modal) modal.classList.remove('hidden');
+
+  const shareProofBtn = document.getElementById('share-proof-whatsapp-btn');
+  const hasProof = Boolean(order.paymentProof || (order.payment && order.payment.proofAttached) || (order.paymentMethod && order.paymentMethod !== 'cod'));
+  if (shareProofBtn) {
+    if (hasProof) {
+      shareProofBtn.classList.remove('hidden');
+      shareProofBtn.onclick = () => {
+        const text = encodeURIComponent(`مرحباً 👋 مرفق إشعار التحويل لطلب رقم #${order.id} بمبلغ ${order.total} ج.م`);
+        window.open(`https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${text}`, '_blank');
+      };
+    } else {
+      shareProofBtn.classList.add('hidden');
+    }
+  }
 }
 
 export function closeConfirmationModal() {
@@ -1586,22 +1669,122 @@ export function closeConfirmationModal() {
 }
 
 // ==========================================
-// PAYMENT METHOD SELECTION & DETAILS
+// PAYMENT METHOD SELECTION & DETAILS (R12)
 // ==========================================
 export function handlePaymentMethodChange(method) {
   state.paymentMethod = method;
   const detailsEl = document.getElementById('payment-method-details');
+  const proofGroup = document.getElementById('payment-proof-group');
   if (!detailsEl) return;
+
+  const calc = calculateCart({
+    items: state.cart,
+    coupon: state.coupon,
+    governorate: state.selectedGovernorate
+  });
+
   if (method === 'instapay') {
-    detailsEl.innerHTML = `⚡ الدفع عبر تطبيق InstaPay المعتمد إلى المعرّف: <strong class="font-mono text-[#FF5000]">stickify21@instapay</strong> (يرجى إرسال إشعار التحويل عبر واتساب بعد إتمام الطلب لتأكيده).`;
-    detailsEl.className = 'mt-2 p-2.5 rounded-xl bg-purple-50/80 border border-purple-200/80 text-[11px] text-purple-950 leading-relaxed';
+    detailsEl.innerHTML = `
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-zinc-900">⚡ الدفع عبر تطبيق InstaPay المعتمد:</span>
+          <span class="text-zinc-600 font-mono text-xs">المطلوب: <strong class="text-[#FF5000]">${calc.total} ${CONFIG.CURRENCY}</strong></span>
+        </div>
+        <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-purple-200">
+          <span class="font-mono font-black text-purple-900 select-all" id="instapay-handle-text">stickify21@instapay</span>
+          <button type="button" onclick="copyToClipboardText('stickify21@instapay')" class="copy-btn px-2.5 py-1 rounded-md bg-purple-100 hover:bg-purple-200 text-purple-800 text-[11px] font-bold transition flex items-center gap-1">
+            <span>نسخ</span>
+            <span>📋</span>
+          </button>
+        </div>
+        <p class="text-[10px] text-purple-800">يرجى تحويل المبلغ بدقة ورفع صورة الإشعار بالأسفل لتأكيد حجز طلبك فورياً.</p>
+      </div>
+    `;
+    detailsEl.className = 'mt-2 p-3 rounded-xl bg-purple-50/80 border border-purple-200/80 text-[11px] text-purple-950 leading-relaxed';
+    if (proofGroup) proofGroup.classList.remove('hidden');
   } else if (method === 'vodafone_cash') {
-    detailsEl.innerHTML = `📱 التحويل عبر محفظة فودافون كاش الذكية إلى الرقم: <strong class="font-mono text-[#FF5000]">01043546503</strong> (يرجى إرسال لقطة شاشة للتحويل عبر واتساب بعد إتمام الطلب لتأكيده).`;
-    detailsEl.className = 'mt-2 p-2.5 rounded-xl bg-rose-50/80 border border-rose-200/80 text-[11px] text-rose-950 leading-relaxed';
+    detailsEl.innerHTML = `
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-zinc-900">📱 التحويل عبر محفظة فودافون كاش:</span>
+          <span class="text-zinc-600 font-mono text-xs">المطلوب: <strong class="text-[#FF5000]">${calc.total} ${CONFIG.CURRENCY}</strong></span>
+        </div>
+        <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-rose-200">
+          <span class="font-mono font-black text-rose-900 select-all" id="vodafone-number-text">01043546503</span>
+          <button type="button" onclick="copyToClipboardText('01043546503')" class="copy-btn px-2.5 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-800 text-[11px] font-bold transition flex items-center gap-1">
+            <span>نسخ</span>
+            <span>📋</span>
+          </button>
+        </div>
+        <p class="text-[10px] text-rose-800">يرجى تحويل المبلغ لرقم الكاش الموضح ورفع لقطة شاشة التحويل بالأسفل لتأكيد حجز طلبك.</p>
+      </div>
+    `;
+    detailsEl.className = 'mt-2 p-3 rounded-xl bg-rose-50/80 border border-rose-200/80 text-[11px] text-rose-950 leading-relaxed';
+    if (proofGroup) proofGroup.classList.remove('hidden');
   } else {
-    detailsEl.innerHTML = `💵 الدفع نقداً لمندوب الشحن عند استلام الشحنة ومعاينتها والتأكد من سلامتها.`;
+    detailsEl.innerHTML = `💵 الدفع نقداً للمندوب عند استلام الشحنة ومعاينتها والتأكد من سلامتها.`;
     detailsEl.className = 'mt-2 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed';
+    if (proofGroup) proofGroup.classList.add('hidden');
   }
+}
+
+export function handlePaymentProofSelected(event) {
+  const file = event.target.files?.[0];
+  const errEl = document.getElementById('payment-proof-error');
+  const previewBox = document.getElementById('payment-proof-preview');
+  const previewImg = document.getElementById('payment-proof-preview-img');
+  const filenameEl = document.getElementById('payment-proof-filename');
+
+  if (errEl) errEl.classList.add('hidden');
+
+  if (!file) {
+    state.checkoutPaymentProof = null;
+    if (previewBox) previewBox.classList.add('hidden');
+    return;
+  }
+
+  // Check 5MB limit
+  if (file.size > 5 * 1024 * 1024) {
+    if (errEl) {
+      errEl.textContent = 'حجم الصورة يتجاوز الحد الأقصى (5 ميجابايت). يرجى اختيار صورة أصغر.';
+      errEl.classList.remove('hidden');
+    }
+    event.target.value = '';
+    state.checkoutPaymentProof = null;
+    if (previewBox) previewBox.classList.add('hidden');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    state.checkoutPaymentProof = e.target.result;
+    if (previewImg) previewImg.src = e.target.result;
+    if (filenameEl) filenameEl.textContent = file.name;
+    if (previewBox) previewBox.classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+export function clearPaymentProof() {
+  state.checkoutPaymentProof = null;
+  const fileInput = document.getElementById('payment-proof-file');
+  if (fileInput) fileInput.value = '';
+  const previewBox = document.getElementById('payment-proof-preview');
+  if (previewBox) previewBox.classList.add('hidden');
+}
+
+export async function copyToClipboardText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`تم نسخ [${text}] بنجاح ✓`);
+  } catch (e) {
+    showToast('تعذر النسخ التلقائي، يمكنك النسخ يدوياً', 'warning');
+  }
+}
+
+export function sharePaymentProofOnWhatsApp() {
+  const text = encodeURIComponent(`مرحباً 👋 مرفق إشعار التحويل لتأكيد الطلب`);
+  window.open(`https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${text}`, '_blank');
 }
 
 // ==========================================
@@ -1695,7 +1878,7 @@ export function addProductDetailToCart() {
     ? CONFIG.BOOKMARK_SPECS.dimensions
     : (sizeKey === 'small' ? '6 سم (Small)' : (sizeKey === 'large' ? '10 سم (Large)' : '8 سم (Medium)'));
 
-  const finishLabel = finishKey === 'holographic' ? 'هولوجرام ✨' : (finishKey === 'glossy' ? 'لامع' : 'مطفي');
+  const finishLabel = finishKey === 'glossy' ? 'لامع' : 'مطفي';
 
   const lineKey = generateCartLineKey({ productId: product.id, sizeKey });
   const existingIndex = state.cart.findIndex(i => i.id === lineKey);
@@ -1742,7 +1925,6 @@ export function renderProductDetailModal(product) {
   if (!container) return;
 
   const isBookmark = product.category === 'bookmarks' || product.type === 'bookmark';
-  const isHolo = state.productDetail.selectedFinish === 'holographic';
   const hasImage = Boolean(product.image);
   const safeImage = sanitizeUrl(product.image);
   const safeSvg = sanitizeSvg(product.svg);
@@ -1779,7 +1961,7 @@ export function renderProductDetailModal(product) {
       
       <!-- Left: Visual Graphic Stage (5 cols) -->
       <div class="md:col-span-5 flex flex-col items-center">
-        <div class="w-full aspect-square rounded-3xl bg-zinc-50 border border-zinc-200/90 p-8 flex items-center justify-center relative overflow-hidden shadow-inner ${isHolo ? 'hologram-effect' : ''}">
+        <div class="w-full aspect-square rounded-3xl bg-zinc-50 border border-zinc-200/90 p-8 flex items-center justify-center relative overflow-hidden shadow-inner">
           <div class="${stageClass} sticker-diecut-minimal flex items-center justify-center transition-all duration-300">
             ${hasImage && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(product.nameAr)}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
           </div>
@@ -1841,15 +2023,12 @@ export function renderProductDetailModal(product) {
         <!-- Finish Options -->
         <div>
           <label class="block text-xs font-bold text-zinc-800 mb-1.5">اللمسة النهائية واللمعان:</label>
-          <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-center">
+          <div id="modal-finish-options" class="grid grid-cols-2 gap-2 text-xs font-semibold text-center">
             <button type="button" onclick="selectProductDetailFinish('matte')" class="p-2.5 rounded-xl border transition ${currentFinishKey === 'matte' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
               <span>مطفي (Matte)</span>
             </button>
             <button type="button" onclick="selectProductDetailFinish('glossy')" class="p-2.5 rounded-xl border transition ${currentFinishKey === 'glossy' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
               <span>لامع (Glossy)</span>
-            </button>
-            <button type="button" onclick="selectProductDetailFinish('holographic')" class="p-2.5 rounded-xl border transition ${currentFinishKey === 'holographic' ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-sm' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-black'}">
-              <span>هولوجرام ✨</span>
             </button>
           </div>
         </div>
@@ -2225,7 +2404,7 @@ export function updateCustomPrintSummary() {
   if (qtyEl) qtyEl.textContent = `${qty} قطعة`;
   if (unitEl) unitEl.textContent = `${summary.unitPrice} ج.م`;
   
-  const finishLabels = { glossy: 'لامع', matte: 'مطفي', holographic: 'هولوجرام ✨' };
+  const finishLabels = { glossy: 'لامع', matte: 'مطفي' };
   const sizeLabels = { '6cm': '6 سم', '8cm': '8 سم', '10cm': '10 سم', 'custom': 'مقاس مخصص' };
   if (specEl) specEl.textContent = `${sizeLabels[state.customPrint.size] || '8 سم'} • ${finishLabels[state.customPrint.finish] || 'لامع'}`;
   
@@ -2396,7 +2575,7 @@ export const POLICY_DATA = {
         </p>
         <h4 class="font-bold text-zinc-800 text-xs">خاماتنا ومواصفات الإنتاج:</h4>
         <ul class="list-disc list-inside space-y-1.5 pr-2">
-          <li><strong>استيكرات الفينيل المقاومة للماء (Die-Cut Vinyl):</strong> مقاومة تماماً للمياه، الرطوبة، والخدوش. متوفرة بثلاثة مقاسات قياسية (6 سم، 8 سم، 10 سم) وتشطيبات فاخرة (لامع Glossy، مطفي Matte، وهولوجرافيك Holographic عاكس للإضاءة).</li>
+          <li><strong>استيكرات الفينيل المقاومة للماء (Die-Cut Vinyl):</strong> مقاومة تماماً للمياه، الرطوبة، والخدوش. متوفرة بثلاثة مقاسات قياسية (6 سم، 8 سم، 10 سم) وتشطيبات فاخرة (لامع Glossy، ومطفي Matte).</li>
           <li><strong>فواصل الكتب الفاخرة (Bookmarks):</strong> مطبوعة على ورق كرتون مقوى 350gsm بسلوفان مطفي ناعم الملمس وتصميمات أدبية وسينمائية تلهم القراءة.</li>
           <li><strong>الطباعة المخصصة (Custom Printing):</strong> نوفر لنوادي الجامعات، الشركات الناشئة، المدارس، والمكتبات خدمة طباعة التصاميم والشعارات الخاصة ابتداءً من 10 قطع وحتى آلاف القطع بأعلى جودة وسرعة تنفيذ.</li>
         </ul>
@@ -2762,6 +2941,11 @@ window.submitCustomPrintOrder = submitCustomPrintOrder;
 window.openPolicyModal = openPolicyModal;
 window.closePolicyModal = closePolicyModal;
 window.switchPolicyTab = switchPolicyTab;
+window.removeGroupedLine = removeGroupedLine;
+window.handlePaymentProofSelected = handlePaymentProofSelected;
+window.clearPaymentProof = clearPaymentProof;
+window.copyToClipboardText = copyToClipboardText;
+window.sharePaymentProofOnWhatsApp = sharePaymentProofOnWhatsApp;
 window.analytics = analytics;
 
 if (document.readyState === 'loading') {
