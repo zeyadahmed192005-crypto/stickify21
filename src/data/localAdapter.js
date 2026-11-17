@@ -4,6 +4,8 @@
 import { CONFIG } from '../config/config.js';
 import { CURRENT_SCHEMA_VERSION, migrateStorageBundle } from './migrations.js';
 import { SEED_PRODUCTS, SEED_CATEGORIES, SEED_COUPONS } from './seed.js';
+import { DEFAULT_POLICIES } from './policies.js';
+import { stripEmoji } from '../utils/emoji.js';
 
 const STORAGE_KEYS = {
   SCHEMA: 'stickify21_schema_version',
@@ -220,9 +222,35 @@ export const LocalAdapter = {
         if (!finishes.includes('glossy')) finishes.push('glossy');
         updated = true;
       }
+
+      // Strip any emojis from product strings
+      const cleanNameAr = stripEmoji(p.nameAr || p.name);
+      const cleanDescAr = stripEmoji(p.descAr || p.desc);
+      const cleanBadgeAr = stripEmoji(p.badgeAr || p.badge);
+      const cleanNameEn = stripEmoji(p.nameEn || p.name);
+      const cleanDescEn = stripEmoji(p.descEn || p.desc);
+      const cleanBadgeEn = stripEmoji(p.badgeEn || p.badge);
+
+      if (cleanNameAr !== p.nameAr || cleanDescAr !== p.descAr || cleanBadgeAr !== p.badgeAr || !p.nameEn) {
+        updated = true;
+      }
+
       if (updated) {
         changed = true;
-        return { ...p, finish, finishes };
+        return {
+          ...p,
+          finish,
+          finishes,
+          name: cleanNameAr,
+          nameAr: cleanNameAr,
+          desc: cleanDescAr,
+          descAr: cleanDescAr,
+          badge: cleanBadgeAr,
+          badgeAr: cleanBadgeAr,
+          nameEn: cleanNameEn || cleanNameAr,
+          descEn: cleanDescEn || cleanDescAr,
+          badgeEn: cleanBadgeEn || cleanBadgeAr
+        };
       }
       return p;
     });
@@ -232,15 +260,27 @@ export const LocalAdapter = {
     return prods;
   },
   async saveProduct(product) {
+    const cleanProduct = {
+      ...product,
+      name: stripEmoji(product.nameAr || product.name),
+      nameAr: stripEmoji(product.nameAr || product.name),
+      desc: stripEmoji(product.descAr || product.desc),
+      descAr: stripEmoji(product.descAr || product.desc),
+      badge: stripEmoji(product.badgeAr || product.badge),
+      badgeAr: stripEmoji(product.badgeAr || product.badge),
+      nameEn: stripEmoji(product.nameEn || product.name),
+      descEn: stripEmoji(product.descEn || product.desc),
+      badgeEn: stripEmoji(product.badgeEn || product.badge)
+    };
     const products = await this.getProducts();
-    const idx = products.findIndex(p => p.id === product.id);
+    const idx = products.findIndex(p => p.id === cleanProduct.id);
     if (idx !== -1) {
-      products[idx] = { ...products[idx], ...product };
+      products[idx] = { ...products[idx], ...cleanProduct };
     } else {
-      products.unshift(product);
+      products.unshift(cleanProduct);
     }
     safeSave(STORAGE_KEYS.PRODUCTS, products);
-    return product;
+    return cleanProduct;
   },
   async deleteProduct(productId) {
     const products = await this.getProducts();
@@ -297,7 +337,23 @@ export const LocalAdapter = {
 
   // Categories
   async getCategories() {
-    return safeLoad(STORAGE_KEYS.CATEGORIES, SEED_CATEGORIES);
+    let cats = safeLoad(STORAGE_KEYS.CATEGORIES, SEED_CATEGORIES);
+    const iconMap = { '🔖': 'bookmark', '💻': 'code', '⚡': 'quote', '📐': 'faculty', '🍖': 'anime', '🎮': 'gaming', '💪': 'fitness', '🍊': 'brand' };
+    let changed = false;
+    cats = cats.map(c => {
+      let iconKey = c.iconKey || iconMap[c.icon] || 'tag';
+      let nameAr = stripEmoji(c.nameAr || c.name);
+      let badge = stripEmoji(c.badge || '');
+      if (c.iconKey !== iconKey || c.nameAr !== nameAr || c.icon || c.badge !== badge) {
+        changed = true;
+        const copy = { ...c, iconKey, nameAr, badge };
+        delete copy.icon;
+        return copy;
+      }
+      return c;
+    });
+    if (changed) safeSave(STORAGE_KEYS.CATEGORIES, cats);
+    return cats;
   },
   async saveCategory(cat) {
     const categories = await this.getCategories();
@@ -345,14 +401,16 @@ export const LocalAdapter = {
       shippingRates: { ...CONFIG.SHIPPING_RATES },
       governorates: CONFIG.GOVERNORATES.map(g => ({ ...g })),
       paymentAccounts: (CONFIG.PAYMENT_ACCOUNTS || []).map(a => ({ ...a })),
-      whatsappTemplates: { ...(CONFIG.WHATSAPP_TEMPLATES || {}) }
+      whatsappTemplates: { ...(CONFIG.WHATSAPP_TEMPLATES || {}) },
+      policies: JSON.parse(JSON.stringify(DEFAULT_POLICIES))
     };
     const loaded = safeLoad(STORAGE_KEYS.SETTINGS, defaultSettings);
     return {
       ...defaultSettings,
       ...loaded,
       paymentAccounts: loaded.paymentAccounts || defaultSettings.paymentAccounts,
-      whatsappTemplates: { ...defaultSettings.whatsappTemplates, ...(loaded.whatsappTemplates || {}) }
+      whatsappTemplates: { ...defaultSettings.whatsappTemplates, ...(loaded.whatsappTemplates || {}) },
+      policies: { ...defaultSettings.policies, ...(loaded.policies || {}) }
     };
   },
   async saveSettings(settings) {

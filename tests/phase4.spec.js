@@ -208,14 +208,14 @@ test.describe('Phase 4 Acceptance Tests - Admin Dashboard, Catalog CRUD, CSV & S
 
     // Auto-generate SKU
     await page.locator('#prod-category').selectOption('tech');
-    await page.locator('button:has-text("توليد ⚡")').click();
+    await page.locator('button:has-text("توليد")').click();
     const generatedSku = await page.locator('#prod-sku').inputValue();
     expect(generatedSku).toMatch(/^DEV-\d{2}$/);
 
-    const testProductNameAr = 'استيكر مهندس برمجيات محترف 💻';
+    const testProductNameAr = 'استيكر مهندس برمجيات محترف';
     await page.locator('#prod-name-ar').fill(testProductNameAr);
     await page.locator('#prod-price').fill('45');
-    await page.locator('#prod-badge').fill('جديد كلياً 🔥');
+    await page.locator('#prod-badge').fill('جديد كلياً');
 
     // Submit product
     await page.locator('#prod-submit-btn').click();
@@ -239,7 +239,7 @@ test.describe('Phase 4 Acceptance Tests - Admin Dashboard, Catalog CRUD, CSV & S
     
     // Change rate to 65 EGP
     await alexRateInput.fill('65');
-    await page.locator('button:has-text("✓ حفظ أسعار الشحن")').click();
+    await page.locator('button:has-text("حفظ أسعار الشحن")').click();
 
     // 2. Open Storefront and add 1 item to cart
     await page.goto('/', { waitUntil: 'domcontentloaded' });

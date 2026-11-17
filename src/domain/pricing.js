@@ -220,14 +220,14 @@ export function groupCartItemsIntoPacks(items = [], strategy = null) {
       nudge = {
         neededCount: needed,
         targetDiscount: 20,
-        message: `أضف ${needed} ستيكر واحد كمان لتحصل على خصم باقة الـ 5 (20%)! 🔥`
+        message: `أضف ${needed} استيكر لتحصل على خصم باقة الـ 5 (20%)`
       };
     } else if (totalLooseStickers < 10) {
       const needed = 10 - totalLooseStickers;
       nudge = {
         neededCount: needed,
         targetDiscount: 30,
-        message: `أضف ${needed} ستيكر كمان لترقية الخصم إلى باقة الـ 10 (30%)! 👑`
+        message: `أضف ${needed} استيكر لترقية الخصم إلى باقة الـ 10 (30%)`
       };
     } else {
       const rem = totalLooseStickers % 10;
@@ -236,14 +236,14 @@ export function groupCartItemsIntoPacks(items = [], strategy = null) {
         nudge = {
           neededCount: needed,
           targetDiscount: 20,
-          message: `أضف ${needed} ستيكر إضافي لتحصل على باقة 5 إضافية بخصم 20%! 🔥`
+          message: `أضف ${needed} استيكر إضافي لتحصل على باقة 5 إضافية بخصم 20%`
         };
       } else if (rem >= 5) {
         const needed = 10 - rem;
         nudge = {
           neededCount: needed,
           targetDiscount: 30,
-          message: `أضف ${needed} ستيكر إضافي لترقية الباقة الإضافية إلى باقة 10 بخصم 30%! 👑`
+          message: `أضف ${needed} استيكر إضافي لترقية الباقة الإضافية إلى باقة 10 بخصم 30%`
         };
       }
     }

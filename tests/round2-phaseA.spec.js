@@ -226,7 +226,7 @@ test.describe('Round 2 - Phase A: Orders & Admin Core', () => {
     }
 
     // Close shipping modal
-    const closeShipModalBtn = page.locator('#shipping-dispatch-modal button:has-text("✕")');
+    const closeShipModalBtn = page.locator('#shipping-dispatch-modal button:has-text("✕"), #shipping-dispatch-modal button[onclick*="closeShippingDispatchModal"]').first();
     if (await closeShipModalBtn.isVisible()) {
       await closeShipModalBtn.click();
     }

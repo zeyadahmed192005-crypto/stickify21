@@ -14,6 +14,10 @@ import { evaluateCoupon } from './src/domain/coupons.js';
 import { formatOrderWhatsAppMessage, formatCustomPrintWhatsAppMessage } from './src/domain/orders.js';
 import { checkProductStock } from './src/domain/inventory.js';
 import { analytics } from './src/utils/analytics.js';
+import { initI18n, getLanguage, setLanguage, t, formatCurrency } from './src/i18n/index.js';
+import { stripEmoji } from './src/utils/emoji.js';
+import { getIcon } from './src/utils/icons.js';
+import { DEFAULT_POLICIES } from './src/data/policies.js';
 
 // Safe JSON parser with fallback and corrupted snapshot
 function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
@@ -30,7 +34,18 @@ function safeJsonParse(jsonString, fallback, storageKey = 'unknown') {
 }
 
 // App State
+
+// Global exposures for Phase C
+if (typeof window !== 'undefined') {
+  window.stripEmoji = stripEmoji;
+  window.t = t;
+  window.formatCurrency = formatCurrency;
+  window.getLanguage = getLanguage;
+  window.__openedUrls = window.__openedUrls || [];
+}
+
 const state = {
+  settings: null,
   categories: [],
   products: [],
   cart: safeJsonParse(localStorage.getItem('stickify21_cart'), [], 'stickify21_cart'),
@@ -145,7 +160,7 @@ const devices = {
     decorationsHtml: `
       <div class="absolute inset-4 rounded-lg border border-[#D4AF37]/35 pointer-events-none flex flex-col justify-between p-4">
         <div class="text-center font-mono text-[9px] tracking-widest text-[#D4AF37]/60">STICKIFY 21 LIMITED EDITION</div>
-        <div class="text-center font-mono text-[9px] text-[#D4AF37]/40 tracking-wider">★ NOVEL &amp; LITERATURE ★</div>
+        <div class="text-center font-mono text-[9px] text-[#D4AF37]/40 tracking-wider">NOVEL &amp; LITERATURE</div>
       </div>
       <div class="absolute -top-3 right-10 w-3.5 h-14 bg-[#FF5000] rounded-b-md shadow-md pointer-events-none transform -rotate-2"></div>
       <div class="absolute top-2 bottom-2 -right-2.5 w-2.5 bg-gradient-to-b from-[#F3EEEA] via-[#E8E2DC] to-[#DDD6CE] rounded-r-sm shadow-md border-r border-[#C9C0B7] pointer-events-none"></div>
@@ -187,6 +202,92 @@ const devices = {
 // ==========================================
 // INITIALIZATION
 // ==========================================
+
+export function toggleStoreLanguage() {
+  const current = getLanguage();
+  const next = current === 'ar' ? 'en' : 'ar';
+  setLanguage(next);
+  const toggleLabel = document.getElementById('lang-toggle-label');
+  if (toggleLabel) {
+    toggleLabel.textContent = next === 'ar' ? 'EN' : 'عربي';
+  }
+  applyStaticTranslations(next);
+  renderAppForLanguage();
+}
+window.toggleStoreLanguage = toggleStoreLanguage;
+
+export function renderAppForLanguage() {
+  renderCategories();
+  renderProducts();
+  renderCart();
+  renderPackBuilder();
+  renderMockupDevice();
+  updateCustomPrintSummary();
+  updateCartBadge();
+}
+
+export function applyStaticTranslations(lang = getLanguage()) {
+  const isEn = lang === 'en';
+
+  // Taglines
+  const brandTagline = document.getElementById('header-tagline');
+  if (brandTagline) brandTagline.textContent = isEn ? 'Waterproof Die-Cut Stickers & Premium Bookmarks' : 'استيكرات فينيل مقاومة للماء وفواصل كتب فاخرة';
+  document.querySelectorAll('.brand-slogan').forEach(el => {
+    el.textContent = 'STICK YOUR VIBE';
+  });
+
+  // Hero Section
+  const heroTitle = document.getElementById('hero-title');
+  if (heroTitle) heroTitle.textContent = isEn ? 'Waterproof Die-Cut Vinyl Stickers & Premium Bookmarks' : 'استيكرات فينيل مقاومة للماء وفواصل كتب تعبر عنك';
+  const heroSub = document.getElementById('hero-subtitle');
+  if (heroSub) heroSub.textContent = isEn ? 'High-definition digital print with ultra-durable matte and glossy laminates. Resistant to water, heat, and scratches.' : 'طباعة رقمية فائقة الدقة وسلوفان حراري عالي التحمل ضد الماء والحرارة والخدوش. صُممت لتلهم القراء والمبرمجين وصناع المحتوى.';
+  const heroBrowse = document.getElementById('hero-browse-btn');
+  if (heroBrowse) heroBrowse.textContent = isEn ? 'Browse Stickers' : 'تصفح الاستيكرات';
+  const heroPack = document.getElementById('hero-pack-btn');
+  if (heroPack) heroPack.textContent = isEn ? 'Build a Pack & Save up to 30%' : 'كوّن باقتك ووفر حتى 30%';
+
+  // Search Input placeholder
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.placeholder = isEn ? 'Search stickers & bookmarks...' : 'بحث عن استيكر أو بوك مارك...';
+
+  // Cart Button
+  const cartBtnText = document.querySelector('#cart-btn > span:not(#cart-badge)');
+  if (cartBtnText) cartBtnText.textContent = isEn ? 'Cart' : 'السلة';
+
+  // Section Headers
+  const catHeading = document.getElementById('categories-heading');
+  if (catHeading) catHeading.textContent = isEn ? 'Browse by Category' : 'تصفح حسب القسم';
+  const catalogHeading = document.getElementById('catalog-heading');
+  if (catalogHeading) catalogHeading.textContent = isEn ? 'Featured Stickers & Bookmarks' : 'أحدث الاستيكرات وفواصل الكتب';
+
+  // Filter Buttons
+  const filterAll = document.querySelector('[data-filter="all"]');
+  if (filterAll) filterAll.textContent = isEn ? 'All' : 'الكل';
+  const filterStk = document.querySelector('[data-filter="stickers"]');
+  if (filterStk) filterStk.textContent = isEn ? 'Vinyl Stickers' : 'استيكرات فينيل';
+  const filterBm = document.querySelector('[data-filter="bookmarks"]');
+  if (filterBm) filterBm.textContent = isEn ? 'Bookmarks' : 'فواصل كتب';
+
+  // Pack Builder
+  const packTitle = document.getElementById('pack-builder-title');
+  if (packTitle) packTitle.textContent = isEn ? 'Custom Pack Builder' : 'منشئ الباقات المخصصة';
+
+  // Mockup Studio
+  const mockupTitle = document.getElementById('mockup-studio-title');
+  if (mockupTitle) mockupTitle.textContent = isEn ? 'Realistic Mockup Studio' : 'استوديو المعاينة التفاعلي';
+
+  // Custom Print
+  const customTitle = document.getElementById('custom-print-title');
+  if (customTitle) customTitle.textContent = isEn ? 'Custom Sticker Printing' : 'خدمة الطباعة المخصصة للشركات والنوادي';
+
+  // Checkout Modal Static Texts
+  const checkoutTitle = document.getElementById('checkout-modal-title');
+  if (checkoutTitle) checkoutTitle.textContent = isEn ? 'Checkout' : 'بيانات التوصيل';
+  const checkoutSub = document.getElementById('checkout-modal-subtitle');
+  if (checkoutSub) checkoutSub.textContent = isEn ? 'Enter your details to confirm your order via WhatsApp' : 'أدخل بياناتك لتجهيز الطلب وتحويله للواتساب مباشرة';
+}
+
+
 export async function initApp() {
   await storage.init();
 
@@ -194,12 +295,21 @@ export async function initApp() {
   try {
     const settings = await storage.getSettings();
     if (settings) {
+      state.settings = settings;
       if (settings.whatsappNumber) CONFIG.WHATSAPP_NUMBER = settings.whatsappNumber;
       if (settings.freeShippingThreshold !== undefined) CONFIG.FREE_SHIPPING_THRESHOLD = settings.freeShippingThreshold;
       if (settings.defaultShipping !== undefined) CONFIG.DEFAULT_SHIPPING = settings.defaultShipping;
       if (settings.shippingRates) CONFIG.SHIPPING_RATES = { ...CONFIG.SHIPPING_RATES, ...settings.shippingRates };
     }
   } catch(e) {}
+
+  // Initialize i18n
+  const activeLang = initI18n();
+  const toggleLabel = document.getElementById('lang-toggle-label');
+  if (toggleLabel) {
+    toggleLabel.textContent = activeLang === 'ar' ? 'EN' : 'عربي';
+  }
+  applyStaticTranslations(activeLang);
 
   // Load from unified storage interface
   state.categories = await storage.getCategories();
@@ -285,10 +395,12 @@ export function renderProducts() {
   const emptyState = document.getElementById('catalog-empty-state');
   if (!container) return;
 
+  const isAr = getLanguage() === 'ar';
+  const curr = isAr ? 'ج.م' : 'EGP';
   const products = getFilteredProducts();
 
   if (countBadge) {
-    countBadge.innerText = `${products.length} تصميم متوفر`;
+    countBadge.innerText = isAr ? `${products.length} تصميم متوفر` : `${products.length} Designs Available`;
   }
 
   if (products.length === 0) {
@@ -314,7 +426,10 @@ export function renderProducts() {
     const medPrice = getProductPriceForSize(product, 'medium');
     const largePrice = getProductPriceForSize(product, 'large');
 
-    // Valid standard Tailwind size stage classes (fixes Bug 01: w-34 h-34 replaced with w-36 h-36)
+    const displayName = isAr ? (product.nameAr || product.name) : (product.nameEn || product.name || product.nameAr);
+    const displayBadge = isAr ? (product.badgeAr || product.badge) : (product.badgeEn || product.badge || product.badgeAr);
+    const displayDesc = isAr ? (product.descAr || product.desc) : (product.descEn || product.desc || product.descAr);
+
     let stageClass = 'w-28 h-28';
     if (isBookmark) {
       stageClass = 'w-24 h-36';
@@ -325,8 +440,8 @@ export function renderProducts() {
     }
 
     const currentSizeLabel = isBookmark 
-      ? 'فاصل كتب 15 × 5 سم' 
-      : (currentSizeKey === 'small' ? '6 سم (Small)' : (currentSizeKey === 'large' ? '10 سم (Large)' : '8 سم (Medium)'));
+      ? (isAr ? 'فاصل كتب 15 × 5 سم' : 'Bookmark 15 × 5 cm')
+      : (currentSizeKey === 'small' ? (isAr ? '6 سم (Small)' : '6 cm (Small)') : (currentSizeKey === 'large' ? (isAr ? '10 سم (Large)' : '10 cm (Large)') : (isAr ? '8 سم (Medium)' : '8 cm (Medium)')));
 
     return `
       <div class="sticker-card group relative rounded-2xl bg-white border border-zinc-200/90 hover:border-zinc-900 p-5 transition-all duration-200 flex flex-col justify-between hover:shadow-sm">
@@ -334,10 +449,10 @@ export function renderProducts() {
         <!-- Header Tags: Badge + SKU -->
         <div class="flex items-center justify-between mb-4">
           <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full ${isBookmark ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-zinc-100 text-zinc-700'}">
-            ${escapeHtml(product.badge)}
+            ${escapeHtml(displayBadge)}
           </span>
           <div class="flex items-center gap-1.5 font-mono">
-            ${isOutOfStock ? '<span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold border border-red-200">نفد من المخزون</span>' : ''}
+            ${isOutOfStock ? `<span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold border border-red-200">${isAr ? 'نفد من المخزون' : 'Out of Stock'}</span>` : ''}
             <span class="text-[10px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-bold border border-zinc-200">#${escapeHtml(product.sku)}</span>
           </div>
         </div>
@@ -345,12 +460,12 @@ export function renderProducts() {
         <!-- Graphic Stage -->
         <div onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="relative w-full aspect-square p-6 flex items-center justify-center rounded-xl bg-zinc-50 border border-zinc-100 mb-4 overflow-hidden cursor-pointer">
           <div id="graphic-wrapper-${escapeHtml(product.id)}" class="${stageClass} sticker-diecut-minimal flex items-center justify-center transition-all duration-200">
-            ${hasImage && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(product.nameAr)}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
+            ${hasImage && safeImage ? `<img src="${safeImage}" alt="${escapeHtml(displayName)}" class="w-full h-full object-contain pointer-events-none">` : safeSvg}
           </div>
 
-          <!-- Preview Button: touch-preview-visible fixes Bug 05 (visible on touch devices) -->
-          <button onclick="event.stopPropagation(); addStickerToMockup('${escapeHtml(product.id)}')" title="جرب على جهازك" class="touch-preview-visible absolute bottom-2.5 left-2.5 px-3 py-1.5 rounded-lg bg-white/95 text-zinc-900 border border-zinc-200 hover:border-black hover:bg-black hover:text-white transition shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1.5 text-xs font-semibold">
-            <span>معاينة</span>
+          <!-- Preview Button -->
+          <button onclick="event.stopPropagation(); addStickerToMockup('${escapeHtml(product.id)}')" title="${isAr ? 'جرب على جهازك' : 'Preview on item'}" class="touch-preview-visible absolute bottom-2.5 left-2.5 px-3 py-1.5 rounded-lg bg-white/95 text-zinc-900 border border-zinc-200 hover:border-black hover:bg-black hover:text-white transition shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-1.5 text-xs font-semibold">
+            <span>${isAr ? 'معاينة' : 'Preview'}</span>
             <span>↗</span>
           </button>
         </div>
@@ -358,50 +473,48 @@ export function renderProducts() {
         <!-- Info & Price -->
         <div class="mb-3">
           <div class="flex items-baseline justify-between gap-2 mb-1.5">
-            <h3 onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="font-bold text-sm text-zinc-900 group-hover:text-[#FF5000] transition cursor-pointer">${escapeHtml(product.nameAr)}</h3>
+            <h3 onclick="openProductDetailModal('${escapeHtml(product.id)}')" class="font-bold text-sm text-zinc-900 group-hover:text-[#FF5000] transition cursor-pointer">${escapeHtml(displayName)}</h3>
             <div class="text-left font-mono">
-              <span id="card-price-${escapeHtml(product.id)}" class="font-extrabold text-zinc-900 text-base whitespace-nowrap">${currentPrice}</span>
-              <span class="text-[10px] font-medium text-zinc-500">${CONFIG.CURRENCY}</span>
+              <span id="card-price-${escapeHtml(product.id)}" class="price-tag font-extrabold text-zinc-900 text-base whitespace-nowrap">${currentPrice}</span>
+              <span class="text-[10px] font-medium text-zinc-500">${curr}</span>
             </div>
           </div>
-          <p class="text-xs text-zinc-500 leading-relaxed line-clamp-2">${escapeHtml(product.desc)}</p>
+          <p class="text-xs text-zinc-500 leading-relaxed line-clamp-2">${escapeHtml(displayDesc)}</p>
         </div>
 
         <!-- Size Selector Pill (Stickers only) -->
         ${!isBookmark ? `
           <div class="mb-4 bg-zinc-50 border border-zinc-200/80 p-2 rounded-xl">
             <div class="flex items-center justify-between text-[11px] mb-1.5 font-semibold text-zinc-600">
-              <span>اختر المقاس:</span>
+              <span>${isAr ? 'اختر المقاس:' : 'Select Size:'}</span>
               <span id="selected-size-label-${escapeHtml(product.id)}" class="text-zinc-900 font-bold">${escapeHtml(currentSizeLabel)}</span>
             </div>
             <div class="grid grid-cols-3 gap-1 bg-zinc-200/60 p-1 rounded-lg text-xs font-bold text-center">
               <button type="button" onclick="selectCardSize('${escapeHtml(product.id)}', 'small', event)" id="size-btn-${escapeHtml(product.id)}-small" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'small' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
-                6 سم <span class="text-[9px] block font-mono font-normal">(${smallPrice} ${CONFIG.CURRENCY})</span>
+                6 ${isAr ? 'سم' : 'cm'} <span class="text-[9px] block font-mono font-normal">(${smallPrice} ${curr})</span>
               </button>
               <button type="button" onclick="selectCardSize('${escapeHtml(product.id)}', 'medium', event)" id="size-btn-${escapeHtml(product.id)}-medium" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'medium' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
-                8 سم <span class="text-[9px] block font-mono font-normal">(${medPrice} ${CONFIG.CURRENCY})</span>
+                8 ${isAr ? 'سم' : 'cm'} <span class="text-[9px] block font-mono font-normal">(${medPrice} ${curr})</span>
               </button>
               <button type="button" onclick="selectCardSize('${escapeHtml(product.id)}', 'large', event)" id="size-btn-${escapeHtml(product.id)}-large" class="size-pill-btn py-1 rounded-md transition ${currentSizeKey === 'large' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:text-black hover:bg-white'}">
-                10 سم <span class="text-[9px] block font-mono font-normal">(${largePrice} ${CONFIG.CURRENCY})</span>
+                10 ${isAr ? 'سم' : 'cm'} <span class="text-[9px] block font-mono font-normal">(${largePrice} ${curr})</span>
               </button>
             </div>
           </div>
         ` : `
           <div class="mb-4 bg-amber-50/70 border border-amber-200/60 p-2 rounded-xl text-center">
-            <span class="text-[11px] font-bold text-amber-900">🔖 مقاس قياسي فاخر: ${CONFIG.BOOKMARK_SPECS.dimensions} (${CONFIG.BOOKMARK_SPECS.material})</span>
+            <span class="text-[11px] font-bold text-amber-900">${isAr ? 'مقاس قياسي فاخر' : 'Standard Dimensions'}: ${CONFIG.BOOKMARK_SPECS.dimensions} (${CONFIG.BOOKMARK_SPECS.material})</span>
           </div>
         `}
 
-        <!-- Actions: Fixes Bug 04 (hide "للباقة" for bookmarks) -->
+        <!-- Actions -->
         <div class="grid ${!isBookmark ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-auto pt-2 border-t border-zinc-100">
           <button ${isOutOfStock ? 'disabled' : `onclick="addToCart('${escapeHtml(product.id)}')"`} class="w-full py-2.5 px-3 rounded-xl ${isOutOfStock ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed' : 'bg-zinc-900 hover:bg-[#FF5000] text-white active:scale-95'} font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm">
-            <span>${isOutOfStock ? 'نفد من المخزون' : 'أضف للسلة'}</span>
-            <span>${isOutOfStock ? '🔒' : '+'}</span>
+            <span>${isOutOfStock ? (isAr ? 'نفد من المخزون' : 'Out of Stock') : (isAr ? 'أضف للسلة' : 'Add to Cart')}</span>
           </button>
           ${!isBookmark ? `
             <button ${isOutOfStock ? 'disabled' : `onclick="addToPack('${escapeHtml(product.id)}')"`} class="w-full py-2.5 px-2 rounded-xl ${isOutOfStock ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800'} font-bold text-xs flex items-center justify-center gap-1 transition">
-              <span>للباقة</span>
-              <span>📦</span>
+              <span>${isAr ? 'للباقة' : 'Add to Pack'}</span>
             </button>
           ` : ''}
         </div>
@@ -450,11 +563,15 @@ export function selectCardSize(productId, sizeKey, e) {
 export function renderCategories() {
   const gridContainer = document.getElementById('categories-cards-grid');
   const pillsContainer = document.getElementById('category-pills-container');
+  const isAr = getLanguage() === 'ar';
 
   if (gridContainer) {
     gridContainer.innerHTML = state.categories.map(cat => {
       const isActive = state.selectedCategory === cat.id;
       const safeImage = sanitizeUrl(cat.image);
+      const catName = isAr ? (cat.nameAr || cat.name) : (cat.nameEn || cat.nameAr || cat.name);
+      const catSub = isAr ? (cat.nameEn || '') : '';
+      const iconKey = cat.iconKey || 'tag';
 
       return `
         <div onclick="selectCategoryByCard('${escapeHtml(cat.id)}')" class="category-card p-4 flex flex-col items-center justify-between text-center group border transition-all duration-200 cursor-pointer ${isActive ? 'border-zinc-900 ring-2 ring-[#FF5000] bg-orange-50/40 shadow-sm' : 'border-zinc-200 bg-white hover:border-zinc-900'}">
@@ -463,13 +580,13 @@ export function renderCategories() {
             <span class="text-[9px] text-zinc-300 font-mono">#${escapeHtml(cat.id)}</span>
           </div>
 
-          <div class="w-16 h-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center overflow-hidden cat-thumb-img mb-3 p-1.5 shadow-inner">
-            ${safeImage ? `<img src="${safeImage}" alt="${escapeHtml(cat.nameAr)}" class="w-full h-full object-contain">` : `<span class="text-3xl">${escapeHtml(cat.icon || '🏷️')}</span>`}
+          <div class="w-16 h-16 rounded-2xl bg-zinc-50 border border-zinc-100 flex items-center justify-center overflow-hidden cat-thumb-img mb-3 p-2 shadow-inner text-zinc-700 group-hover:text-[#FF5000] transition">
+            ${safeImage ? `<img src="${safeImage}" alt="${escapeHtml(catName)}" class="w-full h-full object-contain">` : getIcon(iconKey, 28)}
           </div>
 
           <div>
-            <h3 class="text-xs sm:text-sm font-bold text-zinc-900 group-hover:text-[#FF5000] transition">${escapeHtml(cat.nameAr)}</h3>
-            <span class="text-[10px] text-zinc-400 font-mono block mt-0.5">${escapeHtml(cat.nameEn || '')}</span>
+            <h3 class="text-xs sm:text-sm font-bold text-zinc-900 group-hover:text-[#FF5000] transition">${escapeHtml(catName)}</h3>
+            ${catSub ? `<span class="text-[10px] text-zinc-400 font-mono block mt-0.5">${escapeHtml(catSub)}</span>` : ''}
           </div>
         </div>
       `;
@@ -480,17 +597,19 @@ export function renderCategories() {
     const isAll = state.selectedCategory === 'all';
     let pillsHtml = `
       <button onclick="selectCategoryByCard('all')" data-category="all" class="cat-filter-btn px-4 py-2 rounded-full whitespace-nowrap transition text-xs font-semibold ${isAll ? 'bg-zinc-900 text-white shadow-sm' : 'bg-zinc-100 text-zinc-600 hover:text-black hover:bg-zinc-200'}">
-        ✨ الكل
+        ${isAr ? 'الكل' : 'All'}
       </button>
     `;
 
     pillsHtml += state.categories.map(cat => {
       const isActive = state.selectedCategory === cat.id;
       const safeImage = sanitizeUrl(cat.image);
+      const catName = isAr ? (cat.nameAr || cat.name) : (cat.nameEn || cat.nameAr || cat.name);
+      const iconKey = cat.iconKey || 'tag';
       return `
         <button onclick="selectCategoryByCard('${escapeHtml(cat.id)}')" data-category="${escapeHtml(cat.id)}" class="cat-filter-btn px-4 py-2 rounded-full whitespace-nowrap transition text-xs font-semibold flex items-center gap-1.5 ${isActive ? 'bg-zinc-900 text-white shadow-sm' : 'bg-zinc-100 text-zinc-600 hover:text-black hover:bg-zinc-200'}">
-          ${safeImage ? `<img src="${safeImage}" class="w-4 h-4 object-contain rounded" alt="">` : `<span>${escapeHtml(cat.icon || '🏷️')}</span>`}
-          <span>${escapeHtml(cat.nameAr)}</span>
+          ${safeImage ? `<img src="${safeImage}" class="w-4 h-4 object-contain rounded" alt="">` : `<span class="inline-block text-zinc-500">${getIcon(iconKey, 14)}</span>`}
+          <span>${escapeHtml(catName)}</span>
         </button>
       `;
     }).join('');
@@ -600,7 +719,7 @@ export function addToCart(productId) {
   renderCart();
   updateCartBadge();
   analytics.trackAddToCart({ sku: product.sku, productId: product.id, nameAr: product.nameAr, name: product.name, price: price, quantity: 1 });
-  showToast(`تمت إضافة [${escapeHtml(product.sku)}] (${escapeHtml(sizeLabel)}) إلى السلة بنجاح 🛒`);
+  showToast(`تمت إضافة [${escapeHtml(product.sku)}] (${escapeHtml(sizeLabel)}) إلى السلة بنجاح`);
 }
 
 export function updateCartQuantity(index, delta) {
@@ -660,6 +779,15 @@ export function renderCart() {
   const nudgeEl = document.getElementById('pack-nudge-banner');
   if (!itemsContainer || !summaryContainer) return;
 
+  const isAr = getLanguage() === 'ar';
+  const curr = isAr ? 'ج.م' : 'EGP';
+
+  // Cart modal header text
+  const cartModalHeader = document.querySelector('#cart-modal h3');
+  if (cartModalHeader) {
+    cartModalHeader.textContent = isAr ? 'سلة المشتريات' : 'Shopping Cart';
+  }
+
   if (state.cart.length === 0) {
     if (nudgeEl) {
       nudgeEl.classList.add('hidden');
@@ -667,11 +795,13 @@ export function renderCart() {
     }
     itemsContainer.innerHTML = `
       <div class="text-center py-20">
-        <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-zinc-100 flex items-center justify-center text-2xl text-zinc-400">🛍️</div>
-        <h4 class="text-sm font-bold text-zinc-800">سلتك فارغة</h4>
-        <p class="text-zinc-500 text-xs mt-1 mb-5">تصفح الاستيكرات وفواصل الكتب وضيف ما يعجبك</p>
+        <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400">
+          <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+        </div>
+        <h4 class="text-sm font-bold text-zinc-800">${isAr ? 'سلتك فارغة' : 'Your cart is empty'}</h4>
+        <p class="text-zinc-500 text-xs mt-1 mb-5">${isAr ? 'تصفح الاستيكرات وفواصل الكتب وضيف ما يعجبك' : 'Browse the collection and add your favorite stickers or bookmarks'}</p>
         <button onclick="toggleCartModal(false)" class="px-5 py-2.5 rounded-full bg-zinc-900 hover:bg-black text-white font-bold text-xs transition">
-          ابدأ التسوق
+          ${isAr ? 'ابدأ التسوق' : 'Start Shopping'}
         </button>
       </div>
     `;
@@ -690,8 +820,7 @@ export function renderCart() {
   if (nudgeEl) {
     if (calc.nudge && calc.nudge.message) {
       nudgeEl.innerHTML = `
-        <span class="text-base flex-shrink-0">🎁</span>
-        <span class="flex-grow">${escapeHtml(calc.nudge.message)}</span>
+        <span class="flex-grow">${escapeHtml(stripEmoji(calc.nudge.message))}</span>
       `;
       nudgeEl.classList.remove('hidden');
     } else {
@@ -707,15 +836,18 @@ export function renderCart() {
     const safeSvg = sanitizeSvg(item.svg);
 
     if (isPack) {
+      const packTitle = isAr ? (item.nameAr || `باقة ${item.size} استيكرات`) : `${item.size}-Sticker Pack`;
       return `
         <div class="p-3.5 rounded-xl bg-orange-50/50 border border-[#FF5000]/30 space-y-2">
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-1.5">
-              <span class="bg-[#FF5000] text-white px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">باقة توفير</span>
-              <h4 class="font-bold text-zinc-900 text-xs">${escapeHtml(item.nameAr || 'باقة استيكرات')}</h4>
+              <span class="bg-[#FF5000] text-white px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">${isAr ? 'باقة توفير' : 'Bundle'}</span>
+              <h4 class="font-bold text-zinc-900 text-xs">${escapeHtml(packTitle)}</h4>
             </div>
             <div class="flex items-center gap-2">
-              <button onclick="removeGroupedLine(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition" title="حذف الباقة بالكامل">✕</button>
+              <button onclick="removeGroupedLine(${index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition" title="${isAr ? 'حذف الباقة بالكامل' : 'Remove pack'}">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
           </div>
 
@@ -724,8 +856,9 @@ export function renderCart() {
             ${(item.items || []).map(sub => {
               const subImg = sanitizeUrl(sub.image);
               const subSvg = sanitizeSvg(sub.svg);
+              const subName = isAr ? (sub.nameAr || sub.name || '') : (sub.nameEn || sub.name || '');
               return `
-                <div class="w-8 h-8 rounded-lg bg-white border border-zinc-200 p-0.5 flex-shrink-0 flex items-center justify-center overflow-hidden" title="${escapeHtml(sub.nameAr || sub.name || '')}">
+                <div class="w-8 h-8 rounded-lg bg-white border border-zinc-200 p-0.5 flex-shrink-0 flex items-center justify-center overflow-hidden" title="${escapeHtml(subName)}">
                   ${subImg ? `<img src="${subImg}" class="w-full h-full object-contain">` : subSvg}
                 </div>
               `;
@@ -733,15 +866,18 @@ export function renderCart() {
           </div>
 
           <div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono border-t border-orange-100 pt-1.5">
-            <span>${item.autoPack ? 'باقة تلقائية' : `المقاس: ${escapeHtml(item.size || '8 سم')}`}</span>
+            <span>${item.autoPack ? (isAr ? 'باقة تلقائية' : 'Auto Pack') : (isAr ? `المقاس: ${escapeHtml(item.size || '8 سم')}` : `Size: ${escapeHtml(item.size || '8 cm')}`)}</span>
             <div>
-              ${item.savings ? `<span class="line-through text-zinc-400 ml-1.5">${item.rawTotal} ${CONFIG.CURRENCY}</span>` : ''}
-              <span class="text-[#FF5000] font-black text-xs">${item.price * (item.quantity || 1)} ${CONFIG.CURRENCY}</span>
+              ${item.savings ? `<span class="line-through text-zinc-400 ml-1.5">${item.rawTotal} ${curr}</span>` : ''}
+              <span class="text-[#FF5000] font-black text-xs">${item.price * (item.quantity || 1)} ${curr}</span>
             </div>
           </div>
         </div>
       `;
     }
+
+    const itemName = isAr ? (item.nameAr || item.name) : (item.nameEn || item.name || item.nameAr);
+    const itemSize = item.type === 'bookmark' ? (isAr ? 'بوك مارك' : 'Bookmark') : (item.size || '8 cm');
 
     return `
       <div class="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50 border border-zinc-200/80 gap-3">
@@ -751,12 +887,12 @@ export function renderCart() {
         <div class="flex-grow min-w-0">
           <div class="flex items-center gap-1.5 truncate">
             <span class="bg-zinc-200 text-zinc-800 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold">#${escapeHtml(item.sku || 'SKU')}</span>
-            <h4 class="font-bold text-zinc-900 text-xs truncate">${escapeHtml(item.nameAr || item.name)}</h4>
+            <h4 class="font-bold text-zinc-900 text-xs truncate">${escapeHtml(itemName)}</h4>
           </div>
           <div class="text-[11px] text-zinc-500 flex items-center gap-2 mt-1 font-mono">
-            <span>${escapeHtml(item.type === 'bookmark' ? 'بوك مارك' : (item.size || '8 سم'))}</span>
+            <span>${escapeHtml(itemSize)}</span>
             <span>•</span>
-            <span class="text-zinc-900 font-bold">${item.price * item.quantity} ${CONFIG.CURRENCY}</span>
+            <span class="text-zinc-900 font-bold">${item.price * item.quantity} ${curr}</span>
           </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
@@ -765,7 +901,9 @@ export function renderCart() {
             <span class="px-2 py-1 text-xs font-bold text-zinc-900 font-mono">${item.quantity}</span>
             <button onclick="updateCartQuantity(${item.originalIndex !== undefined ? item.originalIndex : index}, 1)" class="px-2 py-1 text-zinc-600 hover:text-black hover:bg-zinc-100 font-bold text-xs">+</button>
           </div>
-          <button onclick="removeCartItem(${item.originalIndex !== undefined ? item.originalIndex : index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition">✕</button>
+          <button onclick="removeCartItem(${item.originalIndex !== undefined ? item.originalIndex : index})" class="text-zinc-400 hover:text-red-500 p-1 text-xs transition" title="${isAr ? 'حذف' : 'Remove'}">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
       </div>
     `;
@@ -774,16 +912,16 @@ export function renderCart() {
   summaryContainer.innerHTML = `
     <!-- Coupon -->
     <div class="flex gap-2 mb-4">
-      <input type="text" id="coupon-input" value="${escapeHtml(state.coupon.code)}" placeholder="كود الخصم (جرب STICKIFY10)" class="flex-grow bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 uppercase focus:outline-none focus:border-zinc-900">
-      <button onclick="applyCoupon()" class="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-bold rounded-xl transition">تطبيق</button>
+      <input type="text" id="coupon-input" value="${escapeHtml(state.coupon.code)}" placeholder="${isAr ? 'كود الخصم (جرب STICKIFY10)' : 'Discount Code (e.g. STICKIFY10)'}" class="flex-grow bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs text-zinc-900 uppercase focus:outline-none focus:border-zinc-900">
+      <button onclick="applyCoupon()" class="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-bold rounded-xl transition">${isAr ? 'تطبيق' : 'Apply'}</button>
     </div>
 
-    <!-- Free Shipping Indicator (Fixes Bug 08: evaluated post-discount!) -->
+    <!-- Free Shipping Indicator -->
     <div class="mb-4 bg-zinc-50 p-3 rounded-xl border border-zinc-200/80">
       <div class="flex justify-between text-xs font-semibold mb-1">
-        <span class="text-zinc-700">شحن مجاني فوق ${CONFIG.FREE_SHIPPING_THRESHOLD} ${CONFIG.CURRENCY}</span>
+        <span class="text-zinc-700">${isAr ? `شحن مجاني فوق ${CONFIG.FREE_SHIPPING_THRESHOLD} ${curr}` : `Free shipping on orders over ${CONFIG.FREE_SHIPPING_THRESHOLD} ${curr}`}</span>
         <span class="${calc.isFreeShipping ? 'text-[#FF5000] font-bold' : 'text-zinc-500'}">
-          ${calc.isFreeShipping ? 'تم تفعيل الشحن المجاني! 🚚' : `باقي ${calc.freeShippingRemaining} ${CONFIG.CURRENCY}`}
+          ${calc.isFreeShipping ? (isAr ? 'تم تفعيل الشحن المجاني!' : 'Free shipping unlocked!') : (isAr ? `باقي ${calc.freeShippingRemaining} ${curr}` : `Add ${calc.freeShippingRemaining} ${curr} for free shipping`)}
         </span>
       </div>
       <div class="w-full bg-zinc-200 h-1.5 rounded-full overflow-hidden">
@@ -794,33 +932,32 @@ export function renderCart() {
     <!-- Pricing Summary -->
     <div class="space-y-1.5 text-xs text-zinc-600 border-t border-zinc-200 pt-3 mb-4 font-mono">
       <div class="flex justify-between">
-        <span class="font-sans text-zinc-600">المجموع الفرعي:</span>
-        <span class="font-bold text-zinc-900">${calc.subtotal} ${CONFIG.CURRENCY}</span>
+        <span class="font-sans text-zinc-600">${isAr ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
+        <span class="font-bold text-zinc-900">${calc.subtotal} ${curr}</span>
       </div>
       ${calc.discount > 0 ? `
         <div class="flex justify-between text-[#FF5000] font-bold">
-          <span class="font-sans">الخصم (${escapeHtml(state.coupon.code)}):</span>
-          <span>-${calc.discount} ${CONFIG.CURRENCY}</span>
+          <span class="font-sans">${isAr ? `الخصم (${escapeHtml(state.coupon.code)}):` : `Discount (${escapeHtml(state.coupon.code)}):`}</span>
+          <span>-${calc.discount} ${curr}</span>
         </div>
       ` : ''}
       <div class="flex justify-between">
-        <span class="font-sans text-zinc-600">الشحن (${escapeHtml(state.selectedGovernorate)}):</span>
-        <span class="text-zinc-900 font-bold">${calc.shipping === 0 ? '<span class="text-[#FF5000]">مجاناً</span>' : `${calc.shipping} ${CONFIG.CURRENCY}`}</span>
+        <span class="font-sans text-zinc-600">${isAr ? `الشحن (${escapeHtml(state.selectedGovernorate)}):` : `Shipping (${escapeHtml(state.selectedGovernorate)}):`}</span>
+        <span class="text-zinc-900 font-bold">${calc.shipping === 0 ? `<span class="text-[#FF5000]">${isAr ? 'مجاناً' : 'Free'}</span>` : `${calc.shipping} ${curr}`}</span>
       </div>
       <div class="flex justify-between text-base font-extrabold text-zinc-900 border-t border-zinc-200 pt-2 font-mono">
-        <span class="font-sans">الإجمالي:</span>
-        <span class="text-[#FF5000]">${calc.total} ${CONFIG.CURRENCY}</span>
+        <span class="font-sans">${isAr ? 'الإجمالي:' : 'Total:'}</span>
+        <span class="text-[#FF5000]">${calc.total} ${curr}</span>
       </div>
     </div>
 
     <!-- CTAs -->
     <div class="space-y-2">
       <button onclick="checkoutViaWhatsAppDirect()" class="w-full py-3.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm">
-        <span>إرسال الطلب عبر واتساب (${CONFIG.WHATSAPP_DISPLAY})</span>
-        <span>💬</span>
+        <span>${isAr ? `إرسال الطلب عبر واتساب (${CONFIG.WHATSAPP_DISPLAY})` : `Order via WhatsApp (${CONFIG.WHATSAPP_DISPLAY})`}</span>
       </button>
       <button id="open-checkout-btn" onclick="openCheckoutModal()" class="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-black text-white font-semibold text-xs flex items-center justify-center gap-2 transition">
-        <span>إتمام الشراء بالبيانات التفصيلية</span>
+        <span>${isAr ? 'إتمام الشراء بالبيانات التفصيلية' : 'Proceed to Checkout'}</span>
       </button>
     </div>
   `;
@@ -842,7 +979,7 @@ export async function applyCoupon() {
       discountFixed: result.coupon.type === 'fixed' ? result.coupon.value : 0,
       type: result.coupon.type
     };
-    showToast(`تم تفعيل كود الخصم "${escapeHtml(result.coupon.code)}" بنجاح! 🎉`);
+    showToast(`تم تفعيل كود الخصم "${escapeHtml(result.coupon.code)}" بنجاح!`);
     renderCart();
   } else {
     showToast(result.error || 'كود الخصم غير صحيح أو منتهي الصلاحية', 'error');
@@ -933,7 +1070,7 @@ export function renderPackBuilder() {
             ${safeImg ? `<img src="${safeImg}" alt="" class="w-full h-full object-contain">` : safeSvg}
           </div>
           <button onclick="removePackItem(${i})" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-zinc-900 text-white font-bold text-[10px] flex items-center justify-center transition hover:bg-red-500 shadow">
-            ✕
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       `;
@@ -1012,7 +1149,7 @@ export function addPackToCart() {
   saveCart();
   renderCart();
   updateCartBadge();
-  showToast(`تمت إضافة باقة الـ ${target} استيكرات إلى السلة بخصم ${summary.discountRate * 100}%! 🎉`);
+  showToast(`تمت إضافة باقة الـ ${target} استيكرات إلى السلة بخصم ${summary.discountRate * 100}%! `);
 
   state.packBuilder.items = [];
   renderPackBuilder();
@@ -1193,10 +1330,10 @@ function updatePlacedControls() {
 
       <div class="flex items-center gap-2">
         <button onclick="rotateCurrentSticker()" class="p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 transition" title="تدوير الاستيكر">
-          🔄 تدوير
+          تدوير
         </button>
         <button onclick="deleteCurrentSticker()" class="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition" title="إزالة من المعاينة">
-          🗑️ إزالة
+          إزالة
         </button>
       </div>
     </div>
@@ -1299,7 +1436,7 @@ export function updateCheckoutPricingPreview() {
         return `
           <div class="p-2.5 rounded-xl bg-orange-50/60 border border-orange-200/80 space-y-1.5">
             <div class="flex items-center justify-between font-bold text-xs">
-              <span class="text-[#FF5000]">🎁 ${escapeHtml(item.nameAr || 'باقة استيكرات')} (الكمية: ${item.quantity || 1})</span>
+              <span class="text-[#FF5000]">${escapeHtml(item.nameAr || 'باقة استيكرات')} (الكمية: ${item.quantity || 1})</span>
               <span class="font-mono">${item.price * (item.quantity || 1)} ${CONFIG.CURRENCY}</span>
             </div>
             <div class="space-y-1 pr-2 border-r-2 border-[#FF5000]/40">
@@ -1336,7 +1473,7 @@ export function updateCheckoutPricingPreview() {
     ` : ''}
     <div class="flex justify-between">
       <span class="font-sans text-zinc-600">مصاريف الشحن (${escapeHtml(state.selectedGovernorate || 'لم تحدد')}):</span>
-      <span class="text-zinc-900 font-bold">${calc.shipping === 0 ? '<span class="text-[#FF5000]">مجاناً 🎉</span>' : `${calc.shipping} ${CONFIG.CURRENCY}`}</span>
+      <span class="text-zinc-900 font-bold">${calc.shipping === 0 ? '<span class="text-[#FF5000]">مجاناً</span>' : `${calc.shipping} ${CONFIG.CURRENCY}`}</span>
     </div>
     <div class="flex justify-between text-sm font-extrabold text-zinc-900 border-t border-zinc-200/80 pt-1 mt-1 font-mono">
       <span class="font-sans">الإجمالي المطلوب:</span>
@@ -1538,10 +1675,17 @@ export async function submitOrder(e) {
       await storage.incrementCouponUsage(state.coupon.code);
     }
 
+    // Record customer language (R4)
+    order.lang = getLanguage();
+
     // Generate Order Code and WhatsApp message
     const orderCode = generateOrderCode(order);
     const whatsappMsg = formatOrderWhatsAppMessage(order, orderCode);
     const whatsappUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMsg)}`;
+
+    // Record opened WhatsApp URL for verification & tests
+    window.__openedUrls = window.__openedUrls || [];
+    window.__openedUrls.push(whatsappUrl);
 
     // Clear cart ONLY AFTER order is saved successfully
     state.cart = [];
@@ -1560,7 +1704,7 @@ export async function submitOrder(e) {
       console.warn('Popup blocked, customer can use modal buttons', popupErr);
     }
 
-    showToast(`تم تسجيل الطلب ${orderId} بنجاح! 🚀`);
+    showToast(getLanguage() === 'en' ? `Order #${orderId} placed successfully!` : `تم تسجيل الطلب ${orderId} بنجاح!`);
   } catch (err) {
     console.error('Failed to create order:', err);
     showToast('حدث خطأ أثناء حفظ الطلب، لم يتم مسح السلة. يرجى المحاولة مرة أخرى.', 'error');
@@ -1582,15 +1726,29 @@ export function openConfirmationModal(order, whatsappUrl, whatsappMsg) {
   const summaryEl = document.getElementById('confirmed-order-summary');
   const trackBtn = document.getElementById('track-confirmed-order-btn');
 
+  const isEn = (order.lang || getLanguage()) === 'en';
+  const curr = isEn ? 'EGP' : 'ج.م';
+
   if (idEl) idEl.textContent = order.id;
 
+  if (modal) {
+    const heading = modal.querySelector('h3');
+    if (heading) heading.textContent = isEn ? 'Order Confirmed' : 'تم تسجيل طلبك بنجاح!';
+    const badge = modal.querySelector('span.rounded-full');
+    if (badge) badge.textContent = isEn ? 'Status: Awaiting Confirmation' : 'الحالة: بانتظار التأكيد (Awaiting Confirmation)';
+    const idLabel = modal.querySelector('p.text-xs.text-zinc-500');
+    if (idLabel) idLabel.textContent = isEn ? 'Order Number:' : 'رقم الطلب الخاص بك:';
+  }
+
   if (copyIdBtn) {
+    const copyLabel = copyIdBtn.querySelector('span');
+    if (copyLabel) copyLabel.textContent = isEn ? 'Copy' : 'نسخ';
     copyIdBtn.onclick = async () => {
       try {
         await navigator.clipboard.writeText(order.id);
-        showToast(`تم نسخ رقم الطلب #${order.id} بنجاح!`);
+        showToast(isEn ? `Order #${order.id} copied to clipboard!` : `تم نسخ رقم الطلب #${order.id} بنجاح!`);
       } catch (e) {
-        showToast('تعذر النسخ التلقائي لرقم الطلب', 'warning');
+        showToast(isEn ? 'Could not copy order number' : 'تعذر النسخ التلقائي لرقم الطلب', 'warning');
       }
     };
   }
@@ -1599,25 +1757,27 @@ export function openConfirmationModal(order, whatsappUrl, whatsappMsg) {
     const linesCount = (order.lines || order.items || []).length;
     summaryEl.innerHTML = `
       <div class="flex justify-between text-zinc-900 font-bold border-b border-zinc-200 pb-1.5 mb-1.5">
-        <span>الإجمالي المستحق:</span>
-        <span class="text-[#FF5000] text-sm">${order.total} ${CONFIG.CURRENCY}</span>
+        <span>${isEn ? 'Total Due:' : 'الإجمالي المستحق:'}</span>
+        <span class="text-[#FF5000] text-sm">${order.total} ${curr}</span>
       </div>
       <div class="flex justify-between text-zinc-600">
-        <span>عدد البنود:</span>
-        <span class="text-zinc-900 font-bold">${linesCount} بنود</span>
+        <span>${isEn ? 'Items Count:' : 'عدد البنود:'}</span>
+        <span class="text-zinc-900 font-bold">${linesCount} ${isEn ? 'items' : 'بنود'}</span>
       </div>
       <div class="flex justify-between text-zinc-600">
-        <span>طريقة الدفع:</span>
-        <span class="text-zinc-900">${escapeHtml(order.payment)}</span>
+        <span>${isEn ? 'Payment Method:' : 'طريقة الدفع:'}</span>
+        <span class="text-zinc-900">${escapeHtml(order.paymentMethod ? (order.paymentMethod === 'cod' ? (isEn ? 'Cash on Delivery (COD)' : 'عند الاستلام (COD)') : (order.paymentMethod === 'instapay' ? 'InstaPay' : 'Vodafone Cash')) : (order.payment || (isEn ? 'Cash on Delivery' : 'عند الاستلام')))}</span>
       </div>
       <div class="flex justify-between text-zinc-600">
-        <span>عنوان التوصيل:</span>
+        <span>${isEn ? 'Delivery Address:' : 'عنوان التوصيل:'}</span>
         <span class="text-zinc-900 truncate max-w-[200px]">${escapeHtml(order.customer?.city || order.customer?.governorate || '')} - ${escapeHtml(order.customer?.address || '')}</span>
       </div>
     `;
   }
 
   if (trackBtn) {
+    const trackSpan = trackBtn.querySelector('span');
+    if (trackSpan) trackSpan.textContent = isEn ? 'Track Your Order Now' : 'تتبع مسار طلبك الآن';
     trackBtn.href = `#/track/${encodeURIComponent(order.id)}`;
     trackBtn.onclick = () => {
       closeConfirmationModal();
@@ -1626,22 +1786,25 @@ export function openConfirmationModal(order, whatsappUrl, whatsappMsg) {
   }
 
   if (reopenBtn) {
+    const reopenSpan = reopenBtn.querySelector('span');
+    if (reopenSpan) reopenSpan.textContent = isEn ? `Open WhatsApp (${CONFIG.WHATSAPP_DISPLAY})` : `إعادة فتح محادثة واتساب (${CONFIG.WHATSAPP_DISPLAY})`;
     reopenBtn.onclick = () => {
       window.open(whatsappUrl, '_blank');
     };
   }
 
   if (copyBtn) {
+    if (copyBtnText) copyBtnText.textContent = isEn ? 'Copy WhatsApp Message' : 'نسخ نص رسالة الطلب يدوياً';
     copyBtn.onclick = async () => {
       try {
         await navigator.clipboard.writeText(whatsappMsg);
-        if (copyBtnText) copyBtnText.textContent = 'تم نسخ الرسالة بنجاح! ✓';
-        showToast('تم نسخ نص رسالة الطلب للحافظة بنجاح');
+        if (copyBtnText) copyBtnText.textContent = isEn ? 'Message Copied!' : 'تم نسخ الرسالة بنجاح!';
+        showToast(isEn ? 'WhatsApp message copied to clipboard' : 'تم نسخ نص رسالة الطلب للحافظة بنجاح');
         setTimeout(() => {
-          if (copyBtnText) copyBtnText.textContent = 'نسخ نص رسالة الطلب يدوياً';
+          if (copyBtnText) copyBtnText.textContent = isEn ? 'Copy WhatsApp Message' : 'نسخ نص رسالة الطلب يدوياً';
         }, 3000);
       } catch (e) {
-        showToast('تعذر النسخ التلقائي، يمكنك تحديد النص ونسخه يدوياً', 'warning');
+        showToast(isEn ? 'Could not copy message' : 'تعذر النسخ التلقائي، يمكنك تحديد النص ونسخه يدوياً', 'warning');
       }
     };
   }
@@ -1654,7 +1817,7 @@ export function openConfirmationModal(order, whatsappUrl, whatsappMsg) {
     if (hasProof) {
       shareProofBtn.classList.remove('hidden');
       shareProofBtn.onclick = () => {
-        const text = encodeURIComponent(`مرحباً 👋 مرفق إشعار التحويل لطلب رقم #${order.id} بمبلغ ${order.total} ج.م`);
+        const text = encodeURIComponent(`مرحباً، مرفق إشعار التحويل لطلب رقم #${order.id} بمبلغ ${order.total} ج.م`);
         window.open(`https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${text}`, '_blank');
       };
     } else {
@@ -1687,14 +1850,14 @@ export function handlePaymentMethodChange(method) {
     detailsEl.innerHTML = `
       <div class="space-y-1.5">
         <div class="flex items-center justify-between">
-          <span class="font-bold text-zinc-900">⚡ الدفع عبر تطبيق InstaPay المعتمد:</span>
+          <span class="font-bold text-zinc-900">الدفع عبر تطبيق InstaPay المعتمد:</span>
           <span class="text-zinc-600 font-mono text-xs">المطلوب: <strong class="text-[#FF5000]">${calc.total} ${CONFIG.CURRENCY}</strong></span>
         </div>
         <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-purple-200">
           <span class="font-mono font-black text-purple-900 select-all" id="instapay-handle-text">stickify21@instapay</span>
           <button type="button" onclick="copyToClipboardText('stickify21@instapay')" class="copy-btn px-2.5 py-1 rounded-md bg-purple-100 hover:bg-purple-200 text-purple-800 text-[11px] font-bold transition flex items-center gap-1">
             <span>نسخ</span>
-            <span>📋</span>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           </button>
         </div>
         <p class="text-[10px] text-purple-800">يرجى تحويل المبلغ بدقة ورفع صورة الإشعار بالأسفل لتأكيد حجز طلبك فورياً.</p>
@@ -1706,14 +1869,14 @@ export function handlePaymentMethodChange(method) {
     detailsEl.innerHTML = `
       <div class="space-y-1.5">
         <div class="flex items-center justify-between">
-          <span class="font-bold text-zinc-900">📱 التحويل عبر محفظة فودافون كاش:</span>
+          <span class="font-bold text-zinc-900">التحويل عبر محفظة فودافون كاش:</span>
           <span class="text-zinc-600 font-mono text-xs">المطلوب: <strong class="text-[#FF5000]">${calc.total} ${CONFIG.CURRENCY}</strong></span>
         </div>
         <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-rose-200">
           <span class="font-mono font-black text-rose-900 select-all" id="vodafone-number-text">01043546503</span>
           <button type="button" onclick="copyToClipboardText('01043546503')" class="copy-btn px-2.5 py-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-800 text-[11px] font-bold transition flex items-center gap-1">
             <span>نسخ</span>
-            <span>📋</span>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           </button>
         </div>
         <p class="text-[10px] text-rose-800">يرجى تحويل المبلغ لرقم الكاش الموضح ورفع لقطة شاشة التحويل بالأسفل لتأكيد حجز طلبك.</p>
@@ -1722,7 +1885,7 @@ export function handlePaymentMethodChange(method) {
     detailsEl.className = 'mt-2 p-3 rounded-xl bg-rose-50/80 border border-rose-200/80 text-[11px] text-rose-950 leading-relaxed';
     if (proofGroup) proofGroup.classList.remove('hidden');
   } else {
-    detailsEl.innerHTML = `💵 الدفع نقداً للمندوب عند استلام الشحنة ومعاينتها والتأكد من سلامتها.`;
+    detailsEl.innerHTML = `الدفع نقداً للمندوب عند استلام الشحنة ومعاينتها والتأكد من سلامتها.`;
     detailsEl.className = 'mt-2 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 leading-relaxed';
     if (proofGroup) proofGroup.classList.add('hidden');
   }
@@ -1776,14 +1939,14 @@ export function clearPaymentProof() {
 export async function copyToClipboardText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    showToast(`تم نسخ [${text}] بنجاح ✓`);
+    showToast(`تم نسخ [${text}] بنجاح`);
   } catch (e) {
     showToast('تعذر النسخ التلقائي، يمكنك النسخ يدوياً', 'warning');
   }
 }
 
 export function sharePaymentProofOnWhatsApp() {
-  const text = encodeURIComponent(`مرحباً 👋 مرفق إشعار التحويل لتأكيد الطلب`);
+  const text = encodeURIComponent(`مرحباً، مرفق إشعار التحويل لتأكيد الطلب`);
   window.open(`https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${text}`, '_blank');
 }
 
@@ -1907,7 +2070,7 @@ export function addProductDetailToCart() {
   renderCart();
   updateCartBadge();
   closeProductDetailModal();
-  showToast(`تمت إضافة ${qty} قطعة من "${product.nameAr}" إلى السلة 🛍️`);
+  showToast(`تمت إضافة ${qty} قطعة من "${product.nameAr}" إلى السلة`);
   toggleCartModal(true);
 }
 
@@ -1916,7 +2079,7 @@ export function addDetailProductToMockup() {
     addStickerToMockup(state.productDetail.productId);
     closeProductDetailModal();
     document.getElementById('mockup-studio-section')?.scrollIntoView({ behavior: 'smooth' });
-    showToast('تمت إضافة التصميم إلى استوديو المعاينة 💻');
+    showToast('تمت إضافة التصميم إلى استوديو المعاينة');
   }
 }
 
@@ -1972,7 +2135,7 @@ export function renderProductDetailModal(product) {
 
         <button onclick="addDetailProductToMockup()" class="mt-4 w-full py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition flex items-center justify-center gap-1.5">
           <span>تجربة على الأجهزة (المعاينة)</span>
-          <span>💻</span>
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8m-4-4v4"/></svg>
         </button>
       </div>
 
@@ -2013,7 +2176,7 @@ export function renderProductDetailModal(product) {
           </div>
         ` : `
           <div class="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/80 text-xs text-amber-950 space-y-1">
-            <p class="font-bold">🔖 مواصفات فاصل الكتب القياسي:</p>
+            <p class="font-bold">مواصفات فاصل الكتب القياسي:</p>
             <p class="text-[11px] text-amber-900/90 leading-relaxed">
               المقاس: ${CONFIG.BOOKMARK_SPECS.dimensions} • كرتون كوشيه مقوى فاخر 350gsm • طبقة حماية سلوفان مطفي ناعمة فاخرة ضد الرطوبة.
             </p>
@@ -2052,7 +2215,7 @@ export function renderProductDetailModal(product) {
 
         <!-- Add to cart CTA -->
         <button ${isOutOfStock ? 'disabled' : 'onclick="addProductDetailToCart()"'} class="w-full py-4 rounded-2xl ${isOutOfStock ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed' : 'bg-zinc-900 hover:bg-[#FF5000] text-white active:scale-95'} font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
-          <span>${isOutOfStock ? 'المنتج نفد من المخزون' : 'إضافة إلى سلة المشتريات 🛍️'}</span>
+          <span>${isOutOfStock ? 'المنتج نفد من المخزون' : 'إضافة إلى سلة المشتريات'}</span>
         </button>
 
       </div>
@@ -2147,7 +2310,7 @@ export async function searchTrackOrder(query) {
 
   container.innerHTML = `
     <div class="py-8 text-center text-xs text-zinc-500 font-mono">
-      <span>جاري البحث في سجلات الطلبات... ⏳</span>
+      <span>جاري البحث في سجلات الطلبات...</span>
     </div>
   `;
 
@@ -2155,17 +2318,17 @@ export async function searchTrackOrder(query) {
   if (!order) {
     container.innerHTML = `
       <div class="p-6 bg-zinc-50 border border-zinc-200 rounded-2xl text-center space-y-3">
-        <div class="text-3xl">🔍</div>
+        <div class="w-10 h-10 mx-auto text-zinc-400"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
         <h4 class="font-bold text-sm text-zinc-900">لم يتم العثور على طلب بهذا الرقم</h4>
         <p class="text-xs text-zinc-500 leading-relaxed max-w-sm mx-auto">
           لم نتمكن من العثور على طلب مسجل برقم <strong class="font-mono text-zinc-900">${escapeHtml(cleanQuery)}</strong> في متصفحك الحالي.
         </p>
         <div class="p-3 bg-amber-50 rounded-xl text-[11px] text-amber-800 text-right leading-relaxed border border-amber-200/60">
-          💡 <strong>ملاحظة (DEMO):</strong> في هذه النسخة المحلية (Prototype)، تُحفظ الطلبات في متصفح العميل فقط حتى يتم تفعيل الخادم المركزي. يمكنك التواصل مع خدمة العملاء لمتابعة طلبك:
+          <strong>ملاحظة (DEMO):</strong> في هذه النسخة المحلية (Prototype)، تُحفظ الطلبات في متصفح العميل فقط حتى يتم تفعيل الخادم المركزي. يمكنك التواصل مع خدمة العملاء لمتابعة طلبك:
         </div>
         <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(`مرحباً STICKIFY 21، أود الاستفسار عن حالة طلبي رقم: ${cleanQuery}`)}" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] text-white font-bold text-xs hover:bg-[#20ba59] transition shadow-sm">
           <span>تواصل مع الدعم عبر واتساب (01043546503)</span>
-          <span>💬</span>
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
         </a>
       </div>
     `;
@@ -2174,12 +2337,12 @@ export async function searchTrackOrder(query) {
 
   // Visual status timeline
   const lifecycleSteps = [
-    { key: 'pending', label: 'جديد', icon: '📝' },
-    { key: 'awaiting_confirmation', label: 'بانتظار التأكيد', icon: '⏳' },
-    { key: 'confirmed', label: 'مؤكد', icon: '✓' },
-    { key: 'preparing', label: 'قيد التجهيز', icon: '📦' },
-    { key: 'shipped', label: 'تم الشحن', icon: '🚚' },
-    { key: 'completed', label: 'مكتمل', icon: '🎉' }
+    { key: 'pending', label: 'جديد', icon: '1' },
+    { key: 'awaiting_confirmation', label: 'بانتظار التأكيد', icon: '2' },
+    { key: 'confirmed', label: 'مؤكد', icon: '3' },
+    { key: 'preparing', label: 'قيد التجهيز', icon: '4' },
+    { key: 'shipped', label: 'تم الشحن', icon: '5' },
+    { key: 'completed', label: 'مكتمل', icon: '6' }
   ];
 
   const isCancelled = order.status === 'cancelled';
@@ -2187,7 +2350,7 @@ export async function searchTrackOrder(query) {
 
   const timelineHtml = isCancelled ? `
     <div class="p-4 bg-red-50 border border-red-200 rounded-2xl text-center text-xs text-red-800 font-bold mb-4">
-      ⚠️ تم إلغاء هذا الطلب. إذا كان لديك استفسار يرجى التواصل معنا عبر واتساب.
+      تم إلغاء هذا الطلب. إذا كان لديك استفسار يرجى التواصل معنا عبر واتساب.
     </div>
   ` : `
     <div class="py-4 px-2 bg-zinc-50 rounded-2xl border border-zinc-200 mb-5">
@@ -2200,7 +2363,7 @@ export async function searchTrackOrder(query) {
           return `
             <div class="relative z-10 flex flex-col items-center text-center">
               <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${isCurrent ? 'bg-[#FF5000] text-white ring-4 ring-[#FF5000]/20 scale-110' : (isPassed ? 'bg-zinc-900 text-white' : 'bg-white border-2 border-zinc-300 text-zinc-400')}">
-                ${isPassed && !isCurrent ? '✓' : step.icon}
+                ${isPassed && !isCurrent ? step.icon : step.icon}
               </div>
               <span class="text-[10px] mt-1.5 font-bold whitespace-nowrap ${isCurrent ? 'text-[#FF5000]' : (isPassed ? 'text-zinc-900' : 'text-zinc-400')}">
                 ${step.label}
@@ -2267,7 +2430,7 @@ export async function searchTrackOrder(query) {
       <div class="pt-2">
         <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(`مرحباً STICKIFY 21، أود المتابعة بخصوص طلبي رقم: ${order.id}`)}" target="_blank" class="w-full py-3.5 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-sm">
           <span>متابعة الطلب مع الدعم الفني على واتساب</span>
-          <span>💬</span>
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
         </a>
       </div>
     </div>
@@ -2317,7 +2480,7 @@ export function handleCustomFileSelect(files) {
 
   if (mediaBox) {
     if (file.type === 'application/pdf') {
-      mediaBox.innerHTML = '<span class="text-3xl">📄</span>';
+      mediaBox.innerHTML = '<span class="text-xs text-zinc-400 font-mono font-bold">FILE</span>';
     } else {
       const url = URL.createObjectURL(file);
       mediaBox.innerHTML = `<img src="${url}" class="w-full h-full object-contain">`;
@@ -2326,7 +2489,7 @@ export function handleCustomFileSelect(files) {
 
   if (dropPrompt) dropPrompt.classList.add('hidden');
   if (dropPreview) dropPreview.classList.remove('hidden');
-  showToast('تم تحميل ملف التصميم بنجاح ✓');
+  showToast('تم تحميل ملف التصميم بنجاح');
 }
 
 export function clearCustomUpload(e) {
@@ -2498,7 +2661,7 @@ export async function submitCustomPrintOrder() {
     const waMsg = formatCustomPrintWhatsAppMessage(customOrder);
     const waUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(waMsg)}`;
 
-    showToast(`تم تجهيز طلب الطباعة المخصصة ${customOrderId}! 🎉`);
+    showToast(`تم تجهيز طلب الطباعة المخصصة ${customOrderId}! `);
     window.open(waUrl, '_blank');
   } catch (err) {
     console.error('Error submitting custom print order:', err);
@@ -2562,142 +2725,7 @@ export function updateProductJsonLd(products) {
 // ==========================================
 // POLICY MODAL & LEGAL VIEWS
 // ==========================================
-export const POLICY_DATA = {
-  about: {
-    title: 'قصة STICKIFY 21 (Stick Your Vibe)',
-    content: `
-      <div class="space-y-4">
-        <p class="font-bold text-zinc-900 text-sm">
-          أهلاً بك في STICKIFY 21 — استيكرات وفواصل كتب تعبر عن هويتك وشغفك 🍊
-        </p>
-        <p>
-          نحن براند مصري مستقل تأسس لخدمة مجتمع القراء والطلاب والمهندسين وصناع المحتوى في مصر. نؤمن أن اللابتوب، الهواتف الذكية، زجاجات المياه، ورواياتك المفضلة ليست مجرد مقتنيات، بل مساحات تعكس هويتك وأفكارك وشغفك اليومي.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">خاماتنا ومواصفات الإنتاج:</h4>
-        <ul class="list-disc list-inside space-y-1.5 pr-2">
-          <li><strong>استيكرات الفينيل المقاومة للماء (Die-Cut Vinyl):</strong> مقاومة تماماً للمياه، الرطوبة، والخدوش. متوفرة بثلاثة مقاسات قياسية (6 سم، 8 سم، 10 سم) وتشطيبات فاخرة (لامع Glossy، ومطفي Matte).</li>
-          <li><strong>فواصل الكتب الفاخرة (Bookmarks):</strong> مطبوعة على ورق كرتون مقوى 350gsm بسلوفان مطفي ناعم الملمس وتصميمات أدبية وسينمائية تلهم القراءة.</li>
-          <li><strong>الطباعة المخصصة (Custom Printing):</strong> نوفر لنوادي الجامعات، الشركات الناشئة، المدارس، والمكتبات خدمة طباعة التصاميم والشعارات الخاصة ابتداءً من 10 قطع وحتى آلاف القطع بأعلى جودة وسرعة تنفيذ.</li>
-        </ul>
-        <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-2xl flex items-center justify-between">
-          <span class="font-bold text-zinc-800">تواصل مباشر مع فريق العمل:</span>
-          <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}" target="_blank" class="font-mono text-[#FF5000] font-bold hover:underline">01043546503</a>
-        </div>
-      </div>
-    `
-  },
-  shipping_returns: {
-    title: 'سياسة الشحن والتوصيل والاستبدال',
-    content: `
-      <div class="space-y-4">
-        <h4 class="font-bold text-zinc-900 text-sm">🚚 الشحن والتوصيل لكافة المحافظات</h4>
-        <p>
-          نقوم بالتوصيل إلى جميع محافظات جمهورية مصر العربية الـ 27 عبر شركات شحن متخصصة تضمن تسليم الشحنات سليمة في أسرع وقت.
-        </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div class="bg-zinc-50 p-3 rounded-2xl border border-zinc-200">
-            <span class="font-bold text-zinc-900 block mb-1">القاهرة الكبرى والإسكندرية:</span>
-            <span class="text-zinc-600">خلال 2 – 4 أيام عمل (تكلفة الشحن 35 – 45 ج.م).</span>
-          </div>
-          <div class="bg-zinc-50 p-3 rounded-2xl border border-zinc-200">
-            <span class="font-bold text-zinc-900 block mb-1">باقي محافظات مصر والصعيد:</span>
-            <span class="text-zinc-600">خلال 3 – 5 أيام عمل (تكلفة الشحن 50 – 75 ج.م).</span>
-          </div>
-        </div>
-        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 font-bold">
-          🎉 شحن مجاني بالكامل لأي طلب يتجاوز ${CONFIG.FREE_SHIPPING_THRESHOLD} ج.م (يُحتسب بعد تطبيق كود الخصم).
-        </div>
-
-        <h4 class="font-bold text-zinc-900 text-sm pt-2">🔄 سياسة الاسترجاع والاستبدال (14 يوماً)</h4>
-        <ul class="list-disc list-inside space-y-1.5 pr-2">
-          <li>طبقاً لقانون حماية المستهلك المصري، يحق للعميل استبدال أو إرجاع الاستيكرات الجاهزة وفواصل الكتب خلال <strong>14 يوماً</strong> من تاريخ الاستلام، بشرط أن تكون المنتجات بحالتها الأصلية غير مستخدمة.</li>
-          <li>في حال وجود أي عيب طباعة، أو تلف بالمنتج، أو خطأ في المحتوى مقارنة بالطلب، يتحمل متجر STICKIFY 21 كافة مصاريف الشحن للاستبدال أو إعادة كامل المبلغ للعميل فوراً.</li>
-          <li><strong>الطلبات المخصصة (Custom Prints):</strong> نظراً لتصنيعها خصيصاً بناءً على طلب العميل وتصاميمه المعتمدة، لا يمكن استرجاعها إلا في حال وجود عيب مصنعي في خامة الفينيل أو خطأ في أبعاد الطباعة مقارنة بالملف المرسل.</li>
-        </ul>
-      </div>
-    `
-  },
-  terms: {
-    title: 'الشروط والأحكام العامة للمتجر',
-    content: `
-      <div class="space-y-4">
-        <p>
-          مرحباً بكم في STICKIFY 21. تنطبق هذه الشروط والأحكام على كافة عمليات الشراء واستخدام المتجر الإلكتروني.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">1. العملة والأسعار</h4>
-        <p>
-          جميع الأسعار المعروضة في المتجر مقوّمة بـ <strong>الجنيه المصري (EGP / ج.م)</strong>. يحق للمتجر تحديث الأسعار والعروض الترويجية في أي وقت دون إشعار مسبق، مع التزام المتجر بالأسعار المعتمدة للطلبات التي تم تأكيدها بالفعل.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">2. آليات الدفع وتأكيد الحجز</h4>
-        <p>
-          يوفر المتجر خيارات الدفع عند الاستلام (COD)، إنستاباي (InstaPay)، ومحافظ فودافون كاش. في حال الدفع الإلكتروني، يتعين على العميل إرفاق لقطة شاشة أو معرّف التحويل عبر واتساب لمطابقة العملية واعتماد الطلب من الإدارة.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">3. كوبونات الخصم والعروض الترويجية</h4>
-        <p>
-          يتم تطبيق الخصم وفق الشروط المحددة لكل كوبون (الحد الأدنى، تاريخ الانتهاء، وعدد مرات الاستخدام). لا يجوز دمج أكثر من كود خصم في الطلب الواحد ما لم يتم النص على ذلك صراحة.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">4. حقوق الملكية الفكرية</h4>
-        <p>
-          جميع العلامات التجارية، الشعار الرسمي لـ STICKIFY 21، والمحتوى البصري المعروض بالموقع ملك لأصحابها ومحمية بموجب القوانين. التصاميم المتاحة مخصصة للاستخدام الشخصي المستقل.
-        </p>
-      </div>
-    `
-  },
-  privacy: {
-    title: 'سياسة الخصوصية وأمان البيانات',
-    content: `
-      <div class="space-y-4">
-        <p class="font-bold text-zinc-900">
-          خصوصيتك وأمان بياناتك الشخصية أولوية قصوى لدينا في STICKIFY 21.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">1. تخزين البيانات في هذا النموذج الأولي</h4>
-        <p>
-          يعمل هذا المتجر بنظام محلي آمن يعتمد على تقنيات المتصفح الحديثة (LocalStorage و IndexedDB). يتم حفظ محتويات السلة، مسودات الطلبات، والتفضيلات محلياً داخل جهازك فقط، ولا يتم إرسال أي بيانات شخصية إلى أي خوادم طرف ثالث غير مصرح بها.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">2. البيانات المطلوبة للشحن</h4>
-        <p>
-          عند إتمام الطلب، يتم طلب الاسم، رقم الهاتف المحمول، المحافظة، والعنوان التفصيلي. تُستخدم هذه البيانات حصراً لتجهيز الطلبية، التواصل بشأن موعد التسليم، والتنسيق مع شركة الشحن لتوصيل الطلب إلى باب منزلك.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">3. كود الطلب المشفر عبر واتساب (Order Code)</h4>
-        <p>
-          لضمان دقة الطلب وسرعة اعتماده، يتم تضمين كود رقمي مؤمن في نهاية رسالة الواتساب يحتوي على تفاصيل العناصر والكميات ليتمكن فريق الإدارة من استيراد الطلب بدقة 100% دون أخطاء كتابية.
-        </p>
-        <h4 class="font-bold text-zinc-800 text-xs">4. حق التحكم ومسح البيانات</h4>
-        <p>
-          يحق لك في أي وقت مسح بياناتك من خلال إفراغ سلة الشراء أو مسح بيانات الموقع المحلي من إعدادات المتصفح.
-        </p>
-      </div>
-    `
-  },
-  contact: {
-    title: 'تواصل مع فريق STICKIFY 21',
-    content: `
-      <div class="space-y-4">
-        <p>
-          فريق خدمة العملاء والدعم الفني في STICKIFY 21 جاهز للرد على استفساراتك واستقبال طلباتك المخصصة.
-        </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
-            <span class="text-xs text-zinc-400 block font-bold mb-1">واتساب المبيعات والدعم:</span>
-            <a href="https://wa.me/${CONFIG.WHATSAPP_NUMBER}" target="_blank" class="font-mono text-base font-extrabold text-[#25D366] hover:underline flex items-center gap-1.5">
-              <span>💬</span>
-              <span>01043546503</span>
-            </a>
-            <span class="text-[11px] text-zinc-500 block mt-1">متاح يومياً من 10 ص حتى 10 م بتوقيت مصر.</span>
-          </div>
-          <div class="bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
-            <span class="text-xs text-zinc-400 block font-bold mb-1">طلبات الطباعة المخصصة والجملة:</span>
-            <span class="font-bold text-zinc-900 block text-sm">نوادي، شركات، مكتبات، وجامعات</span>
-            <span class="text-[11px] text-zinc-500 block mt-1">خصومات تبدأ من 10 قطع وتصل لـ 50% على الكميات الكبيرة.</span>
-          </div>
-        </div>
-        <div class="p-3 bg-zinc-100 rounded-2xl text-[11px] text-zinc-600 font-mono text-center">
-          STICKIFY 21 — Made with Passion in Egypt 🇪🇬
-        </div>
-      </div>
-    `
-  }
-};
+export const POLICY_DATA = DEFAULT_POLICIES;
 
 export function openPolicyModal(section = 'about') {
   const modal = document.getElementById('policy-modal');
@@ -2713,14 +2741,36 @@ export function closePolicyModal() {
 
 export function switchPolicyTab(section = 'about') {
   const contentEl = document.getElementById('policy-content');
-  const data = POLICY_DATA[section] || POLICY_DATA.about;
+  const policies = state.settings?.policies || DEFAULT_POLICIES;
+  const lang = getLanguage();
+  const isAr = lang === 'ar';
+
+  let key = section;
+  if (section === 'shipping_returns' || section === 'shipping') {
+    key = 'shipping';
+  }
+
+  const pData = policies[key] || policies.about || DEFAULT_POLICIES.about;
+  const title = isAr ? (pData.titleAr || pData.title || '') : (pData.titleEn || pData.titleAr || pData.title || '');
+  const rawContent = isAr ? (pData.contentAr || pData.content || '') : (pData.contentEn || pData.contentAr || pData.content || '');
+
+  const cleanText = stripEmoji(rawContent);
+  const formattedHtml = cleanText.split('\n\n').map(para => {
+    if (para.includes('\n- ')) {
+      const parts = para.split('\n- ');
+      const head = parts[0];
+      const items = parts.slice(1);
+      return `<p class="font-bold text-zinc-800 text-xs mb-1.5">${escapeHtml(head)}</p><ul class="list-disc list-inside space-y-1 pr-2">${items.map(it => `<li>${escapeHtml(it)}</li>`).join('')}</ul>`;
+    }
+    return `<p class="text-zinc-600 leading-relaxed">${escapeHtml(para).replace(/\n/g, '<br>')}</p>`;
+  }).join('<div class="h-2"></div>');
 
   // Update tab buttons style
   document.querySelectorAll('.policy-tab-btn').forEach(btn => {
     btn.classList.remove('bg-zinc-900', 'text-white');
     btn.classList.add('bg-zinc-100', 'text-zinc-700');
   });
-  const activeBtn = document.getElementById(`policy-tab-btn-${section}`);
+  const activeBtn = document.getElementById(`policy-tab-btn-${section}`) || document.getElementById(`policy-tab-btn-${key}`);
   if (activeBtn) {
     activeBtn.classList.remove('bg-zinc-100', 'text-zinc-700');
     activeBtn.classList.add('bg-zinc-900', 'text-white');
@@ -2728,8 +2778,8 @@ export function switchPolicyTab(section = 'about') {
 
   if (contentEl) {
     contentEl.innerHTML = `
-      <h3 id="policy-modal-title" class="font-extrabold text-base text-zinc-900 mb-3">${escapeHtml(data.title)}</h3>
-      <div id="policy-modal-body">${data.content}</div>
+      <h3 id="policy-modal-title" class="font-extrabold text-base text-zinc-900 mb-3">${escapeHtml(title)}</h3>
+      <div id="policy-modal-body" class="space-y-3 text-xs">${formattedHtml}</div>
     `;
   }
 }
@@ -2801,7 +2851,7 @@ export function showToast(message, type = 'success') {
   toast.className = `px-4 py-3 rounded-xl text-xs font-semibold shadow-lg flex items-center gap-2 transform transition-all duration-200 translate-y-3 opacity-0 ${bg}`;
   
   const iconSpan = document.createElement('span');
-  iconSpan.textContent = type === 'error' ? '✕' : (type === 'warning' ? '!' : '✓');
+  iconSpan.textContent = '';
 
   const textSpan = document.createElement('span');
   textSpan.textContent = message;

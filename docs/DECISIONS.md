@@ -248,3 +248,29 @@ This document records all architectural decisions, ground-truth constraints, and
 - **WhatsApp Message Templates:** Admin Settings enables customizing message templates for new orders, preparation completion, and courier dispatch with bracketed placeholders (`{name}`, `{order}`, `{tracking}`, `{courier}`, `{total}`).
 
 
+
+### AD-35: Bilingual Storefront Architecture & i18n Engine (R4)
+- **Decision:** Implement a zero-dependency bilingual localization layer (`src/i18n/ar.js`, `src/i18n/en.js`, `src/i18n/index.js`) for the storefront with client-side language switching (`ar` <-> `en`).
+- **Storefront / Admin Separation:** Storefront is fully bilingual; Owner/Admin dashboard (`admin.html`) and warehouse packing slip (`packing-slip.html`) remain in Egyptian Arabic for operational simplicity.
+- **RTL / LTR Dynamics:**
+  - Active language switches `<html lang="en" dir="ltr">` vs `<html lang="ar" dir="rtl">` dynamically without page reload.
+  - Logical CSS / responsive layout maintains zero horizontal scrollbar overflow across mobile (375px), tablet (768px), and desktop (1280px).
+- **Typography & Formatting:**
+  - Arabic typography prioritizes `Readex Pro`; English typography prioritizes `Space Grotesk`.
+  - Western Arabic numerals (`1, 2, 3...`) are strictly maintained across both locales.
+  - Currency symbol dynamically renders `ج.م` in Arabic and `EGP` in English.
+- **Catalog Fields:** Products support `nameAr` / `nameEn`, `descAr` / `descEn`, and `badgeAr` / `badgeEn`. Missing English fields fall back cleanly to Arabic without placeholders.
+- **Owner WhatsApp Notification:** Orders placed in English generate the WhatsApp message in Arabic for the Egyptian owner, explicitly including a dedicated line: `*لغة العميل:* EN`.
+
+### AD-36: Universal Emoji & AI-Decoration Purge (R9)
+- **Decision:** Remove 100% of Unicode emojis and AI-like sparkles (`✨`, `🔥`, `🚀`, `👑`, `🍊`, `✓`, `✕`, etc.) across all source files, runtime DOM, toasts, and decoded WhatsApp URL templates.
+- **Standardized Outline Icon System:**
+  - Created `src/utils/icons.js` offering standard SVG outline icons (stroke 1.75, `currentColor`, viewBox `0 0 24 24`) for UI navigation and category representations.
+  - Category records migrate from emoji `icon` properties to clean SVG `iconKey` identifiers (`tag`, `code`, `book`, `flame`, `sparkles`, `tv`, `palette`).
+- **Sanitization Utility:**
+  - Created `src/utils/emoji.js` exporting `stripEmoji(string)` covering standard Unicode Emoji blocks and decorative glyphs, automatically applied on all customer and catalog input saves.
+
+### AD-37: Editable Bilingual Policies & FAQ Management (A11)
+- **Decision:** Store policies and FAQ specifications are maintained in structured data (`src/data/policies.js`) and persisted in `stickify21_settings.policies` for real-time admin editing.
+- **Admin Control:** Admin Settings tab includes `#policies-faq-manager` enabling the store owner to customize Arabic and English text for Shipping, Returns, Specs & Materials, and Privacy.
+- **Storefront Access:** Storefront `#policy-modal` dynamically reads and displays the active policies according to the current customer language.

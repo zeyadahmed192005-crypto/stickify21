@@ -1,3 +1,5 @@
+import { DEFAULT_POLICIES } from './src/data/policies.js';
+import { stripEmoji } from './src/utils/emoji.js';
 /**
  * STICKIFY 21 - Admin Portal Controller
  * Powered by unified StorageService & PBKDF2 Web Crypto Authentication
@@ -354,7 +356,7 @@ export function renderOrders() {
   if (filtered.length === 0) {
     container.innerHTML = `
       <div class="text-center py-16 bg-zinc-50 rounded-2xl border border-zinc-200">
-        <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-zinc-100 flex items-center justify-center text-3xl">📭</div>
+        <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400"><svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-4a2 2 0 00-2 2v1a2 2 0 01-2 2H8a2 2 0 01-2-2v-1a2 2 0 00-2-2H4"/></svg></div>
         <h3 class="text-sm font-bold text-zinc-800">لا توجد طلبات تطابق معايير البحث والفلترة</h3>
         <p class="text-xs text-zinc-400 mt-1">جرب تغيير الفلاتر أو إعادة ضبط البحث للوصول لجميع الطلبات.</p>
       </div>
@@ -397,7 +399,7 @@ export function renderOrders() {
       packsExpandHtml = `
         <div class="mt-2.5 pt-2 border-t border-zinc-200/60">
           <button onclick="toggleOrderPacksExpand('${escapeHtml(order.id)}')" class="text-[11px] font-bold text-[#FF5000] hover:underline flex items-center gap-1">
-            <span>📦 محتويات باقات الطلب (${packLines.length} باقة)</span>
+            <span>محتويات باقات الطلب (${packLines.length} باقة)</span>
             <span id="pack-arrow-${escapeHtml(order.id)}">▼</span>
           </button>
           <div id="order-packs-expand-${escapeHtml(order.id)}" class="mt-2 space-y-2 hidden">
@@ -439,18 +441,18 @@ export function renderOrders() {
               <span class="order-status-badge px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}">
                 ${escapeHtml(statusObj.labelAr)}
               </span>
-              ${order.courier ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">🚚 ${escapeHtml(order.courier)} ${order.trackingNumber ? `(${escapeHtml(order.trackingNumber)})` : ''}</span>` : ''}
+              ${order.courier ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">${escapeHtml(order.courier)} ${order.trackingNumber ? `(${escapeHtml(order.trackingNumber)})` : ''}</span>` : ''}
               ${order.source === 'whatsapp_import' ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">WHATSAPP CODE</span>' : ''}
             </div>
 
             <div class="flex items-center gap-2 text-xs font-bold text-zinc-900 flex-wrap">
-              <span>👤 ${escapeHtml(order.customer?.name || 'عميل')}</span>
+              <span>${escapeHtml(order.customer?.name || 'عميل')}</span>
               <span class="text-zinc-300">•</span>
-              <span class="font-mono text-zinc-600" dir="ltr">📱 ${escapeHtml(order.customer?.phone || '')}</span>
+              <span class="font-mono text-zinc-600" dir="ltr">${escapeHtml(order.customer?.phone || '')}</span>
               <span class="text-zinc-300">•</span>
-              <span class="text-zinc-500">📍 ${escapeHtml(order.customer?.governorate || order.customer?.city || '')}</span>
+              <span class="text-zinc-500">${escapeHtml(order.customer?.governorate || order.customer?.city || '')}</span>
               <span class="text-zinc-300">•</span>
-              <span class="text-zinc-500 text-[11px] font-normal truncate max-w-xs">🏠 ${escapeHtml(order.customer?.address || '')}</span>
+              <span class="text-zinc-500 text-[11px] font-normal truncate max-w-xs">${escapeHtml(order.customer?.address || '')}</span>
             </div>
 
             <div class="text-xs text-zinc-500 flex items-center gap-2 flex-wrap">
@@ -471,11 +473,11 @@ export function renderOrders() {
           ${quickBtnHtml}
 
           <button onclick="openOrderDetailModal('${escapeHtml(order.id)}')" class="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold transition flex items-center gap-1">
-            <span>👁️ عرض التفاصيل</span>
+            <span>عرض التفاصيل</span>
           </button>
 
           <a href="${packingSlipUrl}" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold transition flex items-center gap-1 shadow-sm">
-            <span>🖼️ إذن التجهيز</span>
+            <span>إذن التجهيز</span>
             <span>↗</span>
           </a>
 
@@ -491,11 +493,11 @@ export function renderOrders() {
           </select>
 
           <button onclick="promptCancelOrder('${escapeHtml(order.id)}')" class="p-1.5 text-zinc-400 hover:text-amber-600 rounded-lg hover:bg-amber-50 transition" title="إلغاء الطلب مع ذكر السبب">
-            🚫
+            <svg class="w-4 h-4 text-zinc-400 hover:text-amber-600 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>
           </button>
 
           <button onclick="deleteOrder('${escapeHtml(order.id)}')" class="p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition" title="حذف الطلب">
-            🗑️
+            <svg class="w-4 h-4 text-zinc-400 hover:text-red-500 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
         </div>
 
@@ -671,7 +673,7 @@ export function exportOrdersCsv(ordersToExport = null) {
       } catch (e) {}
     }, 1000);
   }
-  showAdminToast(`تم تصدير ${orders.length} طلب إلى ملف CSV (UTF-8 BOM) بنجاح 📊`);
+  showAdminToast(`تم تصدير ${orders.length} طلب إلى ملف CSV (UTF-8 BOM) بنجاح`);
 }
 
 export function exportSelectedOrdersCsv() {
@@ -745,7 +747,7 @@ export async function handleOrderStatusChange(orderId, targetKey) {
   try {
     await storage.updateOrderStatus(orderId, targetKey, `تحديث من لوحة الإدارة إلى ${ORDER_STATUSES[targetKey]?.labelAr}`);
     await loadData();
-    showAdminToast(`تم تحديث حالة الطلب #${orderId} إلى "${ORDER_STATUSES[targetKey]?.labelAr}" بنجاح! ✓`);
+    showAdminToast(`تم تحديث حالة الطلب #${orderId} إلى "${ORDER_STATUSES[targetKey]?.labelAr}" بنجاح!`);
   } catch (err) {
     console.error(err);
     showAdminToast(err.message || 'فشل تحديث حالة الطلب', 'error');
@@ -805,31 +807,31 @@ export function getNextLogicalStep(currentKey) {
     case 'awaiting_confirmation':
       return {
         target: 'confirmed',
-        label: 'تأكيد الطلب ✓',
+        label: 'تأكيد الطلب',
         btnClass: 'bg-blue-600 hover:bg-blue-700 text-white'
       };
     case 'confirmed':
       return {
         target: 'preparing',
-        label: 'بدء التجهيز ⚙️',
+        label: 'بدء التجهيز',
         btnClass: 'bg-purple-600 hover:bg-purple-700 text-white'
       };
     case 'preparing':
       return {
         target: 'ready',
-        label: 'تم التجهيز 📦',
+        label: 'تم التجهيز',
         btnClass: 'bg-teal-600 hover:bg-teal-700 text-white'
       };
     case 'ready':
       return {
         target: 'shipped',
-        label: 'تم الشحن 🚚',
+        label: 'تم الشحن',
         btnClass: 'bg-indigo-600 hover:bg-indigo-700 text-white'
       };
     case 'shipped':
       return {
         target: 'completed',
-        label: 'تم التسليم ✓',
+        label: 'تم التسليم',
         btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white'
       };
     default:
@@ -995,7 +997,7 @@ export async function confirmShippingDispatch() {
   const customerPhone = (order.customer?.phone || '').replace(/\D/g, '');
   const waPhone = customerPhone.startsWith('0') ? '2' + customerPhone : (customerPhone.startsWith('2') ? customerPhone : '20' + customerPhone);
   
-  const waMsg = `مرحباً ${order.customer?.name || 'عميلنا العزيز'} 👋\nتم شحن طلبك من STICKIFY 21 بنجاح! 🚚\n\nرقم الطلب: ${order.id}\nشركة الشحن: ${courier}\n${trackingNumber ? `رقم التتبع / البوليصة: ${trackingNumber}\n` : ''}المبلغ المطلوب: ${order.total} ${CONFIG.CURRENCY}\n\nيمكنك متابعة حالة الطلب من الرابط التالي:\n${window.location.origin}/track.html?id=${encodeURIComponent(order.id)}\n\nشكراً لتسوقك معنا! ❤️`;
+  const waMsg = `مرحباً ${order.customer?.name || 'عميلنا العزيز'}\nتم شحن طلبك من STICKIFY 21 بنجاح!\n\nرقم الطلب: ${order.id}\nشركة الشحن: ${courier}\n${trackingNumber ? `رقم التتبع / البوليصة: ${trackingNumber}\n` : ''}المبلغ المطلوب: ${order.total} ${CONFIG.CURRENCY}\n\nيمكنك متابعة حالة الطلب من الرابط التالي:\n${window.location.origin}/track.html?id=${encodeURIComponent(order.id)}\n\nشكراً لتسوقك معنا.`;
   
   const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
   const waLink = document.getElementById('ship-whatsapp-link');
@@ -1004,7 +1006,7 @@ export async function confirmShippingDispatch() {
     waLink.classList.remove('hidden');
   }
 
-  showAdminToast(`تم تحديث الطلب إلى "تم الشحن" بنجاح! 🚚`);
+  showAdminToast(`تم تحديث الطلب إلى "تم الشحن" بنجاح!`);
   startStatusUndoToast(order.id, prevStatus, 'تم الشحن');
 }
 
@@ -1044,7 +1046,7 @@ export async function handleChangePasscode(e) {
 
   const res = await changeAdminPasscode(oldPass, newPass);
   if (res.success) {
-    showAdminToast('تم تغيير رمز الدخول بنجاح! احفظ الرمز الجديد 🔒');
+    showAdminToast('تم تغيير رمز الدخول بنجاح! احفظ الرمز الجديد');
     oldInput.value = '';
     newInput.value = '';
   } else {
@@ -1095,7 +1097,7 @@ export function openOrderDetailModal(orderId) {
   const isCod = order.paymentMethod === 'cod' || (typeof order.payment === 'string' && order.payment.includes('COD'));
   const payMethodBadge = document.getElementById('modal-payment-method-badge');
   if (payMethodBadge) {
-    payMethodBadge.textContent = order.paymentMethod ? (order.paymentMethod === 'instapay' ? 'InstaPay ⚡' : (order.paymentMethod === 'vodafone_cash' ? 'فودافون كاش 📱' : 'عند الاستلام (COD)')) : (order.payment || 'عند الاستلام');
+    payMethodBadge.textContent = order.paymentMethod ? (order.paymentMethod === 'instapay' ? 'InstaPay' : (order.paymentMethod === 'vodafone_cash' ? 'فودافون كاش' : 'عند الاستلام (COD)')) : (order.payment || 'عند الاستلام');
   }
 
   const proofImgContainer = document.getElementById('modal-payment-proof-container');
@@ -1121,16 +1123,16 @@ export function openOrderDetailModal(orderId) {
   }
   if (payStatusBadge) {
     if (isVerified) {
-      payStatusBadge.textContent = 'تم التحقق ✓';
+      payStatusBadge.textContent = 'تم التحقق';
       payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-200';
     } else if (proofUrl) {
-      payStatusBadge.textContent = 'بانتظار التحقق من الإشعار ⏳';
+      payStatusBadge.textContent = 'بانتظار التحقق من الإشعار';
       payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-amber-100 text-amber-800 border border-amber-200';
     } else if (isCod) {
-      payStatusBadge.textContent = 'دفع عند الاستلام 💵';
+      payStatusBadge.textContent = 'دفع عند الاستلام';
       payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-zinc-100 text-zinc-700';
     } else {
-      payStatusBadge.textContent = 'لم يتم الدفع / لا يوجد إشعار ✕';
+      payStatusBadge.textContent = 'لم يتم الدفع / لا يوجد إشعار';
       payStatusBadge.className = 'font-bold px-2.5 py-0.5 rounded-full text-[11px] bg-red-100 text-red-700';
     }
   }
@@ -1167,7 +1169,7 @@ export function openOrderDetailModal(orderId) {
       return `
         <div class="bg-orange-50/60 p-3 rounded-2xl border border-orange-200 space-y-2">
           <div class="flex items-center justify-between font-bold text-xs">
-            <span class="text-[#FF5000]">🎁 باقة ${line.size} استيكرات (${Math.round((line.discountRate || 0.2) * 100)}% خصم)</span>
+            <span class="text-[#FF5000]">باقة ${line.size} استيكرات (${Math.round((line.discountRate || 0.2) * 100)}% خصم)</span>
             <span class="font-mono text-zinc-900 font-black">${line.packPrice} ${CONFIG.CURRENCY}</span>
           </div>
           <div class="space-y-1.5 pr-2 border-r-2 border-[#FF5000]/40">
@@ -1319,7 +1321,7 @@ export async function verifyCurrentOrderPayment() {
   }
 
   await storage.updateOrder(order);
-  showAdminToast(`تم تأكيد استلام دفعة الطلب #${order.id} بنجاح! ✓`);
+  showAdminToast(`تم تأكيد استلام دفعة الطلب #${order.id} بنجاح!`);
   openOrderDetailModal(order.id);
   renderOrders();
 }
@@ -1384,7 +1386,7 @@ export async function submitWhatsAppImport() {
     await storage.createOrder(importedOrder);
     closeWhatsAppImportModal();
     await loadData();
-    showAdminToast(`تم استيراد الطلب [${importedOrder.id}] بنجاح! 🎉`);
+    showAdminToast(`تم استيراد الطلب [${importedOrder.id}] بنجاح!`);
   } catch (err) {
     console.error('WhatsApp import error:', err);
     showAdminToast(err.message || 'فشل استيراد الطلب، يرجى التأكد من كود الطلب', 'error');
@@ -1409,7 +1411,7 @@ export async function exportAllDataJson() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showAdminToast('تم تصدير ملف النسخة الاحتياطية بنجاح 💾');
+    showAdminToast('تم تصدير ملف النسخة الاحتياطية بنجاح');
   } catch (err) {
     console.error(err);
     showAdminToast('حدث خطأ أثناء تصدير البيانات', 'error');
@@ -1439,7 +1441,7 @@ export async function importDataJson(e) {
 
       await storage.importData(content);
       await loadData();
-      showAdminToast('تم استيراد وترقية البيانات بنجاح! 🎉');
+      showAdminToast('تم استيراد وترقية البيانات بنجاح!');
     } catch (err) {
       console.error(err);
       showAdminToast(err.message || 'فشل استيراد ملف البيانات', 'error');
@@ -1466,7 +1468,7 @@ export async function handleResetDemoDataWithPrompt() {
   try {
     await storage.resetDemoData();
     await loadData();
-    showAdminToast('تمت استعادة بيانات المصنع والديمو بنجاح! 🔄');
+    showAdminToast('تمت استعادة بيانات المصنع والديمو بنجاح!');
   } catch (err) {
     console.error(err);
     showAdminToast('فشل إعادة ضبط البيانات', 'error');
@@ -1488,7 +1490,7 @@ export function renderCategories() {
       <div class="bg-zinc-50 hover:bg-white p-4 rounded-2xl border border-zinc-200 shadow-sm flex items-center justify-between gap-3 group transition">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-12 h-12 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-2xl shadow-sm flex-shrink-0 overflow-hidden p-1">
-            ${safeImage ? `<img src="${safeImage}" class="w-full h-full object-contain" alt="${escapeHtml(cat.nameAr)}">` : `<span class="text-2xl">${escapeHtml(cat.icon || '🏷️')}</span>`}
+            ${safeImage ? `<img src="${safeImage}" class="w-full h-full object-contain" alt="${escapeHtml(cat.nameAr)}">` : `<span class="text-xs text-zinc-400 font-mono font-bold">CAT</span>`}
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
@@ -1510,11 +1512,10 @@ export function renderCategories() {
           </div>
 
           <button onclick="editCategory(${index})" class="px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs transition flex items-center gap-1" title="تعديل">
-            <span>✏️</span>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             <span>تعديل</span>
           </button>
-          <button onclick="deleteCategory(${index})" class="p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition" title="حذف">
-            ✕
+          <button onclick="deleteCategory(${index})" class="p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition" title="حذف"><svg class="w-3.5 h-3.5 text-zinc-400 hover:text-red-500 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
@@ -1547,7 +1548,7 @@ export function handleCategoryFileUpload(e) {
     const input = document.getElementById('cat-image-url');
     if (input) input.value = evt.target.result;
     updateCategoryPreview();
-    showAdminToast('تم تحميل صورة القسم بنجاح! 📸');
+    showAdminToast('تم تحميل صورة القسم بنجاح!');
   };
   reader.readAsDataURL(file);
 }
@@ -1564,7 +1565,7 @@ export function updateCategoryPreview() {
   } else if (icon) {
     previewBox.innerHTML = `<span class="text-3xl">${escapeHtml(icon)}</span>`;
   } else {
-    previewBox.innerHTML = `<span class="text-3xl">🏷️</span>`;
+    previewBox.innerHTML = `<span class="text-xs text-zinc-400 font-bold">لا توجد صورة</span>`;
   }
 }
 
@@ -1582,7 +1583,7 @@ export function editCategory(index) {
 
   document.getElementById('cat-form-title').innerText = `تعديل قسم: ${cat.nameAr}`;
   document.getElementById('cat-form-desc').innerText = 'قم بتعديل بيانات أو صورة القسم ثم اضغط حفظ التعديلات';
-  document.getElementById('cat-submit-btn').innerHTML = `<span>✓ حفظ تعديلات قسم "${escapeHtml(cat.nameAr)}"</span>`;
+  document.getElementById('cat-submit-btn').innerHTML = `<span>حفظ تعديلات قسم "${escapeHtml(cat.nameAr)}"</span>`;
   document.getElementById('cat-cancel-edit-btn').classList.remove('hidden');
 
   updateCategoryPreview();
@@ -1613,7 +1614,7 @@ export async function handleSaveCategory(e) {
   const nameEn = document.getElementById('cat-name-en').value.trim();
   const id = document.getElementById('cat-id-input').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
   const badge = document.getElementById('cat-badge-input').value.trim();
-  const icon = document.getElementById('cat-icon-input').value.trim() || '🏷️';
+  const icon = document.getElementById('cat-icon-input').value.trim() || 'tag';
   const image = document.getElementById('cat-image-url').value.trim();
 
   if (!nameAr || !id) {
@@ -1631,7 +1632,7 @@ export async function handleSaveCategory(e) {
   };
 
   await storage.saveCategory(catObj);
-  showAdminToast(`تم حفظ قسم "${nameAr}" بنجاح! ✓`);
+  showAdminToast(`تم حفظ قسم "${nameAr}" بنجاح!`);
 
   cancelEditCategory();
   await loadData();
@@ -1673,7 +1674,7 @@ export function renderProducts() {
     adminState.categories.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
-      opt.textContent = `${c.icon || '🏷️'} ${c.nameAr}`;
+      opt.textContent = c.nameAr;
       catFilterSelect.appendChild(opt);
     });
   }
@@ -1692,14 +1693,16 @@ export function renderProducts() {
   }
 
   // Category filter
-  if (adminState.productCategoryFilter && adminState.productCategoryFilter !== 'all') {
+  if (adminState.productCategoryFilter === 'missing_en') {
+    list = list.filter(p => !p.nameEn || p.nameEn.trim() === '' || p.nameEn === p.nameAr);
+  } else if (adminState.productCategoryFilter && adminState.productCategoryFilter !== 'all') {
     list = list.filter(p => p.category === adminState.productCategoryFilter);
   }
 
   if (list.length === 0) {
     container.innerHTML = `
       <div class="col-span-full py-12 text-center text-zinc-400 bg-white rounded-2xl border border-zinc-200">
-        <div class="text-2xl mb-1">🔍</div>
+        <div class="w-8 h-8 mx-auto mb-1 text-zinc-400"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></div>
         <p class="text-xs font-bold text-zinc-700">لا توجد منتجات مطابقة للبحث أو الفلتر</p>
       </div>
     `;
@@ -1750,13 +1753,13 @@ export function renderProducts() {
           <div class="flex items-center justify-between py-2 border-t border-zinc-100 text-xs">
             <span class="text-[11px] text-zinc-600 font-bold">حالة التوفر:</span>
             <button onclick="toggleProductInStock('${escapeHtml(p.id)}')" class="px-2.5 py-1 rounded-full text-[10px] font-bold border transition ${inStock ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-red-50 text-red-700 border-red-300'}">
-              ${inStock ? '✓ متوفر للطلب' : '✕ غير متوفر'}
+              ${inStock ? 'متوفر للطلب' : 'غير متوفر'}
             </button>
           </div>
 
           <div class="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-100 text-xs">
             <button onclick="openProductModal(${realIndex})" class="py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold transition flex items-center justify-center gap-1">
-              <span>✏️</span>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               <span>تعديل</span>
             </button>
             <button onclick="deleteProduct(${realIndex})" class="py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-bold transition">
@@ -1776,7 +1779,7 @@ export async function toggleProductInStock(productId) {
   prod.inStock = prod.inStock === false ? true : false;
   await storage.saveProduct(prod);
   renderProducts();
-  showAdminToast(`تم تحديث توفر [${prod.sku}] إلى: ${prod.inStock ? 'متوفر ✓' : 'غير متوفر ✕'}`);
+  showAdminToast(`تم تحديث توفر [${prod.sku}] إلى: ${prod.inStock ? 'متوفر' : 'غير متوفر'}`);
 }
 
 export async function quickUpdatePrice(index, newPrice) {
@@ -1799,7 +1802,7 @@ export async function handleProductFileUpload(e) {
     const input = document.getElementById('prod-image');
     if (input) input.value = asset.previewUrl;
     updateProductPreview();
-    showAdminToast('تم حفظ وضغط الصورة بنجاح! 📸');
+    showAdminToast('تم حفظ وضغط الصورة بنجاح!');
   } catch (err) {
     console.warn('Fallback to DataURL:', err);
     const reader = new FileReader();
@@ -1807,7 +1810,7 @@ export async function handleProductFileUpload(e) {
       const input = document.getElementById('prod-image');
       if (input) input.value = evt.target.result;
       updateProductPreview();
-      showAdminToast('تم تحميل صورة المنتج بنجاح! 📸');
+      showAdminToast('تم تحميل صورة المنتج بنجاح!');
     };
     reader.readAsDataURL(file);
   }
@@ -1880,18 +1883,20 @@ export function openProductModal(index = null) {
   form.reset();
 
   catSelect.innerHTML = adminState.categories.map(c => `
-    <option value="${escapeHtml(c.id)}">${escapeHtml(c.icon || '🏷️')} ${escapeHtml(c.nameAr)}</option>
+    <option value="${escapeHtml(c.id)}">${escapeHtml(c.nameAr)}</option>
   `).join('');
 
   if (index !== null) {
     const p = adminState.products[index];
     title.innerText = `تعديل الاستيكر: ${p.nameAr} (#${p.sku})`;
-    if (submitText) submitText.innerText = '✓ حفظ تعديلات الاستيكر';
+    if (submitText) submitText.innerText = 'حفظ تعديلات الاستيكر';
     document.getElementById('prod-edit-id').value = index;
     document.getElementById('prod-sku').value = p.sku || '';
     document.getElementById('prod-type').value = p.type || (p.category === 'bookmarks' ? 'bookmark' : 'sticker');
     document.getElementById('prod-name-ar').value = p.nameAr || '';
-    document.getElementById('prod-name-en').value = p.name || '';
+    document.getElementById('prod-name-en').value = p.nameEn || p.name || '';
+    if (document.getElementById('prod-badge-en')) document.getElementById('prod-badge-en').value = p.badgeEn || '';
+    if (document.getElementById('prod-desc-en')) document.getElementById('prod-desc-en').value = p.descEn || '';
     document.getElementById('prod-price').value = p.price || 35;
     catSelect.value = p.category || 'tech';
     document.getElementById('prod-finish').value = p.finish || 'glossy';
@@ -1926,15 +1931,17 @@ export async function handleSaveProduct(e) {
   const editIndexStr = document.getElementById('prod-edit-id').value;
   const sku = document.getElementById('prod-sku').value.trim().toUpperCase();
   const type = document.getElementById('prod-type').value;
-  const nameAr = document.getElementById('prod-name-ar').value.trim();
-  const nameEn = document.getElementById('prod-name-en').value.trim() || nameAr;
+  const nameAr = stripEmoji(document.getElementById('prod-name-ar').value.trim());
+  const nameEn = stripEmoji(document.getElementById('prod-name-en').value.trim()) || nameAr;
   const price = parseInt(document.getElementById('prod-price').value, 10) || 35;
   const category = document.getElementById('prod-category').value;
   const finish = document.getElementById('prod-finish').value;
-  const badge = document.getElementById('prod-badge').value.trim() || (type === 'bookmark' ? 'بوك مارك 🔖' : 'استيكر');
+  const badgeAr = stripEmoji(document.getElementById('prod-badge').value.trim()) || (type === 'bookmark' ? 'بوك مارك' : 'استيكر');
+  const badgeEn = stripEmoji(document.getElementById('prod-badge-en')?.value?.trim() || '') || (type === 'bookmark' ? 'Bookmark' : 'Sticker');
   const image = document.getElementById('prod-image').value.trim();
   const svgInput = document.getElementById('prod-svg-input').value.trim();
-  const desc = document.getElementById('prod-desc').value.trim() || 'استيكر عالي الجودة ومقاوم لعوامل الجو من STICKIFY 21.';
+  const descAr = stripEmoji(document.getElementById('prod-desc').value.trim()) || 'استيكر عالي الجودة ومقاوم لعوامل الجو من STICKIFY 21.';
+  const descEn = stripEmoji(document.getElementById('prod-desc-en')?.value?.trim() || '') || 'High-quality waterproof vinyl sticker from STICKIFY 21.';
   const stockQty = parseInt(document.getElementById('prod-stock-quantity').value, 10) || 50;
   const inStock = document.getElementById('prod-in-stock').checked;
 
@@ -1948,8 +1955,12 @@ export async function handleSaveProduct(e) {
     type: type,
     price: price,
     finish: finish,
-    badge: badge,
-    desc: desc,
+    badge: badgeAr,
+    badgeAr: badgeAr,
+    badgeEn: badgeEn,
+    desc: descAr,
+    descAr: descAr,
+    descEn: descEn,
     inStock: inStock,
     stockQuantity: stockQty,
     image: sanitizeUrl(image) || null,
@@ -1958,7 +1969,7 @@ export async function handleSaveProduct(e) {
   };
 
   await storage.saveProduct(productObj);
-  showAdminToast(`تم حفظ المنتج [${sku}] بنجاح! ✓`);
+  showAdminToast(`تم حفظ المنتج [${sku}] بنجاح!`);
 
   await loadData();
   closeProductModal();
@@ -2011,10 +2022,10 @@ export function renderCoupons() {
 
         <div class="flex items-center gap-2">
           <button onclick="toggleCouponActive(${index})" class="px-2.5 py-1 rounded-full text-[10px] font-bold border transition ${active ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-zinc-200 text-zinc-600 border-zinc-300'}">
-            ${active ? '✓ نشط' : '✕ معطل'}
+            ${active ? 'نشط' : 'معطل'}
           </button>
           <button onclick="deleteCoupon(${index})" class="p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition" title="حذف الكود">
-            🗑️
+            <svg class="w-4 h-4 text-zinc-400 hover:text-red-500 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
         </div>
       </div>
@@ -2072,7 +2083,7 @@ export async function handleCreateCoupon(e) {
   document.getElementById('coupon-percent-input').value = '';
 
   await loadData();
-  showAdminToast(`تم تفعيل كود الخصم "${code}" بنجاح! 🎉`);
+  showAdminToast(`تم تفعيل كود الخصم "${code}" بنجاح!`);
 }
 
 export async function deleteCoupon(index) {
@@ -2159,7 +2170,69 @@ export async function renderSettings() {
   const shippedTpl = document.getElementById('wa-template-shipped');
   if (readyTpl) readyTpl.value = templates.ready || CONFIG.WHATSAPP_TEMPLATES.ready;
   if (shippedTpl) shippedTpl.value = templates.shipped || CONFIG.WHATSAPP_TEMPLATES.shipped;
+
+  // Populate Policies & FAQ (A11)
+  const policies = settings.policies || DEFAULT_POLICIES;
+  const shipAr = document.getElementById('policy-edit-shipping-ar');
+  const shipEn = document.getElementById('policy-edit-shipping-en');
+  const retAr = document.getElementById('policy-edit-returns-ar');
+  const retEn = document.getElementById('policy-edit-returns-en');
+  const specAr = document.getElementById('policy-edit-specs-ar');
+  const specEn = document.getElementById('policy-edit-specs-en');
+  const privAr = document.getElementById('policy-edit-privacy-ar');
+  const privEn = document.getElementById('policy-edit-privacy-en');
+
+  if (shipAr) shipAr.value = policies.shipping?.contentAr || '';
+  if (shipEn) shipEn.value = policies.shipping?.contentEn || '';
+  if (retAr) retAr.value = policies.returns?.contentAr || '';
+  if (retEn) retEn.value = policies.returns?.contentEn || '';
+  if (specAr) specAr.value = policies.about?.contentAr || '';
+  if (specEn) specEn.value = policies.about?.contentEn || '';
+  if (privAr) privAr.value = policies.privacy?.contentAr || '';
+  if (privEn) privEn.value = policies.privacy?.contentEn || '';
 }
+
+export async function savePoliciesSettings() {
+  const current = adminState.settings || await storage.getSettings();
+  const currentPolicies = current.policies || DEFAULT_POLICIES;
+  const updatedPolicies = {
+    ...currentPolicies,
+    shipping: {
+      titleAr: currentPolicies.shipping?.titleAr || 'الشحن والتوصيل',
+      titleEn: currentPolicies.shipping?.titleEn || 'Shipping & Delivery',
+      contentAr: stripEmoji(document.getElementById('policy-edit-shipping-ar')?.value || ''),
+      contentEn: stripEmoji(document.getElementById('policy-edit-shipping-en')?.value || '')
+    },
+    returns: {
+      titleAr: currentPolicies.returns?.titleAr || 'الاستبدال والاسترجاع',
+      titleEn: currentPolicies.returns?.titleEn || 'Returns & Exchanges',
+      contentAr: stripEmoji(document.getElementById('policy-edit-returns-ar')?.value || ''),
+      contentEn: stripEmoji(document.getElementById('policy-edit-returns-en')?.value || '')
+    },
+    about: {
+      titleAr: currentPolicies.about?.titleAr || 'قصة STICKIFY 21',
+      titleEn: currentPolicies.about?.titleEn || 'About STICKIFY 21',
+      contentAr: stripEmoji(document.getElementById('policy-edit-specs-ar')?.value || ''),
+      contentEn: stripEmoji(document.getElementById('policy-edit-specs-en')?.value || '')
+    },
+    privacy: {
+      titleAr: currentPolicies.privacy?.titleAr || 'الخصوصية وأمان البيانات',
+      titleEn: currentPolicies.privacy?.titleEn || 'Privacy & Data Security',
+      contentAr: stripEmoji(document.getElementById('policy-edit-privacy-ar')?.value || ''),
+      contentEn: stripEmoji(document.getElementById('policy-edit-privacy-en')?.value || '')
+    }
+  };
+
+  const updatedSettings = {
+    ...current,
+    policies: updatedPolicies
+  };
+
+  await storage.saveSettings(updatedSettings);
+  adminState.settings = updatedSettings;
+  showAdminToast('تم حفظ سياسات المتجر بنجاح');
+}
+window.savePoliciesSettings = savePoliciesSettings;
 
 export async function savePaymentAccountsSettings() {
   const current = adminState.settings || await storage.getSettings();
@@ -2199,7 +2272,7 @@ export async function savePaymentAccountsSettings() {
   };
   await storage.saveSettings(updated);
   adminState.settings = updated;
-  showAdminToast('تم حفظ وتحديث حسابات الدفع بنجاح! ✓');
+  showAdminToast('تم حفظ وتحديث حسابات الدفع بنجاح!');
 }
 
 export async function saveWhatsAppTemplatesSettings() {
@@ -2217,7 +2290,7 @@ export async function saveWhatsAppTemplatesSettings() {
   };
   await storage.saveSettings(updated);
   adminState.settings = updated;
-  showAdminToast('تم حفظ وتحديث قوالب رسائل واتساب بنجاح! ✓');
+  showAdminToast('تم حفظ وتحديث قوالب رسائل واتساب بنجاح!');
 }
 
 export function resetWhatsAppTemplates() {
@@ -2245,7 +2318,7 @@ export async function handleSaveStoreSettings(e) {
 
   await storage.saveSettings(updated);
   adminState.settings = updated;
-  showAdminToast('تم حفظ إعدادات المتجر العامة بنجاح! ✓');
+  showAdminToast('تم حفظ إعدادات المتجر العامة بنجاح!');
 }
 
 export async function saveGovernoratesShippingRates() {
@@ -2267,7 +2340,7 @@ export async function saveGovernoratesShippingRates() {
 
   await storage.saveSettings(updatedSettings);
   adminState.settings = updatedSettings;
-  showAdminToast('تم تحديث وحفظ أسعار شحن المحافظات الـ 27 فوراً! ✓');
+  showAdminToast('تم تحديث وحفظ أسعار شحن المحافظات الـ 27 فوراً!');
 }
 
 // Safe Toast
@@ -2280,7 +2353,7 @@ export function showAdminToast(message, type = 'success') {
   toast.className = `px-4 py-3 rounded-xl text-xs font-bold text-white shadow-xl flex items-center gap-2 transform transition-all duration-200 translate-y-3 opacity-0 ${bg}`;
   
   const icon = document.createElement('span');
-  icon.textContent = type === 'error' ? '✕' : (type === 'warning' ? '⚠️' : '✓');
+  icon.textContent = '';
   const text = document.createElement('span');
   text.textContent = message;
 

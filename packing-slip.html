@@ -80,8 +80,8 @@
   <!-- Admin Auth Lock Screen (R11: Shared localStorage Session) -->
   <div id="admin-lock-screen" class="fixed inset-0 z-50 bg-[#0E0E10]/95 backdrop-blur-md flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-4 shadow-2xl">
-      <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center text-2xl">
-        🔒
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center text-zinc-800">
+        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
       </div>
       <div>
         <h3 class="font-extrabold text-base text-zinc-900">إذن تجهيز الطلبيات محمي</h3>
@@ -117,10 +117,10 @@
           A5 نصف صفحة
         </button>
         <button onclick="setSlipViewMode('label')" data-mode="label" class="mode-btn px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition">
-          🏷️ بوليصة شحن
+          بوليصة شحن
         </button>
         <button onclick="window.print()" class="px-4 py-1.5 rounded-xl bg-[#FF5000] hover:bg-[#E04600] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-          <span>🖨️ طباعة / حفظ PDF</span>
+          <span>طباعة / حفظ PDF</span>
         </button>
       </div>
     </div>
@@ -303,7 +303,6 @@
               <div class="slip-pack-group col-span-full p-2.5 rounded-2xl bg-orange-50/50 border border-[#FF5000]/30 space-y-2" data-pack-group>
                 <div class="flex items-center justify-between border-b border-orange-200/60 pb-1.5 font-bold text-xs">
                   <span class="text-[#FF5000] flex items-center gap-1.5">
-                    <span>🎁</span>
                     <span>باقة ${line.size} استيكرات (${Math.round((line.discountRate || 0.2) * 100)}% خصم)</span>
                   </span>
                   <span class="font-mono text-zinc-900">${line.packPrice} ${CONFIG.CURRENCY}</span>
@@ -358,7 +357,7 @@
               </div>
               <div class="text-left font-mono text-xs text-zinc-500">
                 <div>${escapeHtml(new Date(order.date || Date.now()).toLocaleDateString('ar-EG'))}</div>
-                <div class="text-[#FF5000] font-bold font-sans mt-0.5">جاهز للتجميع والتغليف 📦</div>
+                <div class="text-[#FF5000] font-bold font-sans mt-0.5">جاهز للتجميع والتغليف</div>
               </div>
             </div>
 
@@ -383,7 +382,7 @@
             </div>
 
             <!-- Warning for large orders -->
-            ${totalCount > 35 ? `<div class="p-2 bg-amber-50 text-amber-800 text-[10px] rounded-lg border border-amber-200 font-bold mb-2">⚠️ تنبيه: الطلب كبير جداً (${totalCount} قطع) - تم تفعيل الضغط الأقصى للورقة الواحدة.</div>` : ''}
+            ${totalCount > 35 ? `<div class="p-2 bg-amber-50 text-amber-800 text-[10px] rounded-lg border border-amber-200 font-bold mb-2">تنبيه: الطلب كبير جدا (${totalCount} قطع) - تم تفعيل الضغط الأقصى للورقة الواحدة.</div>` : ''}
 
             <!-- Items Section -->
             <div class="space-y-2 mb-4">
